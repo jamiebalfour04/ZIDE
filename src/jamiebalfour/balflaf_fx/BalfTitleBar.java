@@ -31,6 +31,10 @@ public final class BalfTitleBar extends HBox {
     titleLabel.getStyleClass().add("balf-title");
     titleLabel.setMaxWidth(Double.MAX_VALUE);
 
+    getStylesheets().add(
+            getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
+    );
+
     var spacerL = new Region();
     var spacerR = new Region();
     HBox.setHgrow(spacerL, Priority.ALWAYS);

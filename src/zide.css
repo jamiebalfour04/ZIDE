@@ -53,12 +53,21 @@
 }
 
 .search-field, .terminal-input {
-    -fx-background-radius: 10;
-    -fx-border-radius: 10;
     -fx-border-color: rgba(0,0,0,0.12);
     -fx-background-color: -fx-control-inner-background;
     -fx-padding: 7 10 7 10;
 }
+
+.terminal-input {
+    -fx-background-radius: 0;
+    -fx-border-width: 1 0 1 0;
+}
+
+.search-field{
+    -fx-background-radius: 3px 3px 3px 3px;
+    -fx-border-radius: 3px 3px 3px 3px;
+}
+
 .app-root:dark .search-field, .app-root:dark .terminal-input {
     -fx-border-color: rgba(255,255,255,0.12);
 }
@@ -95,8 +104,8 @@
     -fx-padding: 6 6 0 6;
 }
 .editor-tabs .tab {
-    -fx-background-radius: 10 10 0 0;
-    -fx-border-radius: 10 10 0 0;
+    -fx-background-radius: 3 3 0 0;
+    -fx-border-radius: 3 3 0 0;
 }
 
 .code-area, .terminal-output {
@@ -131,24 +140,4 @@
 
 .app-root {
     -fx-background-color: -fx-control-inner-background;
-}
-
-.balf-titlebar {
-    -fx-background-color: -fx-control-inner-background;
-    -fx-border-color: rgba(0,0,0,0.08);
-    -fx-border-width: 0 0 1 0;
-}
-
-.balf-title {
-    -fx-font-weight: 600;
-    -fx-opacity: 0.85;
-}
-
-.balf-traffic-light {
-    -fx-stroke: rgba(0,0,0,0.20);
-    -fx-stroke-width: 1;
-}
-
-.balf-traffic-light:hover {
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 6, 0.2, 0, 1);
 }

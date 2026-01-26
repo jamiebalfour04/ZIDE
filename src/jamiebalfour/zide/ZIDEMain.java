@@ -1,5 +1,7 @@
 package jamiebalfour.zide;
 
+import com.sun.javafx.tk.FontLoader;
+import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.zpe.core.ZPEInstance;
@@ -27,14 +29,43 @@ import javafx.stage.StageStyle;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class ZIDEMain extends Application {
 
-  CodeEditorView mainSyntax;
+  public static void loadFonts() {
+    load("/fonts/JetBrainsMono-Regular.ttf");
+    load("/fonts/JetBrainsMono-Bold.ttf");
+    load("/fonts/JetBrainsMono-Italic.ttf");
+  }
+
+  private static void load(String path) {
+    javafx.scene.text.Font.loadFont(
+            FontLoader.class.getResourceAsStream(path),
+            12
+    );
+  }
+
+  public static Font loadAndRegister(String resourcePath) {
+    try (InputStream in = ZIDEMain.class.getResourceAsStream(resourcePath)) {
+      if (in == null) {
+        throw new IllegalStateException("Font resource not found: " + resourcePath);
+      }
+
+      Font base = Font.createFont(Font.TRUETYPE_FONT, in);
+      GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(base);
+      return base;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to load font: " + resourcePath, e);
+    }
+  }
 
   @Override
   public void start(Stage stage) {
     stage.initStyle(StageStyle.UNDECORATED);
+
+
 
     var root = new BorderPane();
     root.getStyleClass().add("app-root");
@@ -68,9 +99,9 @@ public class ZIDEMain extends Application {
     root.setCenter(verticalSplit);
 
     var scene = new Scene(root, 1280, 800);
-    scene.getStylesheets().add(getClass().getResource("/flatfx.css").toExternalForm());
+    scene.getStylesheets().add(getClass().getResource("/zide.css").toExternalForm());
 
-    stage.setTitle("FlatFX IDE");
+    stage.setTitle("ZIDE");
     stage.setScene(scene);
     stage.show();
   }
@@ -156,7 +187,7 @@ public class ZIDEMain extends Application {
     );
 
     var resources = new TreeItem<>("resources");
-    resources.getChildren().addAll(new TreeItem<>("flatfx.css"), new TreeItem<>("icons/"));
+    resources.getChildren().addAll(new TreeItem<>("zide.css"), new TreeItem<>("icons/"));
 
     root.getChildren().addAll(src, resources, new TreeItem<>("README.md"));
 
@@ -184,12 +215,16 @@ public class ZIDEMain extends Application {
     editorTabs.getStyleClass().add("editor-tabs");
     editorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
 
-    openTab("Welcome.md");
+    openTab("Untitled");
 
     return editorTabs;
   }
 
   private void openTab(String name) {
+    openTab(name, null);
+  }
+
+  private void openTab(String name, String file) {
     for (var t : editorTabs.getTabs()) {
       if (t.getText().equals(name)) {
         editorTabs.getSelectionModel().select(t);
@@ -206,14 +241,18 @@ public class ZIDEMain extends Application {
     // Build Swing UI on the EDT
     SwingUtilities.invokeLater(() -> {
       // Your Swing editor
-      mainSyntax =
+      jamiebalfour.codeeditor.CodeEditorView mainSyntax =
               new jamiebalfour.codeeditor.CodeEditorView(ZPEKit.getKeywordSet(), "\"'`", "$");
 
       mainSyntax.setFontSize(14);
 
+      Font jbMono = loadAndRegister("/files/JetBrainsMono-Regular.ttf");
+      Font editorFont = jbMono.deriveFont(Font.PLAIN, 14);
+      mainSyntax.setFont(editorFont);
+
+
       for (String keyword : ZPEKit.getKeywords()) {
         mainSyntax.addAutoCompleteItem(keyword, CodeEditorView.AutoCompleteItemType.Keyword);
-
       }
 
       // Filter through type keywords and add to suggestions if they start with the current word
@@ -224,7 +263,6 @@ public class ZIDEMain extends Application {
       // Do the same for functions
       for (String function : ZPEKit.getBuiltInFunctions()) {
         mainSyntax.addAutoCompleteItem(function, CodeEditorView.AutoCompleteItemType.Function);
-
       }
 
       for(String s : ZPEInstance.getBuiltInStructuresNames()){
@@ -240,9 +278,17 @@ public class ZIDEMain extends Application {
       // 👇 Padding around the editor
       wrapper.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
 
+      if(file != null){
+
+        try {
+          ((JEditorPane) mainSyntax.getEditPane()).setText(HelperFunctions.readString(file));
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
       swingNode.setContent(wrapper);
     });
-
 
 
     var tab = new Tab(name, swingNode);
@@ -261,7 +307,7 @@ public class ZIDEMain extends Application {
     var output = new TextArea();
     output.setEditable(false);
     output.getStyleClass().add("terminal-output");
-    output.setText("FlatFX IDE terminal ready.\n");
+    output.setText("ZIDE terminal ready.\n");
 
     var input = new TextField();
     input.setPromptText("Type a command…");
