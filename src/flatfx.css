@@ -1,0 +1,154 @@
+/* FlatFX baseline */
+.app-root {
+    -fx-font-family: "Inter", "Segoe UI", system;
+    -fx-font-size: 13px;
+
+    -fx-base: #f5f6f8;
+    -fx-control-inner-background: #ffffff;
+    -fx-background-color: -fx-base;
+
+    -fx-accent: #ff8000;
+    -fx-focus-color: -fx-accent;
+    -fx-faint-focus-color: rgba(255,128,0,0.18);
+}
+
+/* Dark mode (toggled via pseudo-class on root) */
+.app-root:dark {
+    -fx-base: #14171c;
+    -fx-control-inner-background: #1b1f26;
+    -fx-background-color: -fx-base;
+    -fx-text-fill: #e6e9ee;
+}
+
+.app-menubar {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 0 0 1 0;
+}
+
+.app-toolbar {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 6 8 6 8;
+}
+
+.button {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 6 12 6 12;
+    -fx-background-color: rgba(0,0,0,0.04);
+    -fx-border-color: rgba(0,0,0,0.10);
+    -fx-border-width: 1;
+}
+.app-root:dark .button {
+    -fx-background-color: rgba(255,255,255,0.06);
+    -fx-border-color: rgba(255,255,255,0.10);
+}
+
+.button.accent {
+    -fx-background-color: -fx-accent;
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
+}
+
+.search-field, .terminal-input {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: rgba(0,0,0,0.12);
+    -fx-background-color: -fx-control-inner-background;
+    -fx-padding: 7 10 7 10;
+}
+.app-root:dark .search-field, .app-root:dark .terminal-input {
+    -fx-border-color: rgba(255,255,255,0.12);
+}
+
+.side-pane, .terminal-pane {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 0 1 0 0;
+}
+.app-root:dark .side-pane, .app-root:dark .terminal-pane {
+    -fx-border-color: rgba(255,255,255,0.08);
+}
+
+.pane-header {
+    -fx-padding: 10 10 8 10;
+    -fx-border-color: rgba(0,0,0,0.06);
+    -fx-border-width: 0 0 1 0;
+}
+.app-root:dark .pane-header {
+    -fx-border-color: rgba(255,255,255,0.08);
+}
+
+.pane-title {
+    -fx-font-weight: 700;
+    -fx-opacity: 0.85;
+}
+
+.project-tree {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-padding: 6;
+}
+
+.editor-tabs .tab-header-area {
+    -fx-padding: 6 6 0 6;
+}
+.editor-tabs .tab {
+    -fx-background-radius: 10 10 0 0;
+    -fx-border-radius: 10 10 0 0;
+}
+
+.code-area, .terminal-output {
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 0;
+}
+.app-root:dark .code-area, .app-root:dark .terminal-output {
+    -fx-text-fill: #e6e9ee;
+}
+
+.status-bar {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 1 0 0 0;
+}
+.app-root:dark .status-bar {
+    -fx-border-color: rgba(255,255,255,0.08);
+}
+
+.app-menubar {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+}
+
+.app-toolbar {
+    -fx-background-color: transparent;
+    -fx-border-width: 0 0 1 0; /* keep a subtle separator if you like */
+}
+
+.app-root {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.balf-titlebar {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-border-color: rgba(0,0,0,0.08);
+    -fx-border-width: 0 0 1 0;
+}
+
+.balf-title {
+    -fx-font-weight: 600;
+    -fx-opacity: 0.85;
+}
+
+.balf-traffic-light {
+    -fx-stroke: rgba(0,0,0,0.20);
+    -fx-stroke-width: 1;
+}
+
+.balf-traffic-light:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 6, 0.2, 0, 1);
+}
