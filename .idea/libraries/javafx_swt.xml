@@ -1,34 +1,34 @@
 <component name="libraryTable">
   <library name="javafx-swt">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx-swt.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.base.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.controls.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.fxml.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.graphics.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.media.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.swing.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/javafx.web.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/jdk.jsobject.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/jfx.incubator.input.jar!/" />
-      <root url="jar://$PROJECT_DIR$/lib/jfx/jfx.incubator.richtext.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx-swt.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.base.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.controls.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.fxml.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.graphics.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.media.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.swing.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.web.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jdk.jsobject.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.input.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.richtext.jar!/" />
     </CLASSES>
     <JAVADOC />
     <NATIVE>
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
-      <root url="file://$PROJECT_DIR$/lib/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
+      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
     </NATIVE>
     <SOURCES />
   </library>
