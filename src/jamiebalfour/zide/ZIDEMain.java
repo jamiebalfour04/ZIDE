@@ -6,6 +6,7 @@ import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.zpe.core.ZPEInstance;
 import jamiebalfour.zpe.core.ZPEKit;
+
 import jamiebalfour.zpe.core.ZPERuntimeEnvironment;
 import javafx.application.Application;
 import javafx.embed.swing.SwingNode;
