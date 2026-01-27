@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="flatlaf-3.4.1">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/flatlaf-3.4.1.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/flatlaf-3.5.4.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/flatlaf-extras-3.2.jar!/" />
+      <root url="jar://$USER_HOME$/Sync/Programs/JARs/flatlaf-intellij-themes-3.5.4.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
