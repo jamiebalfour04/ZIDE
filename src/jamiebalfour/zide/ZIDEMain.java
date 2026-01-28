@@ -49,6 +49,7 @@ public class ZIDEMain extends Application {
 
   Stage _stage;
   ZPERuntimeEnvironment runtime;
+  Label rightFooterLabel;
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -281,6 +282,32 @@ public class ZIDEMain extends Application {
     editorTabs.getStyleClass().add("editor-tabs");
     editorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
 
+    editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+      if (newTab == null) return;
+
+      Object ud = newTab.getUserData();
+      String path = (ud == null) ? null : ud.toString();
+
+      String lang = newTab.idProperty().getValue();
+
+      String ext = "";
+
+      if (lang != null) {
+        int dot = lang.lastIndexOf('.');
+        if (dot >= 0 && dot < lang.length() - 1) {
+          ext = lang.substring(dot + 1).toLowerCase();
+        }
+      }
+      if(rightFooterLabel != null){
+        if(ext.equals("yas")) {
+          rightFooterLabel.setText("YAS");
+        } else{
+          rightFooterLabel.setText("Text");
+        }
+      }
+
+    });
+
     openTab("Untitled");
 
     return editorTabs;
@@ -327,7 +354,8 @@ public class ZIDEMain extends Application {
     AtomicBoolean hasNonBlankContent = new AtomicBoolean(false);
 
     // Build Swing UI on EDT
-    SwingUtilities.invokeLater(() -> {
+
+
       try {
         jamiebalfour.codeeditor.CodeEditorView mainSyntax = new jamiebalfour.codeeditor.CodeEditorView();
 
@@ -416,23 +444,25 @@ public class ZIDEMain extends Application {
         mainSyntax.setFont(new Font(mainSyntax.getFont().getFontName(), mainSyntax.getFont().getStyle(), mainSyntax.getFont().getSize()));
         mainSyntax.repaint();
 
+
+        // Create the tab using the boolean (no cross-thread Swing calls)
+        Tab tab = createEditorTab(name, mainSyntax, file, swingNode, hasNonBlankContent::get);
+        if(file != null){
+          tab.setId(file);
+        }
+
+
+        editorTabs.getTabs().add(tab);
+        editorTabs.getSelectionModel().select(tab);
+
+        // Helps focus when you click into the editor region
+        swingNode.setOnMousePressed(e -> swingNode.requestFocus());
+
       } catch (IOException ex) {
         throw new RuntimeException(ex);
       }
-    });
-
-    // Create the tab using the boolean (no cross-thread Swing calls)
-    Tab tab = createEditorTab(name, swingNode, hasNonBlankContent::get);
-    if(file != null){
-      tab.setId(file);
-    }
 
 
-    editorTabs.getTabs().add(tab);
-    editorTabs.getSelectionModel().select(tab);
-
-    // Helps focus when you click into the editor region
-    swingNode.setOnMousePressed(e -> swingNode.requestFocus());
   }
 
   private boolean confirmClose(String tabTitle) {
@@ -450,8 +480,8 @@ public class ZIDEMain extends Application {
     return alert.showAndWait().orElse(cancel) == close;
   }
 
-  private Tab createEditorTab(String title, Node content, Supplier<Boolean> hasContent) {
-    Tab tab = new Tab();
+  private Tab createEditorTab(String title, CodeEditorView syntax, String path, Node content, Supplier<Boolean> hasContent) {
+    Tab tab = new EditorTab(title, path, syntax, content);
     tab.setContent(content);
 
     // Disable JavaFX built-in close button
@@ -526,9 +556,9 @@ public class ZIDEMain extends Application {
   private Node buildStatusBar() {
     var left = new Label("Ready");
     var centre = new Label("Ln 1, Col 1");
-    var right = new Label("UTF-8  |  Spaces: 4");
+    rightFooterLabel = new Label("Text");
 
-    var bar = new HBox(left, new Region(), centre, new Region(), right);
+    var bar = new HBox(left, new Region(), centre, new Region(), rightFooterLabel);
     HBox.setHgrow(bar.getChildren().get(1), Priority.ALWAYS);
     HBox.setHgrow(bar.getChildren().get(3), Priority.ALWAYS);
 
@@ -552,7 +582,18 @@ public class ZIDEMain extends Application {
   }
 
   public static void main(String[] args) {
-    launch(args);
+
+    if(args.length > 0) {
+      if(args[0].equals("-h")){
+        System.out.println("Usage: java -jar ZIDE.jar [-h]");
+        System.out.println("--module-path /Users/jamiebalfour/Downloads/javafx-sdk-25.0.2/lib --add-modules javafx.controls,javafx.fxml,javafx.swing");
+      } else if (args[0].equals("-g")) {
+        launch(args);
+      }
+    } else{
+      launch(args);
+    }
+
   }
 
   public static TreeItem<File> loadDirectory(File dir) {

@@ -14,22 +14,6 @@
       <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.richtext.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <NATIVE>
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-      <root url="file://$USER_HOME$/Sync/Programs/JARs/jfx" />
-    </NATIVE>
     <SOURCES />
   </library>
 </component>
