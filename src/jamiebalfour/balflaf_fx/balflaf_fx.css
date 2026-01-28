@@ -1,13 +1,24 @@
 
+.window-root {
+    -fx-background-color: -fx-background;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+}
+
+.mac-window {
+    -fx-background-radius: 12;
+}
+
 .balf-titlebar {
-    -fx-background-color: -fx-control-inner-background;
     -fx-border-color: rgba(0,0,0,0.08);
     -fx-border-width: 0 0 1 0;
+    -fx-background-color: #517;
 }
 
 .balf-title {
     -fx-font-weight: 600;
     -fx-opacity: 0.85;
+    -fx-text-fill: white;
 }
 
 .balf-traffic-light {
@@ -17,4 +28,45 @@
 
 .balf-traffic-light:hover {
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 6, 0.2, 0, 1);
+}
+
+.jb-menu {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-padding: 0 10 0 10;
+
+    -fx-min-height: 24px;
+    -fx-pref-height: 24px;
+    -fx-max-height: 24px;
+
+    -fx-alignment: CENTER;
+}
+
+.jb-menu:hover {
+    -fx-background-color: rgba(0,0,0,0.06);
+}
+
+.jb-menu:pressed,
+.jb-menu:showing {
+    -fx-background-color: rgba(0,0,0,0.10);
+}
+
+/* Label: no vertical padding */
+.jb-menu > .label {
+    -fx-padding: 0;
+}
+
+/* Arrow button: give it WIDTH, not HEIGHT */
+.jb-menu > .arrow-button {
+    -fx-padding: 0 6 0 6;   /* ← this is the key */
+    -fx-background-color: transparent;
+}
+
+/* Arrow itself: slightly larger visual */
+.jb-menu > .arrow-button > .arrow {
+    -fx-padding: 3;
+}
+
+.jb-menu > .arrow-button > .arrow {
+    -fx-background-color: white;
 }

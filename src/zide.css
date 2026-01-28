@@ -106,6 +106,46 @@
 .editor-tabs .tab {
     -fx-background-radius: 3 3 0 0;
     -fx-border-radius: 3 3 0 0;
+    -fx-padding: 7 20;
+    /*-fx-pref-width: 140px;
+    -fx-max-width: 240px;*/
+    -fx-border-color: transparent;
+}
+
+.editor-tabs .tab:selected {
+    -fx-background-color: white;
+}
+
+/* Header strip (behind tabs) */
+.editor-tabs .tab-header-area {
+    -fx-background-color: #e6e6e6;
+}
+
+/* Container for tabs */
+.editor-tabs .headers-region {
+    -fx-background-color: transparent;
+}
+
+/* Inactive tabs */
+.editor-tabs .tab {
+    -fx-background-color: #e2e2e2;
+    -fx-border-color: #cfcfcf;
+}
+
+/* Active tab: pure white, merges into editor */
+.editor-tabs .tab:selected {
+    -fx-background-color: white;
+    -fx-border-color: #cfcfcf #cfcfcf white #cfcfcf;
+}
+
+/* Editor area */
+.editor-tabs .tab-content-area {
+    -fx-background-color: white;
+}
+
+/* IMPORTANT: hide the grey line under active tab */
+.editor-tabs .tab:selected .tab-container {
+    -fx-border-width: 1 1 0 1;
 }
 
 .code-area, .terminal-output {
@@ -140,4 +180,50 @@
 
 .app-root {
     -fx-background-color: -fx-control-inner-background;
+}
+
+.tab-header {
+    -fx-alignment: center-left;
+}
+
+/* Title text inside the tab */
+.tab-title {
+    -fx-font-size: 12px;
+    -fx-padding: 0 2 0 0;
+}
+
+.tab-close-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+
+    -fx-min-width: 10px;
+    -fx-min-height: 10px;
+    -fx-pref-width: 10px;
+    -fx-pref-height: 10px;
+    -fx-max-width: 10px;
+    -fx-max-height: 10px;
+
+    /* Thin X (JetBrains-style) */
+    -fx-shape: "M 2 2 L 3 1 L 5 3 L 7 1 L 8 2 L 6 4 L 8 6 L 7 7 L 5 5 L 3 7 L 2 6 L 4 4 Z";
+
+    -fx-opacity: 0;
+}
+
+/* Show close on hover or when selected */
+.tab:hover .tab-close-button,
+.tab:selected .tab-close-button {
+    -fx-opacity: 1;
+}
+
+/* Light theme X colour + hover */
+.tab-close-button {
+    -fx-background-color: rgba(0,0,0,0.55);
+}
+
+.tab-close-button:hover {
+    -fx-background-color: rgba(0,0,0,0.10);
+}
+
+.tab-close-button:pressed {
+    -fx-background-color: rgba(0,0,0,0.18);
 }
