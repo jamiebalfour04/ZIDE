@@ -70,3 +70,7 @@
 .jb-menu > .arrow-button > .arrow {
     -fx-background-color: white;
 }
+
+.swing-editor-host {
+    -fx-background-color: green;
+}

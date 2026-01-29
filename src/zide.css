@@ -107,12 +107,12 @@
 }
 
 .editor-tabs .tab-header-area {
-    -fx-padding: 6 6 0 6;
+    -fx-padding: 0 0 0 0;
 }
 .editor-tabs .tab {
-    -fx-background-radius: 3 3 0 0;
-    -fx-border-radius: 3 3 0 0;
-    -fx-padding: 7 20;
+    -fx-background-radius: 0 0 0 0;
+    -fx-border-radius: 0 0 0 0;
+    -fx-padding: 4 20;
     /*-fx-pref-width: 140px;
     -fx-max-width: 240px;*/
     -fx-border-color: transparent;
@@ -139,7 +139,7 @@
 }
 
 .app-root:dark .editor-tabs .tab{
-    -fx-background-color: #333333;
+    -fx-background-color: #282D37;
     -fx-border-color: #000000;
 }
 
@@ -147,6 +147,11 @@
 .editor-tabs .tab:selected {
     -fx-background-color: white;
     -fx-border-color: #cfcfcf #cfcfcf white #cfcfcf;
+}
+
+.app-root:dark .editor-tabs .tab:selected {
+    -fx-background-color: #282D37;
+    -fx-border-color: #000000 #000000 #282D37 #000000;
 }
 
 /* Editor area */
