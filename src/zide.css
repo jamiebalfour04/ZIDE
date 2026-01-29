@@ -52,6 +52,12 @@
     -fx-border-color: transparent;
 }
 
+.button.run{
+    -fx-background-color: #0a0;
+    -fx-text-fill: white;
+    -fx-border-color: transparent;
+}
+
 .search-field, .terminal-input {
     -fx-border-color: rgba(0,0,0,0.12);
     -fx-background-color: -fx-control-inner-background;
@@ -130,6 +136,11 @@
 .editor-tabs .tab {
     -fx-background-color: #e2e2e2;
     -fx-border-color: #cfcfcf;
+}
+
+.app-root:dark .editor-tabs .tab{
+    -fx-background-color: #333333;
+    -fx-border-color: #000000;
 }
 
 /* Active tab: pure white, merges into editor */
@@ -226,4 +237,8 @@
 
 .tab-close-button:pressed {
     -fx-background-color: rgba(0,0,0,0.18);
+}
+
+.button.running{
+    -fx-background-color: #a00;
 }

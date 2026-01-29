@@ -6,10 +6,13 @@ import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.WindowResizer;
 import jamiebalfour.codeeditor.CodeEditorView;
+import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfScrollbar;
+import jamiebalfour.zpe.core.ZPEHelperFunctions;
 import jamiebalfour.zpe.core.ZPEInstance;
 import jamiebalfour.zpe.core.ZPEKit;
 import jamiebalfour.zpe.core.ZPERuntimeEnvironment;
+import jamiebalfour.zpe.editor.ConsoleOutputTextArea;
 import javafx.application.Application;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
@@ -38,6 +41,8 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,6 +55,9 @@ public class ZIDEMain extends Application {
   Stage _stage;
   ZPERuntimeEnvironment runtime;
   Label rightFooterLabel;
+  ConsoleOutputTextArea consoleOutputTextArea;
+  BalfScrollbar consoleScrollbar;
+  Button runBtn;
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -124,7 +132,7 @@ public class ZIDEMain extends Application {
   }
 
   private static final Preferences PREFS = Preferences.userNodeForPackage(ZIDEMain.class);
-  private static final String KEY_LAST_DIR = "/Users/jamiebalfour/Documents/";
+  private static final String KEY_LAST_DIR = System.getProperty("user.home");//"/Users/jamiebalfour/Documents/";
 
   private void newFile(){
     String suggestedName = "Untitled";
@@ -197,12 +205,15 @@ public class ZIDEMain extends Application {
       var scene = toggleTheme.getParentPopup().getOwnerWindow().getScene();
       scene.getRoot().pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("dark"),
               toggleTheme.isSelected());
+      BalfLafManager.getInstance().toggleDarkMode(true);
+
     });
     view.getItems().add(toggleTheme);
 
     var run = new Menu("_Run");
     var runProject = new MenuItem("Run");
     runProject.setAccelerator(KeyCombination.keyCombination("Shortcut+R"));
+    runProject.setOnAction(_ -> runCode());
     run.getItems().add(runProject);
 
     var help = new Menu("_Help");
@@ -213,9 +224,27 @@ public class ZIDEMain extends Application {
     return bar;
   }
 
+  private void runCode(){
+    try {
+      Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
+      EditorTab tab = (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+      runBtn.getStyleClass().add("running");
+
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
+      consoleOutputTextArea.runAsProcess(tempPath, false, "");
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private ToolBar buildToolBar() {
-    var runBtn = new Button("Run");
-    runBtn.getStyleClass().add("accent");
+    runBtn = new Button("Run");
+    runBtn.getStyleClass().add("run");
+    runBtn.setOnAction(_ -> {
+      runCode();
+
+    });
 
     var buildBtn = new Button("Build");
     var debugBtn = new Button("Debug");
@@ -239,7 +268,7 @@ public class ZIDEMain extends Application {
     root.setExpanded(true);
 
 
-    File projectDir = new File("/Users/jamiebalfour/");
+    File projectDir = new File(System.getProperty("user.home") + "/Documents/");
 
     var tree = new TreeView<>(loadDirectory(projectDir));
     tree.setShowRoot(true);
@@ -524,12 +553,32 @@ public class ZIDEMain extends Application {
     var title = new Label("Terminal");
     title.getStyleClass().add("pane-title");
 
-    var output = new TextArea();
-    output.setEditable(false);
-    output.getStyleClass().add("terminal-output");
-    output.setText("ZIDE terminal ready.\n");
+    SwingNode terminalNode = new SwingNode();
 
-    var input = new TextField();
+    SwingUtilities.invokeLater(() -> {
+      consoleOutputTextArea =
+              new ConsoleOutputTextArea("", Color.WHITE);
+
+      consoleOutputTextArea.addProcessFinishedListener(new ConsoleOutputTextArea.ProcessFinishedListener() {
+
+        @Override
+        public void onProcessFinished() {
+          runBtn.getStyleClass().remove("running");
+        }
+      });
+
+      //output.setEditable(false);
+      //output.setText("ZIDE terminal ready.\n");
+
+      // Swing scrolling (important!)
+      consoleScrollbar = new BalfScrollbar(consoleOutputTextArea);
+      consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());
+      consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
+
+      terminalNode.setContent(consoleScrollbar);
+    });
+
+    /*var input = new TextField();
     input.setPromptText("Type a command…");
     input.getStyleClass().add("terminal-input");
     input.setOnAction(e -> {
@@ -540,14 +589,14 @@ public class ZIDEMain extends Application {
         output.appendText("…not implemented yet\n");
         input.clear();
       }
-    });
+    });*/
 
     var header = new HBox(title);
     header.setAlignment(Pos.CENTER_LEFT);
     header.getStyleClass().add("pane-header");
 
-    var box = new VBox(header, output, input);
-    VBox.setVgrow(output, Priority.ALWAYS);
+    var box = new VBox(header, terminalNode);
+    VBox.setVgrow(terminalNode, Priority.ALWAYS);
     box.getStyleClass().add("terminal-pane");
     box.setMinHeight(180);
     return box;
