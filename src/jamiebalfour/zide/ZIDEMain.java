@@ -185,7 +185,7 @@ public class ZIDEMain extends Application {
     var file = new Menu("_File");
     var newFile = new MenuItem("New File");
     newFile.setAccelerator(KeyCombination.keyCombination("Shortcut+N"));
-    newFile.setOnAction(_ -> newFile());
+    newFile.setOnAction(e -> newFile());
 
     var open = new MenuItem("Open…");
     open.setAccelerator(KeyCombination.keyCombination("Shortcut+O"));
@@ -194,7 +194,7 @@ public class ZIDEMain extends Application {
     save.setAccelerator(KeyCombination.keyCombination("Shortcut+S"));
 
     var exit = new MenuItem("Exit");
-    exit.setOnAction(_ -> System.exit(0));
+    exit.setOnAction(e -> System.exit(0));
 
     file.getItems().addAll(newFile, open, new SeparatorMenuItem(), save, new SeparatorMenuItem(), exit);
 
@@ -209,7 +209,7 @@ public class ZIDEMain extends Application {
 
     var view = new Menu("_View");
     toggleTheme = new CheckMenuItem("Dark theme");
-    toggleTheme.setOnAction(_ -> {
+    toggleTheme.setOnAction(e -> {
       BalfLafManager.getInstance().toggleDarkMode(toggleTheme.isSelected());
       var scene = toggleTheme.getParentPopup().getOwnerWindow().getScene();
       scene.getRoot().pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("dark"),
@@ -238,7 +238,7 @@ public class ZIDEMain extends Application {
     var run = new Menu("_Run");
     var runProject = new MenuItem("Run");
     runProject.setAccelerator(KeyCombination.keyCombination("Shortcut+R"));
-    runProject.setOnAction(_ -> runCode());
+    runProject.setOnAction(e -> runCode());
     run.getItems().add(runProject);
 
     var help = new Menu("_Help");
@@ -266,7 +266,7 @@ public class ZIDEMain extends Application {
   private ToolBar buildToolBar() {
     runBtn = new Button("Run");
     runBtn.getStyleClass().add("run");
-    runBtn.setOnAction(_ -> {
+    runBtn.setOnAction(e -> {
       runCode();
 
     });

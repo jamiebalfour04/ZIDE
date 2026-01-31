@@ -1,0 +1,18 @@
+<project name="ZPE" default="package_up" basedir=".">
+
+    <!-- Define properties for source and destination -->
+    <property name="src.jar" value="build/zide.jar"/>
+    <property name="dest1.dir" value="/Users/jamiebalfour/Sync/Programs/ZPE"/>
+    <property name="dest2.dir" value="build/package"/>
+
+
+    <!-- Main target -->
+    <target name="package_up">
+        <copy file="${src.jar}" todir="${dest1.dir}" overwrite="true"/>
+        <copy file="${src.jar}" todir="${dest2.dir}" overwrite="true"/>
+        <exec executable="sh" failonerror="true" dir="${basedir}">
+            <arg value="scripts/package.sh"/>
+        </exec>
+    </target>
+
+</project>

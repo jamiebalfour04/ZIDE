@@ -64,45 +64,58 @@ public final class WindowResizer {
       double newH = startHeight;
 
       switch (mode) {
-        case E -> newW = clampMin(startWidth + dx, minW);
-        case S -> newH = clampMin(startHeight + dy, minH);
-        case SE -> {
+        case E: {
+          newW = clampMin(startWidth + dx, minW);
+          break;
+        }
+        case S:
+        {newH = clampMin(startHeight + dy, minH);
+          break;}
+        case SE : {
           newW = clampMin(startWidth + dx, minW);
           newH = clampMin(startHeight + dy, minH);
+          break;
         }
-        case W -> {
+        case W : {
           double w = clampMin(startWidth - dx, minW);
           newX = startX + (startWidth - w);
           newW = w;
+          break;
         }
-        case N -> {
+        case N : {
           double h = clampMin(startHeight - dy, minH);
           newY = startY + (startHeight - h);
           newH = h;
+          break;
         }
-        case NW -> {
+        case NW : {
           double w = clampMin(startWidth - dx, minW);
           double h = clampMin(startHeight - dy, minH);
           newX = startX + (startWidth - w);
           newY = startY + (startHeight - h);
           newW = w;
           newH = h;
+          break;
         }
-        case NE -> {
+        case NE : {
           double w = clampMin(startWidth + dx, minW);
           double h = clampMin(startHeight - dy, minH);
           newY = startY + (startHeight - h);
           newW = w;
           newH = h;
+          break;
         }
-        case SW -> {
+        case SW : {
           double w = clampMin(startWidth - dx, minW);
           double h = clampMin(startHeight + dy, minH);
           newX = startX + (startWidth - w);
           newW = w;
           newH = h;
+          break;
         }
-        default -> {}
+        default : {
+          break;
+        }
       }
 
       stage.setX(newX);
@@ -149,17 +162,17 @@ public final class WindowResizer {
   }
 
   private Cursor cursorFor(ResizeMode mode) {
-    return switch (mode) {
-      case N -> Cursor.N_RESIZE;
-      case S -> Cursor.S_RESIZE;
-      case E -> Cursor.E_RESIZE;
-      case W -> Cursor.W_RESIZE;
-      case NE -> Cursor.NE_RESIZE;
-      case NW -> Cursor.NW_RESIZE;
-      case SE -> Cursor.SE_RESIZE;
-      case SW -> Cursor.SW_RESIZE;
-      default -> Cursor.DEFAULT;
-    };
+    switch (mode) {
+      case N : {return Cursor.N_RESIZE; }
+      case S : {return Cursor.S_RESIZE; }
+      case E : {return Cursor.E_RESIZE; }
+      case W : {return Cursor.W_RESIZE; }
+      case NE : { return Cursor.NE_RESIZE; }
+      case NW : {return Cursor.NW_RESIZE; }
+      case SE : {return Cursor.SE_RESIZE; }
+      case SW : {return Cursor.SW_RESIZE; }
+      default : {return Cursor.DEFAULT; }
+    }
   }
 
   private static double clampMin(double v, double min) {
