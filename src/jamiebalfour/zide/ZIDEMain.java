@@ -405,7 +405,7 @@ public class ZIDEMain extends Application {
 
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
-      consoleOutputTextArea.runAsProcess(tempPath, true, true, "");
+      consoleOutputTextArea.runAsProcess(tempPath, true, false, "");
 
     } catch (IOException e) {
       throw new RuntimeException(e);
