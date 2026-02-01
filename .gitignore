@@ -1,3 +1,8 @@
 /out/
 /build/package/
 /package/
+/build/jfx/
+/build/package/
+/build/.java-version
+/build/.java_version
+/build/run.sh
