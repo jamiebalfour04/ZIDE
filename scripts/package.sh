@@ -28,4 +28,5 @@ fi
   --main-jar zide.jar \
   --main-class jamiebalfour.zide.ZIDEMain \
   --dest ../package \
-  --java-options "-Djava.library.path=\$APPDIR/jfx --module-path=\$APPDIR/jfx --add-modules=javafx.controls,javafx.fxml,javafx.swing"
+  --java-options "-Djava.library.path=\$APPDIR/jfx --module-path=\$APPDIR/jfx --add-modules=javafx.controls,javafx.fxml,javafx.swing" \
+  --icon ../ZIDE.icns &

@@ -1,14 +1,13 @@
 package jamiebalfour.balflaf_fx;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.MenuItem;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
@@ -144,16 +143,39 @@ public class BalfTitleBar extends Region {
     n.setMaxHeight(h);
   }
 
+  private boolean confirmClose() {
+
+    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+    alert.setTitle("Close ZIDE");
+    alert.setContentText("Are you sure you want to close ZIDE?");
+
+    ButtonType close = new ButtonType("Close", ButtonBar.ButtonData.OK_DONE);
+    ButtonType cancel = ButtonType.CANCEL;
+
+    alert.getButtonTypes().setAll(close, cancel);
+
+    return alert.showAndWait().orElse(cancel) == close;
+  }
+
   private Region macTrafficLights(Stage stage) {
     var box = new HBox(8);
     box.setAlignment(Pos.CENTER_LEFT);
     box.getStyleClass().add("balf-traffic");
 
     var close = trafficLight("balf-close", Color.web("#ff5f57"));
+
+
+    close.setOnMouseClicked(e -> {
+      if(confirmClose()) {
+        Platform.exit();
+        System.exit(0);
+      }
+    });
+
     var minimise = trafficLight("balf-minimise", Color.web("#febc2e"));
     var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
 
-    close.setOnMouseClicked(e -> stage.close());
+    //close.setOnMouseClicked(e -> stage.close());
     minimise.setOnMouseClicked(e -> stage.setIconified(true));
     zoom.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
 

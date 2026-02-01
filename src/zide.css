@@ -46,14 +46,12 @@
     -fx-border-color: rgba(255,255,255,0.10);
 }
 
-.button.accent {
-    -fx-background-color: -fx-accent;
-    -fx-text-fill: white;
-    -fx-border-color: transparent;
+.button:hover {
+    -fx-opacity: 0.8;
 }
 
-.button.run{
-    -fx-background-color: #0a0;
+.button.accent {
+    -fx-background-color: -fx-accent;
     -fx-text-fill: white;
     -fx-border-color: transparent;
 }
@@ -245,5 +243,7 @@
 }
 
 .button.running{
-    -fx-background-color: #a00;
+    -fx-background-color: #0a0;
+    -fx-border-color: transparent;
 }
+

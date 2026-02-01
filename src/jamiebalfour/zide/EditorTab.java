@@ -18,6 +18,7 @@ public class EditorTab extends Tab {
     this.path = path;
     this.editor = editor;
     this.pane = pane;
+    pane.setLightColour(Color.white);
 
     BalfLafManager.getInstance().addThemeChangeListener(() -> {
       if(BalfLafManager.getInstance().isDarkModeEnabled()){
@@ -85,10 +86,12 @@ public class EditorTab extends Tab {
 
   void switchOffDarkMode() {
 
+    BalfLafManager.getInstance().toggleDarkMode(false);
+
 
     Color light = new Color(255, 255, 255);
     pane.setLightColour(Color.white);
-    editor.setBackground(light);
+    editor.setBackground(Color.white);
     editor.setForeground(Color.black);
     editor.setAttributeColor(CodeEditorView.ATTR_TYPE.Normal, Color.black);
     editor.setAttributeColor(CodeEditorView.ATTR_TYPE.Quote, new Color(0, 128, 0));
@@ -104,7 +107,7 @@ public class EditorTab extends Tab {
     editor.setAutoCompleteItemBackgroundColor(new Color(241, 241, 241, 255));
 
     resetScroll();
-    BalfLafManager.getInstance().toggleDarkMode(false);
+
 
   }
 

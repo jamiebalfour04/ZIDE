@@ -1,6 +1,7 @@
 package jamiebalfour.zide;
 
 import jamiebalfour.FileHelperFunctions;
+import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.WindowResizer;
 import jamiebalfour.codeeditor.CodeEditorView;
@@ -8,12 +9,16 @@ import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
 import jamiebalfour.ui.components.BalfScrollbar;
 import jamiebalfour.ui.components.BalfSearchBox;
-import jamiebalfour.zpe.core.ZPEHelperFunctions;
-import jamiebalfour.zpe.core.ZPEInstance;
-import jamiebalfour.zpe.core.ZPEKit;
-import jamiebalfour.zpe.core.ZPERuntimeEnvironment;
+import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.editor.ConsoleOutputTextArea;
+import jamiebalfour.zpe.interfaces.ZPEType;
+import jamiebalfour.zpe.types.ZPEMap;
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
@@ -26,7 +31,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.input.KeyCombination;
@@ -40,9 +44,13 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.beans.EventHandler;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -59,8 +67,18 @@ public class ZIDEMain extends Application {
   ConsoleOutputTextArea consoleOutputTextArea;
   BalfScrollbar consoleScrollbar;
   Button runBtn;
+  Button debugBtn;
+  Button stopExecutionBtn;
+  Button stepOverButton;
+  Button continueButton;
+  Separator debugSeparator;
   CheckMenuItem toggleTheme;
-
+  private TableView<VarRow> varTable;
+  private ObservableList<VarRow> varRows;
+  private SplitPane terminalSplit;
+  private VBox variablesPane;
+  private ConsoleOutputTextArea.BreakPoint currentBreakpoint;
+  private CheckMenuItem variablesPaneOption;
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -101,6 +119,8 @@ public class ZIDEMain extends Application {
     root.setTop(top);
 
 
+
+
     // Left: project tree
     Node projectTree = buildProjectTree();
     Node leftPane = wrapTitled("Project", projectTree);
@@ -111,6 +131,18 @@ public class ZIDEMain extends Application {
 
     // Bottom: terminal + status bar
     var terminal = buildTerminal();
+
+    consoleOutputTextArea.addProcessFinishedListener(new ConsoleOutputTextArea.ProcessFinishedListener() {
+
+      @Override
+      public void onProcessFinished() {
+        stopExecutionBtn.setVisible(false);
+        stepOverButton.setVisible(false);
+        continueButton.setVisible(false);
+        debugSeparator.setVisible(false);
+        clearRows();
+      }
+    });
     var bottom = new VBox(terminal, buildStatusBar());
     VBox.setVgrow(terminal, Priority.ALWAYS);
 
@@ -233,7 +265,21 @@ public class ZIDEMain extends Application {
 
 
     });
+
+    var panesMenu = new Menu("Panes");
+    variablesPaneOption = new CheckMenuItem("Variables Pane");
+    variablesPaneOption.setOnAction(e -> {
+      if(variablesPaneOption.isSelected()) {
+        showVariablesPane();
+      } else{
+        hideVariablesPane();
+      }
+    });
+
+    panesMenu.getItems().addAll(variablesPaneOption);
+
     view.getItems().add(toggleTheme);
+    view.getItems().add(panesMenu);
 
     var run = new Menu("_Run");
     var runProject = new MenuItem("Run");
@@ -242,21 +288,124 @@ public class ZIDEMain extends Application {
     run.getItems().add(runProject);
 
     var help = new Menu("_Help");
+
+
+    var downloadZPERuntimeItem = new MenuItem("Download ZPE Runtime Environment");
+    downloadZPERuntimeItem.setOnAction(e -> {
+      downloadZPERuntime();
+    });
+
+    var downloadZPENative = new MenuItem("Download ZPE Native");
+    downloadZPENative.setOnAction(e -> {
+      //
+      try {
+        downloadWithPopup("Latest ZPEX Native Binary", _stage, "https://www.jamiebalfour.scot/downloads/1-zpe/zpe-native-aarch64", Path.of(ZPEInstance.getInstallPath() + "/zpe-aarch64"), false, true);
+      } catch(Exception ex) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText("Error downloading ZPE Native");
+        alert.setContentText(ex.getMessage());
+        alert.showAndWait();
+      }
+    });
+
     help.getItems().add(new MenuItem("About"));
+
+    help.getItems().add(new SeparatorMenuItem());
+    help.getItems().add(downloadZPERuntimeItem);
+    help.getItems().add(downloadZPENative);
 
     var bar = new MenuBar(file, edit, view, run, help);
     bar.getStyleClass().add("app-menubar");
     return bar;
   }
 
-  private void runCode(){
+  private void downloadZPERuntime(){
+    //
     try {
+      downloadWithPopup("Latest ZPE Runtime Environment", _stage, "https://www.jamiebalfour.scot/downloads/1-zpe/zpe", Path.of(ZPEInstance.getInstallPath() + "/zpe.jar"), false, false);
+    } catch(Exception ex) {
+      Alert alert = new Alert(Alert.AlertType.ERROR);
+      alert.setTitle("Error");
+      alert.setHeaderText("Error downloading ZPE Native");
+      alert.setContentText(ex.getMessage());
+      alert.showAndWait();
+    }
+  }
+
+  private void runCode(){
+
+    if(!new File(ZPEInstance.getInstallPath() + "/zpe.jar").exists()) {
+      Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+      alert.setTitle("ZPE Runtime Environment missing");
+      alert.setHeaderText("ZPE Runtime Environment required.");
+      alert.setContentText("ZIDE needs to download a copy of the latest ZPE Runtime Environment before it can run your code. Do you want to continue?");
+
+      ButtonType yes = new ButtonType("Yes", ButtonBar.ButtonData.YES);
+      ButtonType no  = new ButtonType("No", ButtonBar.ButtonData.NO);
+
+      alert.getButtonTypes().setAll(yes, no);
+
+      Optional<ButtonType> result = alert.showAndWait();
+
+      if (result.isPresent() && result.get() == yes) {
+        downloadZPERuntime();
+        return;
+      } else {
+        return;
+      }
+    }
+
+    try {
+
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
       EditorTab tab = (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
       runBtn.getStyleClass().add("running");
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
-      consoleOutputTextArea.runAsProcess(tempPath, false, "");
+      consoleOutputTextArea.runAsProcess(tempPath, false, true, "");
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void debugCode(){
+
+    if(!new File(ZPEInstance.getInstallPath() + "/zpe.jar").exists()) {
+      Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+      alert.setTitle("ZPE Runtime Environment missing");
+      alert.setHeaderText("ZPE Runtime Environment required.");
+      alert.setContentText("ZIDE needs to download a copy of the latest ZPE Runtime Environment before it can run your code. Do you want to continue?");
+
+      ButtonType yes = new ButtonType("Yes", ButtonBar.ButtonData.YES);
+      ButtonType no  = new ButtonType("No", ButtonBar.ButtonData.NO);
+
+      alert.getButtonTypes().setAll(yes, no);
+
+      Optional<ButtonType> result = alert.showAndWait();
+
+      if (result.isPresent() && result.get() == yes) {
+        downloadZPERuntime();
+        return;
+      } else {
+        return;
+      }
+    }
+
+    try {
+      Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
+      EditorTab tab = (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+      debugBtn.getStyleClass().add("running");
+
+      stopExecutionBtn.setVisible(true);
+      stepOverButton.setVisible(true);
+      continueButton.setVisible(true);
+      debugSeparator.setVisible(true);
+
+
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
+      consoleOutputTextArea.runAsProcess(tempPath, true, true, "");
 
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -272,8 +421,56 @@ public class ZIDEMain extends Application {
     });
 
     var buildBtn = new Button("Build");
-    var debugBtn = new Button("Debug");
+
+    debugBtn = new Button("Debug");
+    debugBtn.getStyleClass().add("debug");
+    debugBtn.setOnAction(e -> {
+      consoleOutputTextArea.addBreakPointReachedListener(new ConsoleOutputTextArea.BreakPointReachedListener() {
+
+        @Override
+        public void onBreakPointReached(ConsoleOutputTextArea.BreakPoint b, ZPEMap varData) {
+          currentBreakpoint = b;
+          showVariablesPane();
+          setVariables(varData);
+        }
+      });
+
+      debugCode();
+    });
+
     var sep1 = new Separator(Orientation.VERTICAL);
+
+    stopExecutionBtn = new Button("Stop");
+    stopExecutionBtn.setOnAction(e -> {
+      if(currentBreakpoint == null){
+        consoleOutputTextArea.destroyCurrentProcess();
+      } else{
+        currentBreakpoint.stopExecution();
+      }
+
+    });
+    stopExecutionBtn.setVisible(false);
+
+    stepOverButton = new Button("Step Over");
+    stepOverButton.setOnAction(e -> {
+      if(currentBreakpoint == null){
+        return;
+      }
+      currentBreakpoint.stepOver();
+    });
+    stepOverButton.setVisible(false);
+
+    continueButton = new Button("Continue");
+    continueButton.setOnAction(e -> {
+      if(currentBreakpoint == null){
+        return;
+      }
+      currentBreakpoint.resume();
+    });
+    continueButton.setVisible(false);
+
+    debugSeparator = new Separator(Orientation.VERTICAL);
+    debugSeparator.setVisible(false);
 
     var search = new TextField();
     search.setPromptText("Search…");
@@ -283,7 +480,9 @@ public class ZIDEMain extends Application {
     var spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
 
-    var toolbar = new ToolBar(runBtn, buildBtn, debugBtn, sep1, new Label(" "), spacer, search);
+
+
+    var toolbar = new ToolBar(runBtn, buildBtn, debugBtn, sep1, stopExecutionBtn, stepOverButton, continueButton, debugSeparator, new Label(" "), spacer, search);
     toolbar.getStyleClass().add("app-toolbar");
     return toolbar;
   }
@@ -354,15 +553,13 @@ public class ZIDEMain extends Application {
       }
       if(rightFooterLabel != null){
         if(ext.equals("yas")) {
-          rightFooterLabel.setText("YAS");
+          rightFooterLabel.setText("YASS");
         } else{
           rightFooterLabel.setText("Text");
         }
       }
 
     });
-
-    openTab("Untitled");
 
     return editorTabs;
   }
@@ -439,6 +636,7 @@ public class ZIDEMain extends Application {
         wrapper.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
         wrapper.setBackground(Color.white);
         wrapper.setDarkColour(dark);
+        wrapper.setLightColour(Color.white);
 
 
         BalfScrollbar scrollPane = new BalfScrollbar();
@@ -570,6 +768,7 @@ public class ZIDEMain extends Application {
     closeBtn.getStyleClass().add("tab-close-button");
     closeBtn.setFocusTraversable(false);
 
+
     closeBtn.setMinSize(10, 10);
     closeBtn.setPrefSize(10, 10);
     closeBtn.setMaxSize(10, 10);
@@ -604,24 +803,21 @@ public class ZIDEMain extends Application {
     var title = new Label("Terminal");
     title.getStyleClass().add("pane-title");
 
+    // --- LEFT: Swing console ---
     SwingNode terminalNode = new SwingNode();
 
-    SwingUtilities.invokeLater(() -> {
-      consoleOutputTextArea =
-              new ConsoleOutputTextArea("", Color.WHITE);
 
-      consoleOutputTextArea.addProcessFinishedListener(new ConsoleOutputTextArea.ProcessFinishedListener() {
+      consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
 
-        @Override
-        public void onProcessFinished() {
-          runBtn.getStyleClass().remove("running");
-        }
-      });
 
-      //output.setEditable(false);
-      //output.setText("ZIDE terminal ready.\n");
 
-      // Swing scrolling (important!)
+      consoleOutputTextArea.addProcessFinishedListener(() ->
+              Platform.runLater(() -> {
+                runBtn.getStyleClass().remove("running");
+                debugBtn.getStyleClass().remove("running");
+              })
+      );
+
       consoleScrollbar = new BalfScrollbar(consoleOutputTextArea);
       consoleScrollbar.setLightColour(Color.WHITE);
       consoleScrollbar.setDarkColour(Color.BLACK);
@@ -629,36 +825,124 @@ public class ZIDEMain extends Application {
       consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
 
       terminalNode.setContent(consoleScrollbar);
-    });
 
-    /*var input = new TextField();
-    input.setPromptText("Type a command…");
-    input.getStyleClass().add("terminal-input");
-    input.setOnAction(e -> {
-      var cmd = input.getText();
-      if (cmd != null && !cmd.isBlank()) {
-        output.appendText("> " + cmd + "\n");
-        // TODO: wire to real process execution
-        output.appendText("…not implemented yet\n");
-        input.clear();
-      }
-    });*/
+
+    VBox terminalContainer = new VBox(terminalNode);
+    VBox.setVgrow(terminalNode, Priority.ALWAYS);
+
+    // --- RIGHT: Variables pane (created but NOT added yet) ---
+    variablesPane = buildVariablesPane(); // method below
+
+    // --- SplitPane ---
+    terminalSplit = new SplitPane();
+    terminalSplit.setOrientation(Orientation.HORIZONTAL);
+    terminalSplit.getItems().add(terminalContainer); // 👈 only terminal initially
+
+    // --- Header ---
+    var header = new HBox(title);
+    header.setAlignment(Pos.CENTER_LEFT);
+    header.getStyleClass().add("pane-header");
+
+    var box = new VBox(header, terminalSplit);
+    VBox.setVgrow(terminalSplit, Priority.ALWAYS);
+    box.getStyleClass().add("terminal-pane");
+    box.setMinHeight(180);
+
+    return box;
+  }
+
+  private VBox buildVariablesPane() {
+    varRows = FXCollections.observableArrayList();
+    varTable = new TableView<>(varRows);
+    varTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+    TableColumn<VarRow, String> cName = new TableColumn<>("Name");
+    cName.setCellValueFactory(v -> v.getValue().nameProperty());
+    cName.setMinWidth(70);
+    cName.setPrefWidth(70);
+
+    TableColumn<VarRow, String> cType = new TableColumn<>("Type");
+    cType.setCellValueFactory(v -> v.getValue().typeProperty());
+    cType.setMinWidth(50);
+    cType.setPrefWidth(50);
+    cType.setMaxWidth(90);
+
+    TableColumn<VarRow, String> cFunc = new TableColumn<>("Function");
+    cFunc.setCellValueFactory(v -> v.getValue().functionProperty());
+    cFunc.setMinWidth(80);
+    cFunc.setPrefWidth(80);
+
+    TableColumn<VarRow, String> cValue = new TableColumn<>("Value");
+    cValue.setCellValueFactory(v -> v.getValue().valueProperty());
+
+    varTable.getColumns().setAll(cName, cType, cFunc, cValue);
+
+    var title = new Label("Variables");
+    title.getStyleClass().add("pane-title");
 
     var header = new HBox(title);
     header.setAlignment(Pos.CENTER_LEFT);
     header.getStyleClass().add("pane-header");
 
-    var box = new VBox(header, terminalNode);
-    VBox.setVgrow(terminalNode, Priority.ALWAYS);
-    box.getStyleClass().add("terminal-pane");
-    box.setMinHeight(180);
+    var box = new VBox(header, varTable);
+    VBox.setVgrow(varTable, Priority.ALWAYS);
+    box.getStyleClass().add("variables-pane");
+    box.setMinWidth(320);
+
     return box;
+  }
+
+  private void showVariablesPane() {
+    Platform.runLater(() -> {
+      if (!terminalSplit.getItems().contains(variablesPane)) {
+        terminalSplit.getItems().add(variablesPane);
+        terminalSplit.setDividerPositions(0.72);
+      }
+    });
+    variablesPaneOption.setSelected(true);
+  }
+
+  private void hideVariablesPane() {
+    Platform.runLater(() -> {
+      terminalSplit.getItems().remove(variablesPane);
+    });
+    variablesPaneOption.setSelected(false);
+  }
+
+  public void setVariables(ZPEMap vars) {
+    java.util.List<VarRow> rows = new java.util.ArrayList<>();
+
+    for (ZPEType o : vars) {
+      ZPEMap m = (ZPEMap) vars.get(o);
+
+      String type = ZPEHelperFunctions.getTypeString(m.get("type"));
+
+      rows.add(new VarRow(
+              String.valueOf(m.get("id")),
+              type,
+              String.valueOf(m.get("function")),
+              String.valueOf(m.get("value"))
+      ));
+    }
+
+    Platform.runLater(() -> {
+      varRows.setAll(rows);   // clear + repopulate in one go
+      showVariablesPane();    // if you're hiding it until needed
+    });
+  }
+
+  private void clearRows(){
+    Platform.runLater(() -> {
+      varRows.clear();
+    });
   }
 
   private Node buildStatusBar() {
     var left = new Label("Ready");
-    var centre = new Label("Ln 1, Col 1");
+    var centre = new Label("ZIDE " + ZPECore.getVersionNumber() + " ©\uFE0F Jamie Balfour 2024 - 2026.");
     rightFooterLabel = new Label("Text");
+
+    centre.setStyle("-fx-font-size: 13px;");
 
     rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
       CodeEditorView c = ((EditorTab) editorTabs.getSelectionModel().getSelectedItem()).getEditor();
@@ -898,5 +1182,82 @@ public class ZIDEMain extends Application {
 
     }
     return array;
+  }
+
+  public void downloadWithPopup(String title, javafx.stage.Window owner, String url, Path target, boolean unzipOnComplete, boolean executable) {
+
+    DownloadDialog dlg = new DownloadDialog(owner, "Downloading " + title, "Starting…");
+    dlg.show();
+
+    Path location = target;
+
+    if(unzipOnComplete){
+      try {
+        location = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".zip");
+      } catch (IOException e) {
+        Alert a = new Alert(Alert.AlertType.ERROR, "Download failed: " + e.getMessage());
+      }
+    }
+
+    var task = Downloader.downloadToFileTask(url, location);
+
+    // Bind UI to task
+    dlg.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+    task.messageProperty().addListener((obs, oldV, newV) -> Platform.runLater(() -> dlg.setMessage(newV)));
+    task.progressProperty().addListener((obs, oldV, newV) -> Platform.runLater(() -> dlg.setProgress(newV.doubleValue())));
+
+    Path finalLocation = location;
+    task.setOnSucceeded(e -> {
+      dlg.close();
+      Path downloaded = task.getValue();
+
+      if(unzipOnComplete){
+        try {
+          FileHelperFunctions.unzip(finalLocation, target);
+        } catch (IOException ex) {
+          Alert a = new Alert(Alert.AlertType.ERROR, "Extraction failed: " + ex.getMessage());
+        }
+      }
+      if(executable){
+        try {
+          FileHelperFunctions.makeExecutable(target);
+        } catch (Exception ex) {
+          Alert a = new Alert(Alert.AlertType.ERROR, "Could not make the file executable: " + ex.getMessage());
+        }
+      }
+      // Use the file
+      System.out.println("Downloaded to " + downloaded);
+    });
+
+    task.setOnFailed(e -> {
+      dlg.close();
+      Throwable ex = task.getException();
+      Alert a = new Alert(Alert.AlertType.ERROR, "Download failed: " + ex.getMessage());
+      a.initOwner(owner);
+      a.showAndWait();
+    });
+
+    Thread t = new Thread(task, "zide-downloader");
+    t.setDaemon(true);
+    t.start();
+  }
+
+  public static final class VarRow {
+    private final SimpleStringProperty name = new SimpleStringProperty();
+    private final SimpleStringProperty type = new SimpleStringProperty();
+    private final SimpleStringProperty function = new SimpleStringProperty();
+    private final SimpleStringProperty value = new SimpleStringProperty();
+
+    public VarRow(String name, String type, String function, String value) {
+      this.name.set(name);
+      this.type.set(type);
+      this.function.set(function);
+      this.value.set(value);
+    }
+
+    public StringProperty nameProperty() { return name; }
+    public StringProperty typeProperty() { return type; }
+    public StringProperty functionProperty() { return function; }
+    public StringProperty valueProperty() { return value; }
   }
 }
