@@ -6,7 +6,7 @@ import jamiebalfour.balflaf_fx.WindowResizer;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
-import jamiebalfour.ui.components.BalfScrollbar;
+import jamiebalfour.ui.components.BalfScrollbarPane;
 import jamiebalfour.ui.components.BalfSearchBox;
 import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.editor.ConsoleOutputTextArea;
@@ -60,7 +60,7 @@ public class ZIDEEditor extends Application {
   ZPERuntimeEnvironment runtime;
   Label rightFooterLabel;
   ConsoleOutputTextArea consoleOutputTextArea;
-  BalfScrollbar consoleScrollbar;
+  BalfScrollbarPane consoleScrollbar;
   Button runBtn;
   Button debugBtn;
   Button stopExecutionBtn;
@@ -638,7 +638,7 @@ public class ZIDEEditor extends Application {
         wrapper.setLightColour(Color.white);
 
 
-        BalfScrollbar scrollPane = new BalfScrollbar();
+        BalfScrollbarPane scrollPane = new BalfScrollbarPane();
         scrollPane.setLightColour(Color.white);
         scrollPane.setDarkColour(dark);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
@@ -753,7 +753,7 @@ public class ZIDEEditor extends Application {
     return alert.showAndWait().orElse(cancel) == close;
   }
 
-  private Tab createEditorTab(String title, CodeEditorView syntax, BalfScrollbar scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
+  private Tab createEditorTab(String title, CodeEditorView syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
     EditorTab tab = new EditorTab(title, path, syntax, scrollPane, content);
     tab.setContent(content);
 
@@ -817,7 +817,7 @@ public class ZIDEEditor extends Application {
               })
       );
 
-      consoleScrollbar = new BalfScrollbar(consoleOutputTextArea);
+      consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
       consoleScrollbar.setLightColour(Color.WHITE);
       consoleScrollbar.setDarkColour(Color.BLACK);
       consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());

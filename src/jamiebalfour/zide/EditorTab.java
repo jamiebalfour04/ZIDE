@@ -2,7 +2,7 @@ package jamiebalfour.zide;
 
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
-import jamiebalfour.ui.components.BalfScrollbar;
+import jamiebalfour.ui.components.BalfScrollbarPane;
 import javafx.scene.control.Tab;
 
 import javax.swing.*;
@@ -11,9 +11,9 @@ import java.awt.*;
 public class EditorTab extends Tab {
   private final String path;
   private final jamiebalfour.codeeditor.CodeEditorView editor;
-  private final BalfScrollbar pane;
+  private final BalfScrollbarPane pane;
 
-  public EditorTab(String title, String path, jamiebalfour.codeeditor.CodeEditorView editor, BalfScrollbar pane, javafx.scene.Node content) {
+  public EditorTab(String title, String path, jamiebalfour.codeeditor.CodeEditorView editor, BalfScrollbarPane pane, javafx.scene.Node content) {
     super(title, content);
     this.path = path;
     this.editor = editor;
@@ -44,7 +44,7 @@ public class EditorTab extends Tab {
   }
 
   public jamiebalfour.codeeditor.CodeEditorView getEditor() { return editor; }
-  public BalfScrollbar getScrollPane() { return pane; }
+  public BalfScrollbarPane getScrollPane() { return pane; }
 
   void switchOnDarkMode() {
 
