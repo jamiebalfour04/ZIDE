@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/src/jamiebalfour/zide/ZIDE.iml" filepath="$PROJECT_DIR$/src/jamiebalfour/zide/ZIDE.iml" />
+      <module fileurl="file://$PROJECT_DIR$/ZIDE.iml" filepath="$PROJECT_DIR$/ZIDE.iml" />
     </modules>
   </component>
 </project>
