@@ -1,6 +1,9 @@
 package jamiebalfour.balflaf_fx;
 
+import jamiebalfour.HelperFunctions;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -12,41 +15,52 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.Objects;
+
 public class BalfTitleBar extends Region {
 
   private double dragOffsetX;
   private double dragOffsetY;
-  private Region leftControls;
+
   private final Stage stage;
   private final String title;
 
-  private final MenuButton jbMenu;
+  private Region leftNode;
+  private Region rightNode;
+
+  private final Button jbMenu;
+  private Label jbChevron;
+  private ContextMenu jbContextMenu;
   private final Canvas titleCanvas = new Canvas();
 
   private final Insets padding = new Insets(0, 10, 0, 10);
   private final double barHeight = 32;
 
-  public BalfTitleBar(Stage stage, String title) {
+  // Keep references so we can swap max/restore glyph on Windows
+  private SVGPath winMaxGlyph;
+
+  private EventHandler<ActionEvent> onAbout;
+
+  public BalfTitleBar(Stage stage, String title, EventHandler<ActionEvent> aboutAction) {
     this.stage = stage;
     this.title = title;
+    this.onAbout = aboutAction;
 
     getStyleClass().add("balf-titlebar");
     setMinHeight(barHeight);
     setPrefHeight(barHeight);
     setMaxHeight(barHeight);
-
-    boolean isMac = isMac();
-    leftControls = isMac ? macTrafficLights(stage) : windowsControls(stage);
-
 
     jbMenu = createJBMenu();
     clampToTitlebarHeight(jbMenu, 22);
@@ -55,8 +69,18 @@ public class BalfTitleBar extends Region {
     // Canvas is just for drawing; don't let it steal mouse events
     titleCanvas.setMouseTransparent(true);
 
-    // IMPORTANT: add canvas FIRST so controls are on top visually
-    getChildren().addAll(titleCanvas, leftControls, jbMenu);
+    boolean isMac = isMac();
+
+    if (isMac) {
+      leftNode = macTrafficLights(stage);
+      rightNode = jbMenu;                 // JB menu on right (mac)
+    } else {
+      leftNode = new Region();            // nothing on the left (windows)
+      rightNode = windowsRightCluster(stage); // JB menu + win buttons on right
+    }
+
+    // Add canvas FIRST so controls are on top visually
+    getChildren().addAll(titleCanvas, leftNode, rightNode);
 
     getStylesheets().add(
             getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
@@ -67,6 +91,10 @@ public class BalfTitleBar extends Region {
 
     enableWindowDrag(stage);
     enableDoubleClickZoom(stage);
+
+    // Windows: update max/restore glyph live
+    stage.maximizedProperty().addListener((obs, oldV, newV) -> updateWinMaximiseGlyph(newV));
+    updateWinMaximiseGlyph(stage.isMaximized());
   }
 
   @Override
@@ -82,31 +110,30 @@ public class BalfTitleBar extends Region {
     double leftX = padding.getLeft();
     double rightPad = padding.getRight();
 
-    // Lay out left controls
-    double lcW = snapSizeX(leftControls.prefWidth(h));
-    double lcH = snapSizeY(leftControls.prefHeight(-1));
-    double lcY = Math.round((h - lcH) / 2.0);
-    leftControls.resizeRelocate(leftX, lcY, lcW, lcH);
+    // Layout left node
+    double leftW = snapSizeX(leftNode.prefWidth(h));
+    double leftH = snapSizeY(leftNode.prefHeight(-1));
+    double leftY = Math.round((h - leftH) / 2.0);
+    leftNode.resizeRelocate(leftX, leftY, leftW, leftH);
 
-    // Lay out right menu
-    double menuW = snapSizeX(jbMenu.prefWidth(-1));
-    double menuH = snapSizeY(jbMenu.prefHeight(-1));
-    double menuX = Math.round(w - rightPad - menuW);
-    double menuY = Math.round((h - menuH) / 2.0);
-    jbMenu.resizeRelocate(menuX, menuY, menuW, menuH);
+    // Layout right node
+    double rightW = snapSizeX(rightNode.prefWidth(-1));
+    double rightH = snapSizeY(rightNode.prefHeight(-1));
+    double rightX = Math.round(w - rightPad - rightW);
+    double rightY = Math.round((h - rightH) / 2.0);
+    rightNode.resizeRelocate(rightX, rightY, rightW, rightH);
 
     // Canvas covers whole titlebar
     titleCanvas.setWidth(w);
     titleCanvas.setHeight(h);
 
-    redrawTitle(w, h, leftControls.getLayoutX() + leftControls.getWidth(), jbMenu.getLayoutX());
+    redrawTitle(w, h, leftNode.getLayoutX() + leftNode.getWidth(), rightNode.getLayoutX());
   }
 
   private void redrawTitle(double w, double h, double leftOccupiedEndX, double rightOccupiedStartX) {
     GraphicsContext g = titleCanvas.getGraphicsContext2D();
     g.clearRect(0, 0, w, h);
 
-    // Choose a font that matches your UI. Swap to your bundled font if you like.
     Font font = Font.font("System", FontWeight.MEDIUM, 13);
     g.setFont(font);
     g.setFill(Color.WHITE);
@@ -117,13 +144,11 @@ public class BalfTitleBar extends Region {
     double textW = t.getLayoutBounds().getWidth();
     double textH = t.getLayoutBounds().getHeight();
 
-    // IntelliJ-like centring: centre within the "free" band between left & right controls.
-    double bandLeft = leftOccupiedEndX + 10;            // small gap after traffic lights
-    double bandRight = rightOccupiedStartX - 10;        // small gap before JB menu
+    double bandLeft = leftOccupiedEndX + 10;
+    double bandRight = rightOccupiedStartX - 10;
     double bandWidth = Math.max(0, bandRight - bandLeft);
 
     double x = bandLeft + (bandWidth - textW) / 2.0;
-    // Clamp so it never overlaps if window is tiny
     x = clamp(x, bandLeft, bandRight - textW);
 
     double y = (h + textH / 2.0) / 2.0;
@@ -136,7 +161,6 @@ public class BalfTitleBar extends Region {
     return Math.max(min, Math.min(max, v));
   }
 
-
   private static void clampToTitlebarHeight(Region n, double h) {
     n.setMinHeight(h);
     n.setPrefHeight(h);
@@ -144,18 +168,32 @@ public class BalfTitleBar extends Region {
   }
 
   private boolean confirmClose() {
-
     Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-    alert.setTitle("Close ZIDE");
-    alert.setContentText("Are you sure you want to close ZIDE?");
+    alert.setTitle("Close " + title);
+    alert.setContentText("Are you sure you want to close " + title + "?");
 
     ButtonType close = new ButtonType("Close", ButtonBar.ButtonData.OK_DONE);
     ButtonType cancel = ButtonType.CANCEL;
 
     alert.getButtonTypes().setAll(close, cancel);
-
     return alert.showAndWait().orElse(cancel) == close;
   }
+
+  private Region windowsRightCluster(Stage stage) {
+    HBox box = new HBox(6);
+    box.setAlignment(Pos.CENTER_RIGHT);
+    box.getStyleClass().add("balf-win-right-cluster");
+
+    // keep JB menu height tidy
+    clampToTitlebarHeight(jbMenu, 22);
+
+    Region win = windowsControls(stage);
+
+    box.getChildren().addAll(jbMenu, win);
+    return box;
+  }
+
+  // ===== macOS traffic lights =====
 
   private Region macTrafficLights(Stage stage) {
     var box = new HBox(8);
@@ -163,10 +201,8 @@ public class BalfTitleBar extends Region {
     box.getStyleClass().add("balf-traffic");
 
     var close = trafficLight("balf-close", Color.web("#ff5f57"));
-
-
     close.setOnMouseClicked(e -> {
-      if(confirmClose()) {
+      if (confirmClose()) {
         Platform.exit();
         System.exit(0);
       }
@@ -175,29 +211,10 @@ public class BalfTitleBar extends Region {
     var minimise = trafficLight("balf-minimise", Color.web("#febc2e"));
     var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
 
-    //close.setOnMouseClicked(e -> stage.close());
     minimise.setOnMouseClicked(e -> stage.setIconified(true));
     zoom.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
 
     box.getChildren().addAll(close, minimise, zoom);
-    return box;
-  }
-
-  private Region windowsControls(Stage stage) {
-    // Minimal placeholder: you can replace with proper glyph buttons later
-    var box = new HBox(8);
-    box.setAlignment(Pos.CENTER_RIGHT);
-    box.getStyleClass().add("balf-win-controls");
-
-    var minimise = trafficLight("balf-minimise", Color.web("#b0b0b0"));
-    var maximise = trafficLight("balf-zoom", Color.web("#b0b0b0"));
-    var close = trafficLight("balf-close", Color.web("#d9534f"));
-
-    minimise.setOnMouseClicked(e -> stage.setIconified(true));
-    maximise.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
-    close.setOnMouseClicked(e -> stage.close());
-
-    box.getChildren().addAll(minimise, maximise, close);
     return box;
   }
 
@@ -208,13 +225,87 @@ public class BalfTitleBar extends Region {
     return c;
   }
 
+  // ===== Windows buttons =====
+
+  private Region windowsControls(Stage stage) {
+    var box = new HBox(0);
+    box.setAlignment(Pos.CENTER_RIGHT);
+    box.getStyleClass().add("balf-win-controls");
+
+    Button min = winButton("balf-win-min", glyphMinimise());
+    Button max = winButton("balf-win-max", glyphMaximise()); // will toggle to restore
+    Button close = winButton("balf-win-close", glyphClose());
+
+    min.setOnAction(e -> stage.setIconified(true));
+    max.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+    close.setOnAction(e -> {
+      if (confirmClose()) {
+        Platform.exit();
+        System.exit(0);
+      }
+    });
+
+    // keep handle so we can swap max/restore path
+    winMaxGlyph = (SVGPath) max.getGraphic();
+
+    // Windows buttons are typically flush-right; no extra padding here
+    box.getChildren().addAll(min, max, close);
+    return box;
+  }
+
+  private Button winButton(String styleClass, SVGPath glyph) {
+    Button b = new Button();
+    b.setFocusTraversable(false);
+    b.getStyleClass().addAll("balf-win-btn", styleClass);
+
+    // Standard-ish Windows caption button hit area
+    b.setMinSize(46, barHeight);
+    b.setPrefSize(46, barHeight);
+    b.setMaxSize(46, barHeight);
+
+    glyph.getStyleClass().add("balf-win-glyph");
+    b.setGraphic(glyph);
+
+    return b;
+  }
+
+  private void updateWinMaximiseGlyph(boolean maximised) {
+    if (winMaxGlyph == null) return;
+    winMaxGlyph.setContent(maximised ? PATH_RESTORE : PATH_MAXIMISE);
+  }
+
+  private SVGPath glyphMinimise() {
+    SVGPath p = new SVGPath();
+    p.setContent(PATH_MINIMISE);
+    return p;
+  }
+
+  private SVGPath glyphMaximise() {
+    SVGPath p = new SVGPath();
+    p.setContent(PATH_MAXIMISE);
+    return p;
+  }
+
+  private SVGPath glyphClose() {
+    SVGPath p = new SVGPath();
+    p.setContent(PATH_CLOSE);
+    return p;
+  }
+
+  // Simple, clean SVG paths (stroke via CSS)
+  private static final String PATH_MINIMISE = "M4 16 H20";
+  private static final String PATH_MAXIMISE = "M5 5 H19 V19 H5 Z";
+  private static final String PATH_RESTORE  = "M7 5 H19 V17 H17 V7 H7 Z M5 7 H15 V19 H5 Z";
+  private static final String PATH_CLOSE    = "M6 6 L18 18 M18 6 L6 18";
+
+  // ===== dragging / maximise =====
+
   private void enableWindowDrag(Stage stage) {
     setOnMousePressed(e -> {
       dragOffsetX = e.getSceneX();
       dragOffsetY = e.getSceneY();
     });
     setOnMouseDragged(e -> {
-      // Don’t drag when maximised; feels wrong.
       if (!stage.isMaximized()) {
         stage.setX(e.getScreenX() - dragOffsetX);
         stage.setY(e.getScreenY() - dragOffsetY);
@@ -235,46 +326,83 @@ public class BalfTitleBar extends Region {
     return os.contains("mac");
   }
 
-  private MenuButton createJBMenu() {
-    /*ImageView icon = new ImageView(new Image(
-            getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png")
+  private Button createJBMenu() {
+
+    ImageView logo = new ImageView(new Image(
+            Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png"))
     ));
-    icon.setFitWidth(20);
-    icon.setFitHeight(20);
-    icon.setPreserveRatio(true);*/
+    logo.setFitHeight(14);
+    logo.setPreserveRatio(true);
 
-    MenuItem about = new MenuItem("About ZIDE");
-    //about.setOnAction(e -> showAboutDialog());
+    jbChevron = new Label("⌄");
+    jbChevron.getStyleClass().add("jb-chevron");
 
-    MenuItem settings = new MenuItem("Settings…");
-    //settings.setOnAction(e -> openSettings());
+    HBox content = new HBox(8, logo, jbChevron);
+    content.setAlignment(Pos.CENTER);
+    content.getStyleClass().add("jb-menu-content");
 
-    MenuItem checkUpdates = new MenuItem("Check for Updates…");
-    //checkUpdates.setOnAction(e -> checkForUpdates());
+    Button jb = new Button();
+    jb.setGraphic(content);
+    jb.getStyleClass().add("jb-menu-button");
+    jb.setFocusTraversable(false);
 
-    MenuItem separator = new MenuItem(); // quick separator alternative below
+    jbChevron.setTranslateY(-1.5);
 
-    MenuItem quit = new MenuItem("Quit");
-    //quit.setOnAction(e -> quitApp());
+    // Context menu contents
+    MenuItem website = new MenuItem("Go to jamieBalfour.scot");
 
-    MenuButton jb = new MenuButton();
-    //jb.setGraphic(icon);
-    jb.getStyleClass().add("jb-menu");
-    jb.getItems().addAll(
+    website.setOnAction(e -> {
+      try {
+        HelperFunctions.openWebsite("https://www.jamiebalfour.scot");
+      } catch (URISyntaxException | IOException ex) {
+        //Ignore
+      }
+    });
+
+    MenuItem github   = new MenuItem("GitHub");
+
+    github.setOnAction(e -> {
+      try {
+        HelperFunctions.openWebsite("https://github.com/jamiebalfour04");
+      }catch (URISyntaxException | IOException ex) {
+        //Ignore
+      }
+    });
+
+    MenuItem about    = new MenuItem("About " + title);
+    about.setOnAction(this.onAbout);
+    MenuItem settings = new MenuItem("Settings");
+    MenuItem quit     = new MenuItem("Quit");
+
+    quit.setOnAction(e -> {
+      if(confirmClose()){
+        Platform.exit();
+        System.exit(0);
+      }
+    });
+
+    jbContextMenu = new ContextMenu(
+            website,
+            github,
+            new SeparatorMenuItem(),
             about,
             settings,
-            checkUpdates,
-            new javafx.scene.control.SeparatorMenuItem(),
+            new SeparatorMenuItem(),
             quit
     );
 
-    jb.setMaxWidth(20);
+    // Show/hide on click
+    jb.setOnAction(e -> {
+      if (jbContextMenu.isShowing()) {
+        jbContextMenu.hide();
+      } else {
+        jbContextMenu.show(jb, Side.BOTTOM, 0, 6);
+      }
+    });
 
-    // Optional: make it drop “downwards” (it will anyway at top bar)
-    jb.setPopupSide(Side.BOTTOM);
-
-    // Optional: no visible arrow
-    jb.getStyleClass().add("no-arrow");
+    // Optional: make chevron feel “live”
+    //jbContextMenu.setOnShowing(e -> jbChevron.setText("⌃"));
+    //jbContextMenu.setOnHiding(e -> jbChevron.setText("⌄"));
 
     return jb;
   }

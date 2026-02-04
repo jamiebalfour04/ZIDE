@@ -14,11 +14,14 @@ import jamiebalfour.zpe.interfaces.ZPEType;
 import jamiebalfour.zpe.types.ZPEMap;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.embed.swing.SwingNode;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -74,6 +77,7 @@ public class ZIDEEditor extends Application {
   private VBox variablesPane;
   private ConsoleOutputTextArea.BreakPoint currentBreakpoint;
   private CheckMenuItem variablesPaneOption;
+  MenuItem runProject;
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -107,14 +111,24 @@ public class ZIDEEditor extends Application {
 
     runtime = new ZPERuntimeEnvironment();
 
+    editorTabs = new TabPane();
+
     var root = new BorderPane();
     root.getStyleClass().add("app-root");
 
     WindowResizer resizer = new WindowResizer();
     resizer.install(stage, root);
 
+    EventHandler<ActionEvent> aboutHandler = e -> {
+      Alert alert = new Alert(Alert.AlertType.INFORMATION);
+      alert.setTitle("About ZIDE");
+      alert.setHeaderText("ZIDE is a lightweight IDE for the ZPE programming language.");
+      alert.setContentText("ZIDE is written in JavaFX and uses the Balf LAF for its UI.");
+      alert.showAndWait();
+    };
+
     // Top: menu + toolbar
-    var top = new VBox(new BalfTitleBar(stage, "ZIDE"), buildMenuBar(), buildToolBar());
+    var top = new VBox(new BalfTitleBar(stage, "ZIDE", aboutHandler), buildMenuBar(), buildToolBar());
     root.setTop(top);
 
 
@@ -281,7 +295,11 @@ public class ZIDEEditor extends Application {
     view.getItems().add(panesMenu);
 
     var run = new Menu("_Run");
-    var runProject = new MenuItem("Run");
+
+    runProject = new MenuItem("Run Project");
+
+
+
     runProject.setAccelerator(KeyCombination.keyCombination("Shortcut+R"));
     runProject.setOnAction(e -> runCode());
     run.getItems().add(runProject);
@@ -529,10 +547,29 @@ public class ZIDEEditor extends Application {
 
   private TabPane editorTabs;
 
+  // Call this whenever you want the label refreshed
+  Runnable refreshRunText = () -> {
+    Tab t = editorTabs.getSelectionModel().getSelectedItem();
+    String tabName = (t == null) ? "" : t.getText();
+    runProject.setText(tabName.isBlank() ? "Run" : "Run " + tabName);
+  };
+
+
   private Node buildEditorTabs() {
-    editorTabs = new TabPane();
     editorTabs.getStyleClass().add("editor-tabs");
     editorTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+
+
+
+    editorTabs.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) c -> {
+      while (c.next()) {
+        if (c.wasAdded()) {
+          for (Tab t : c.getAddedSubList()) {
+            t.textProperty().addListener((o, oldText, newText) -> refreshRunText.run());
+          }
+        }
+      }
+    });
 
     editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
       if (newTab == null) return;

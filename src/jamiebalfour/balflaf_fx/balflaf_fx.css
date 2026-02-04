@@ -74,3 +74,79 @@
 .swing-editor-host {
     -fx-background-color: green;
 }
+
+.balf-win-controls {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+
+.balf-win-btn {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+}
+
+.balf-win-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.balf-win-close:hover {
+    -fx-background-color: #E81123; /* Windows close hover red */
+}
+
+.balf-win-glyph {
+    -fx-fill: transparent;          /* we stroke paths */
+    -fx-stroke: rgba(255,255,255,0.90);
+    -fx-stroke-width: 1.6;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+.jb-menu-button {
+    -fx-background-color: #ddd;
+    -fx-background-radius: 7;
+    -fx-padding: 3 8 3 8;
+    -fx-cursor: hand;
+}
+
+.jb-menu-button:hover {
+    -fx-background-color: #e6e6e6;
+}
+
+.jb-menu-button:pressed {
+    -fx-background-color: #cfcfcf;
+}
+
+.jb-menu-content {
+    -fx-alignment: center;
+}
+
+.jb-chevron {
+    -fx-text-fill: #000;
+    -fx-font-size: 11px;
+}
+
+.jb-menu-button {
+    -fx-background-color: #ddd;
+    -fx-background-radius: 7;
+    -fx-background-insets: 0;   /* 👈 this kills the white border */
+    -fx-padding: 3 8 3 8;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.jb-menu-button:focused {
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-effect: none;          /* removes focus glow */
+}
+
+.jb-menu-button:hover {
+    -fx-background-color: #e6e6e6;
+}
+
+.jb-menu-button:pressed {
+    -fx-background-color: #cfcfcf;
+}
