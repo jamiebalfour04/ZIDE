@@ -2,7 +2,6 @@ package jamiebalfour.zide;
 
 import jamiebalfour.FileHelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
-import jamiebalfour.balflaf_fx.WindowResizer;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
@@ -116,15 +115,8 @@ public class ZIDEEditor extends Application {
     var root = new BorderPane();
     root.getStyleClass().add("app-root");
 
-    WindowResizer resizer = new WindowResizer();
-    resizer.install(stage, root);
-
     EventHandler<ActionEvent> aboutHandler = e -> {
-      Alert alert = new Alert(Alert.AlertType.INFORMATION);
-      alert.setTitle("About ZIDE");
-      alert.setHeaderText("ZIDE is a lightweight IDE for the ZPE programming language.");
-      alert.setContentText("ZIDE is written in JavaFX and uses the Balf LAF for its UI.");
-      alert.showAndWait();
+      ZIDEAboutWindow.show(_stage);
     };
 
     // Top: menu + toolbar
@@ -132,6 +124,7 @@ public class ZIDEEditor extends Application {
     root.setTop(top);
 
 
+    BalfTitleBar.addWindowResizing(stage, root);
 
 
     // Left: project tree
@@ -326,7 +319,11 @@ public class ZIDEEditor extends Application {
       }
     });
 
-    help.getItems().add(new MenuItem("About"));
+    MenuItem aboutMenuItem = new MenuItem("About");
+    help.getItems().add(aboutMenuItem);
+    aboutMenuItem.setOnAction(e -> {
+      ZIDEAboutWindow.show(_stage);
+    });
 
     help.getItems().add(new SeparatorMenuItem());
     help.getItems().add(downloadZPERuntimeItem);

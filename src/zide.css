@@ -247,3 +247,33 @@
     -fx-border-color: transparent;
 }
 
+.about-root {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.about-content {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.about-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: 800;
+}
+
+.about-version {
+    -fx-opacity: 0.75;
+}
+
+.about-tagline {
+    -fx-opacity: 0.9;
+}
+
+.about-key {
+    -fx-font-weight: 700;
+    -fx-opacity: 0.75;
+}
+
+.about-val {
+    -fx-opacity: 0.95;
+}
+

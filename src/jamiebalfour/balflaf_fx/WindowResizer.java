@@ -5,7 +5,7 @@ import javafx.scene.Node;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Stage;
 
-public final class WindowResizer {
+final class WindowResizer {
 
   private static final int RESIZE_MARGIN = 6; // px
 

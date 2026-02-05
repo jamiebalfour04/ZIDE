@@ -8,6 +8,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -22,6 +23,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.io.IOException;
@@ -36,11 +38,10 @@ public class BalfTitleBar extends Region {
   private final Stage stage;
   private final String title;
 
-  private Region leftNode;
+  private final Region leftNode;
   private Region rightNode;
 
   private final Button jbMenu;
-  private Label jbChevron;
   private ContextMenu jbContextMenu;
   private final Canvas titleCanvas = new Canvas();
 
@@ -50,12 +51,26 @@ public class BalfTitleBar extends Region {
   // Keep references so we can swap max/restore glyph on Windows
   private SVGPath winMaxGlyph;
 
-  private EventHandler<ActionEvent> onAbout;
+  private final boolean enableWindowMaximise;
+  private final boolean enableWindowMinimise;
+
+  private final EventHandler<ActionEvent> onAbout;
 
   public BalfTitleBar(Stage stage, String title, EventHandler<ActionEvent> aboutAction) {
+    this(stage, title, aboutAction, true, true, true, true);
+  }
+
+  public BalfTitleBar(Stage stage, String title, EventHandler<ActionEvent> aboutAction, boolean isDialog) {
+    this(stage, title, aboutAction, false, false, false, false);
+  }
+
+  public BalfTitleBar(Stage stage, String title, EventHandler<ActionEvent> aboutAction, boolean enableWindowMinimise, boolean enableWindowMaximise, boolean enableWindowDrag, boolean exitApplicationOnClose) {
     this.stage = stage;
     this.title = title;
     this.onAbout = aboutAction;
+
+    this.enableWindowMinimise = enableWindowMinimise;
+    this.enableWindowMaximise = enableWindowMaximise;
 
     getStyleClass().add("balf-titlebar");
     setMinHeight(barHeight);
@@ -66,6 +81,7 @@ public class BalfTitleBar extends Region {
     clampToTitlebarHeight(jbMenu, 22);
     jbMenu.setFocusTraversable(false);
 
+
     // Canvas is just for drawing; don't let it steal mouse events
     titleCanvas.setMouseTransparent(true);
 
@@ -73,28 +89,45 @@ public class BalfTitleBar extends Region {
 
     if (isMac) {
       leftNode = macTrafficLights(stage);
-      rightNode = jbMenu;                 // JB menu on right (mac)
+      // Add canvas FIRST so controls are on top visually
+      getChildren().addAll(titleCanvas, leftNode);
+      if(stage.getModality() != Modality.WINDOW_MODAL) {
+        rightNode = jbMenu;                 // JB menu on right (mac)
+        getChildren().add(rightNode);
+      }
     } else {
       leftNode = new Region();            // nothing on the left (windows)
       rightNode = windowsRightCluster(stage); // JB menu + win buttons on right
+      // Add canvas FIRST so controls are on top visually
+      getChildren().addAll(titleCanvas, leftNode, rightNode);
     }
 
-    // Add canvas FIRST so controls are on top visually
-    getChildren().addAll(titleCanvas, leftNode, rightNode);
 
-    getStylesheets().add(
-            getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
-    );
+
+    getStylesheets().add(getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm());
 
     widthProperty().addListener((obs, o, n) -> requestLayout());
     heightProperty().addListener((obs, o, n) -> requestLayout());
 
-    enableWindowDrag(stage);
-    enableDoubleClickZoom(stage);
+    if(enableWindowDrag){
+      enableWindowDrag(stage);
+    }
+
+
+    if(enableWindowMaximise) {
+      enableDoubleClickZoom(stage);
+    }
 
     // Windows: update max/restore glyph live
     stage.maximizedProperty().addListener((obs, oldV, newV) -> updateWinMaximiseGlyph(newV));
     updateWinMaximiseGlyph(stage.isMaximized());
+
+
+  }
+
+  public static void addWindowResizing(Stage stage, Node root){
+    WindowResizer resizer = new WindowResizer();
+    resizer.install(stage, root);
   }
 
   @Override
@@ -117,17 +150,40 @@ public class BalfTitleBar extends Region {
     leftNode.resizeRelocate(leftX, leftY, leftW, leftH);
 
     // Layout right node
-    double rightW = snapSizeX(rightNode.prefWidth(-1));
-    double rightH = snapSizeY(rightNode.prefHeight(-1));
+    double rightW;
+
+    if(rightNode == null) {
+      rightW = 0;
+    } else{
+      rightW = snapSizeX(rightNode.prefWidth(-1));
+    }
+
+
+    double rightH;
+    if(rightNode == null) {
+      rightH = 0;
+    } else{
+      rightH = snapSizeY(rightNode.prefHeight(-1));
+    }
+
     double rightX = Math.round(w - rightPad - rightW);
     double rightY = Math.round((h - rightH) / 2.0);
-    rightNode.resizeRelocate(rightX, rightY, rightW, rightH);
+
+    if(rightNode != null) {
+      rightNode.resizeRelocate(rightX, rightY, rightW, rightH);
+    }
 
     // Canvas covers whole titlebar
     titleCanvas.setWidth(w);
     titleCanvas.setHeight(h);
 
-    redrawTitle(w, h, leftNode.getLayoutX() + leftNode.getWidth(), rightNode.getLayoutX());
+    double rightN = 0;
+
+    if(rightNode != null) {
+      rightN = rightNode.getLayoutX();
+    }
+
+    redrawTitle(w, h, leftNode.getLayoutX() + leftNode.getWidth(), rightN);
   }
 
   private void redrawTitle(double w, double h, double leftOccupiedEndX, double rightOccupiedStartX) {
@@ -184,12 +240,18 @@ public class BalfTitleBar extends Region {
     box.setAlignment(Pos.CENTER_RIGHT);
     box.getStyleClass().add("balf-win-right-cluster");
 
-    // keep JB menu height tidy
-    clampToTitlebarHeight(jbMenu, 22);
+    if(stage.getModality() != Modality.WINDOW_MODAL) {
+      // keep JB menu height tidy
+      clampToTitlebarHeight(jbMenu, 22);
+    }
 
     Region win = windowsControls(stage);
 
-    box.getChildren().addAll(jbMenu, win);
+    if(stage.getModality() != Modality.WINDOW_MODAL){
+      box.getChildren().add(jbMenu);
+    }
+
+    box.getChildren().add(win);
     return box;
   }
 
@@ -208,13 +270,22 @@ public class BalfTitleBar extends Region {
       }
     });
 
-    var minimise = trafficLight("balf-minimise", Color.web("#febc2e"));
-    var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
+    box.getChildren().add(close);
 
-    minimise.setOnMouseClicked(e -> stage.setIconified(true));
-    zoom.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
+    if(enableWindowMinimise) {
+      var minimise = trafficLight("balf-minimise", Color.web("#febc2e"));
+      minimise.setOnMouseClicked(e -> stage.setIconified(true));
+      box.getChildren().add(minimise);
+    }
 
-    box.getChildren().addAll(close, minimise, zoom);
+
+
+    if(enableWindowMaximise) {
+      var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
+      zoom.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
+      box.getChildren().add(zoom);
+    }
+
     return box;
   }
 
@@ -259,9 +330,9 @@ public class BalfTitleBar extends Region {
     b.getStyleClass().addAll("balf-win-btn", styleClass);
 
     // Standard-ish Windows caption button hit area
-    b.setMinSize(46, barHeight);
-    b.setPrefSize(46, barHeight);
-    b.setMaxSize(46, barHeight);
+    b.setMinSize(40, barHeight);
+    b.setPrefSize(40, barHeight);
+    b.setMaxSize(40, barHeight);
 
     glyph.getStyleClass().add("balf-win-glyph");
     b.setGraphic(glyph);
@@ -334,7 +405,7 @@ public class BalfTitleBar extends Region {
     logo.setFitHeight(14);
     logo.setPreserveRatio(true);
 
-    jbChevron = new Label("⌄");
+    Label jbChevron = new Label("⌄");
     jbChevron.getStyleClass().add("jb-chevron");
 
     HBox content = new HBox(8, logo, jbChevron);
