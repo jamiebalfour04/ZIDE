@@ -7,6 +7,12 @@
         <target>package_up</target>
       </options>
     </properties>
+    <properties id="ant-preprocessing">
+      <options enabled="true">
+        <file>file://$PROJECT_DIR$/zide_build.ant</file>
+        <target>UpdateBuild</target>
+      </options>
+    </properties>
     <root id="archive" name="zide.jar">
       <element id="directory" name="META-INF">
         <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />

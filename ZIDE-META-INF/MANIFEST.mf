@@ -1,4 +1,4 @@
 Manifest-Version: 1.0
-Main-Class: jamiebalfour.zide.ZIDEMain
+Main-Class: jamiebalfour.zide.core.ZIDE
 Class-Path: .classpath
 

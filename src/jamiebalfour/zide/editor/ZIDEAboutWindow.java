@@ -1,4 +1,4 @@
-package jamiebalfour.zide;
+package jamiebalfour.zide.editor;
 
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.zpe.core.ZPECore;

@@ -1,4 +1,4 @@
-package jamiebalfour.zide;
+package jamiebalfour.zide.editor;
 
 import javafx.geometry.Insets;
 import javafx.scene.Scene;

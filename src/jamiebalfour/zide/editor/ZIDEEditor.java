@@ -1,4 +1,4 @@
-package jamiebalfour.zide;
+package jamiebalfour.zide.editor;
 
 import jamiebalfour.FileHelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
@@ -7,13 +7,14 @@ import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
 import jamiebalfour.ui.components.BalfScrollbarPane;
 import jamiebalfour.ui.components.BalfSearchBox;
+import jamiebalfour.zide.ZIDEHelperFunctions;
+import jamiebalfour.zide.core.ZIDE;
 import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.interfaces.ZPEType;
 import jamiebalfour.zpe.types.ZPEMap;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -972,7 +973,7 @@ public class ZIDEEditor extends Application {
 
   private Node buildStatusBar() {
     var left = new Label("Ready");
-    var centre = new Label("ZIDE " + ZPECore.getVersionNumber() + " ©\uFE0F Jamie Balfour 2024 - 2026.");
+    var centre = new Label("ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion() + " build " + ZIDE.getBuildNumber() + " © Jamie Balfour 2024 - 2026.");
     rightFooterLabel = new Label("Text");
 
     centre.setStyle("-fx-font-size: 13px;");
@@ -1217,7 +1218,7 @@ public class ZIDEEditor extends Application {
       }
     }
 
-    var task = Downloader.downloadToFileTask(url, location);
+    var task = ZIDEHelperFunctions.downloadToFileTask(url, location);
 
     // Bind UI to task
     dlg.setProgress(ProgressBar.INDETERMINATE_PROGRESS);

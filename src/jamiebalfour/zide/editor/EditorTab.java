@@ -1,4 +1,4 @@
-package jamiebalfour.zide;
+package jamiebalfour.zide.editor;
 
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;

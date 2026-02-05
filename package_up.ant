@@ -1,4 +1,4 @@
-<project name="ZPE" default="package_up" basedir=".">
+<project name="ZIDE" default="package_up" basedir=".">
 
     <!-- Define properties for source and destination -->
     <property name="src.jar" value="build/zide.jar"/>

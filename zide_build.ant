@@ -1,0 +1,26 @@
+<project name="ZIDE" default="UpdateBuild" basedir=".">
+
+    <description>
+        Increments the build number after each build
+    </description>
+    <!-- set global properties for this build -->
+    <property name="src" location="src"/>
+
+    <available file="${src}/jamiebalfour/zide/core/ZIDEBuildInformation.java"
+               property="buildinfo.exists"/>
+
+    <fail unless="buildinfo.exists"
+          message="ZIDEBuildInformation.java not found – check src path"/>
+
+    <tstamp>
+        <format property="TODAY_UK" pattern="dd-MM-yyyy" locale="en,UK"/>
+        <format property="TIME_UK" pattern="HH:mm:ss" locale="en,UK"/>
+        <format property="MONTH" pattern="MMMMM yyyy" locale="en,UK"/>
+    </tstamp>
+    <target name="UpdateBuild">
+        <buildnumber/>
+        <replaceregexp file="${src}/jamiebalfour/zide/core/ZIDEBuildInformation.java" match="static String date = &quot;[^&quot;]*&quot;;" replace="static String date = &quot;${TODAY_UK}&quot;;" byline="true"/>
+        <replaceregexp file="${src}/jamiebalfour/zide/core/ZIDEBuildInformation.java" match="static String time = &quot;[^&quot;]*&quot;;" replace="static String time = &quot;${TIME_UK}&quot;;" byline="true"/>
+        <replaceregexp file="${src}/jamiebalfour/zide/core/ZIDEBuildInformation.java" match="static String build = &quot;[^&quot;]*&quot;;" replace="static String build = &quot;${build.number}&quot;;" byline="true"/>
+    </target>
+</project>

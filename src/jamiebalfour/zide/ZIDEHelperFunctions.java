@@ -12,9 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.OptionalLong;
 
-final class Downloader {
+public final class ZIDEHelperFunctions {
 
-  private Downloader() {}
+  private ZIDEHelperFunctions() {}
 
   public static Task<Path> downloadToFileTask(String url, Path target) {
     return new Task<>() {
