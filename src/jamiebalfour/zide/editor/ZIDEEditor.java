@@ -10,9 +10,9 @@ import jamiebalfour.ui.components.BalfSearchBox;
 import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.core.ZIDE;
 import jamiebalfour.zpe.core.*;
-import jamiebalfour.zpe.editor.ConsoleOutputTextArea;
-import jamiebalfour.zpe.interfaces.ZPEType;
-import jamiebalfour.zpe.types.ZPEMap;
+import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
+import jamiebalfour.zpe.core.interfaces.ZPEType;
+import jamiebalfour.zpe.core.types.ZPEMap;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -116,9 +116,7 @@ public class ZIDEEditor extends Application {
     var root = new BorderPane();
     root.getStyleClass().add("app-root");
 
-    EventHandler<ActionEvent> aboutHandler = e -> {
-      ZIDEAboutWindow.show(_stage);
-    };
+    EventHandler<ActionEvent> aboutHandler = e -> ZIDEAboutWindow.show(_stage);
 
     // Top: menu + toolbar
     var top = new VBox(new BalfTitleBar(stage, "ZIDE", aboutHandler), buildMenuBar(), buildToolBar());
@@ -139,16 +137,12 @@ public class ZIDEEditor extends Application {
     // Bottom: terminal + status bar
     var terminal = buildTerminal();
 
-    consoleOutputTextArea.addProcessFinishedListener(new ConsoleOutputTextArea.ProcessFinishedListener() {
-
-      @Override
-      public void onProcessFinished() {
-        stopExecutionBtn.setVisible(false);
-        stepOverButton.setVisible(false);
-        continueButton.setVisible(false);
-        debugSeparator.setVisible(false);
-        clearRows();
-      }
+    consoleOutputTextArea.addProcessFinishedListener(() -> {
+      stopExecutionBtn.setVisible(false);
+      stepOverButton.setVisible(false);
+      continueButton.setVisible(false);
+      debugSeparator.setVisible(false);
+      clearRows();
     });
     var bottom = new VBox(terminal, buildStatusBar());
     VBox.setVgrow(terminal, Priority.ALWAYS);
@@ -165,7 +159,7 @@ public class ZIDEEditor extends Application {
 
     var scene = new Scene(root, 1280, 800);
     //scene.setFill(Color.TRANSPARENT);
-    scene.getStylesheets().add(getClass().getResource("/zide.css").toExternalForm());
+    scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/zide.css")).toExternalForm());
 
     stage.setTitle("ZIDE");
     stage.setScene(scene);
@@ -262,9 +256,7 @@ public class ZIDEEditor extends Application {
           tab.switchOffDarkMode();
         }
         int scrollPosition = tab.getScrollPane().getVerticalScrollBar().getValue();
-        SwingUtilities.invokeLater(() -> {
-          tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition);
-        });
+        SwingUtilities.invokeLater(() -> tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition));
 
       }
 
@@ -302,9 +294,7 @@ public class ZIDEEditor extends Application {
 
 
     var downloadZPERuntimeItem = new MenuItem("Download ZPE Runtime Environment");
-    downloadZPERuntimeItem.setOnAction(e -> {
-      downloadZPERuntime();
-    });
+    downloadZPERuntimeItem.setOnAction(e -> downloadZPERuntime());
 
     var downloadZPENative = new MenuItem("Download ZPE Native");
     downloadZPENative.setOnAction(e -> {
@@ -322,9 +312,7 @@ public class ZIDEEditor extends Application {
 
     MenuItem aboutMenuItem = new MenuItem("About");
     help.getItems().add(aboutMenuItem);
-    aboutMenuItem.setOnAction(e -> {
-      ZIDEAboutWindow.show(_stage);
-    });
+    aboutMenuItem.setOnAction(e -> ZIDEAboutWindow.show(_stage));
 
     help.getItems().add(new SeparatorMenuItem());
     help.getItems().add(downloadZPERuntimeItem);
@@ -430,24 +418,17 @@ public class ZIDEEditor extends Application {
   private ToolBar buildToolBar() {
     runBtn = new Button("Run");
     runBtn.getStyleClass().add("run");
-    runBtn.setOnAction(e -> {
-      runCode();
-
-    });
+    runBtn.setOnAction(e -> runCode());
 
     var buildBtn = new Button("Build");
 
     debugBtn = new Button("Debug");
     debugBtn.getStyleClass().add("debug");
     debugBtn.setOnAction(e -> {
-      consoleOutputTextArea.addBreakPointReachedListener(new ConsoleOutputTextArea.BreakPointReachedListener() {
-
-        @Override
-        public void onBreakPointReached(ConsoleOutputTextArea.BreakPoint b, ZPEMap varData) {
-          currentBreakpoint = b;
-          showVariablesPane();
-          setVariables(varData);
-        }
+      consoleOutputTextArea.addBreakPointReachedListener((b, varData) -> {
+        currentBreakpoint = b;
+        showVariablesPane();
+        setVariables(varData);
       });
 
       debugCode();
@@ -937,9 +918,7 @@ public class ZIDEEditor extends Application {
   }
 
   private void hideVariablesPane() {
-    Platform.runLater(() -> {
-      terminalSplit.getItems().remove(variablesPane);
-    });
+    Platform.runLater(() -> terminalSplit.getItems().remove(variablesPane));
     variablesPaneOption.setSelected(false);
   }
 
@@ -966,9 +945,7 @@ public class ZIDEEditor extends Application {
   }
 
   private void clearRows(){
-    Platform.runLater(() -> {
-      varRows.clear();
-    });
+    Platform.runLater(() -> varRows.clear());
   }
 
   private Node buildStatusBar() {
