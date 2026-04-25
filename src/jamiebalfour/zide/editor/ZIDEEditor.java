@@ -48,10 +48,10 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
-import javax.swing.Timer;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -65,8 +65,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ZIDEEditor extends Application {
 
@@ -89,7 +87,7 @@ public class ZIDEEditor extends Application {
   private CheckMenuItem variablesPaneOption;
   MenuItem runProject;
   MenuItem debugProject;
-  MenuItem stopExecution;
+  MenuItem stopExecution = new MenuItem("Stop Execution");
   private File currentProjectRoot;
   File projectDir;
 
@@ -352,9 +350,12 @@ public class ZIDEEditor extends Application {
             .item("Paste", "⌘V", () -> {
               if (getCurrentTab() != null) getCurrentTab().getEditor().paste();
             })
+            .separator()
             .item("Select All", "⌘A", () -> {
               if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
-            });
+            })
+            .item("Format document", "", this::beautifyCurrentDocument);
+
 
     bar.menu("View")
             .checkItem("Dark theme", toggleTheme != null && toggleTheme.isSelected(), selected -> {
@@ -382,7 +383,7 @@ public class ZIDEEditor extends Application {
               }
             });
 
-    bar.menu("Run")
+    bar.menu("Script")
             .item("Run", "F5", this::runCode)
             .item("Debug", "⇧⌘R", this::debug)
             .separator()
@@ -612,6 +613,22 @@ public class ZIDEEditor extends Application {
 
   }
 
+  public void beautifyCurrentDocument() {
+
+      if(getCurrentTab() == null) return;
+      ZIDESyntaxEditor doc = getCurrentTab().getEditor();
+      String code = doc.getText();
+
+      String formatted = ZPEKit.beautifyCode(code);
+
+      doc.setText(formatted);
+      doc.rehighlightAll();
+
+      doc.setCaretPosition(0);
+
+
+  }
+
   private void runCode(){
 
     if (!getZPE()) return;
@@ -626,7 +643,7 @@ public class ZIDEEditor extends Application {
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
       consoleOutputTextArea.runAsProcess(tempPath, false, false, "");
-      stopExecution.setDisable(false);
+      //stopExecution.setDisable(false);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1084,17 +1101,13 @@ public class ZIDEEditor extends Application {
 
         mainSyntax.setFontSize(14);
 
-        mainSyntax.addLineNumberClickListener(new CodeEditorView.LineNumberClickListener() {
-
-          @Override
-          public void onLineNumberClicked(int lineNumber) {
-            if(mainSyntax.hasSpecialLine(lineNumber)){
-              mainSyntax.removeSpecialLine(lineNumber);
-            } else{
-              mainSyntax.addSpecialLine(lineNumber);
-            }
-
+        mainSyntax.addLineNumberClickListener(lineNumber -> {
+          if(mainSyntax.hasSpecialLine(lineNumber)){
+            mainSyntax.removeSpecialLine(lineNumber);
+          } else{
+            mainSyntax.addSpecialLine(lineNumber);
           }
+
         });
 
         Font jbMono = loadAndRegister("/files/JetBrainsMono-Regular.ttf");
@@ -1113,6 +1126,33 @@ public class ZIDEEditor extends Application {
 
 
 
+        Color normal   = new Color(35, 35, 38);      // #232326
+        Color comment  = new Color(72, 145, 85);     // #489155
+        Color quote    = new Color(220, 95, 60);     // #DC5F3C
+        Color keyword  = new Color(138, 43, 226);    // #8A2BE2
+        Color function = new Color(0, 122, 255);     // #007AFF
+        Color heredoc  = new Color(235, 120, 55);    // #EB7837
+        Color bool     = new Color(200, 55, 135);    // #C83787
+        Color var      = new Color(210, 60, 110);    // #D23C6E
+        Color doc      = new Color(34, 150, 120);    // #229678
+        Color type     = new Color(0, 150, 170);     // #0096AA
+        Color special  = new Color(180, 90, 20);     // #B45A14
+
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Normal, normal);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Comment, comment);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Quote, quote);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Keyword, keyword);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Function, function);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Heredoc, heredoc);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Bool, bool);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Var, var);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Doc, doc);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Type, type);
+        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Special, special);
+
+        mainSyntax.setAttributeFontStyle(CodeEditorView.ATTR_TYPE.Keyword, Font.PLAIN);
+
+
         Color dark = Color.decode("#282D37");
         // Wrapper + padding
         BalfPanel wrapper = new BalfPanel(new BorderLayout());
@@ -1128,7 +1168,7 @@ public class ZIDEEditor extends Application {
         scrollPane.setDarkColour(dark);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
         mainSyntax.repaint();
         mainSyntax.requestFocus();
@@ -1146,6 +1186,8 @@ public class ZIDEEditor extends Application {
           mainSyntax.setText(FileHelperFunctions.readFileAsString(file));
         }
 
+        mainSyntax.loadAllCitizens();
+
         mainSyntax.setCaretPosition(0);
 
         // Track “has content” safely
@@ -1155,7 +1197,7 @@ public class ZIDEEditor extends Application {
           private void update() {
             // always EDT already, but keep it simple
             hasNonBlankContent.set(!mainSyntax.getText().isBlank());
-            mainSyntax.onEditorChanged();
+            mainSyntax.loadAllCitizens();
           }
 
           @Override public void insertUpdate(DocumentEvent e) { update(); }
@@ -1240,7 +1282,7 @@ public class ZIDEEditor extends Application {
     return alert.showAndWait().orElse(cancel) == close;
   }
 
-  private Tab createEditorTab(String title, CodeEditorView syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
+  private Tab createEditorTab(String title, ZIDESyntaxEditor syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
     EditorTab tab = new EditorTab(title, path, syntax, scrollPane, content);
     tab.setContent(content);
 
@@ -1319,12 +1361,6 @@ public class ZIDEEditor extends Application {
 
     consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
 
-    consoleOutputTextArea.addProcessFinishedListener(() ->
-            Platform.runLater(() -> {
-              runBtn.getStyleClass().remove("running");
-              debugBtn.getStyleClass().remove("running");
-            })
-    );
 
     consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
     consoleScrollbar.setLightColour(Color.WHITE);
@@ -1343,7 +1379,7 @@ public class ZIDEEditor extends Application {
     problemsView = wrapWithHeader("Problems", buildProblemsPane());
 
     // --- Variables view ---
-    variablesView = wrapWithHeader("Variables", buildVariablesPane());
+    variablesView = wrapWithHeader("Variable Watch", buildVariablesPane());
 
     // --- Content stack ---
     bottomContentStack = new StackPane(terminalView, problemsView, variablesView);
@@ -1358,7 +1394,7 @@ public class ZIDEEditor extends Application {
     // --- Vertical tabs ---
     terminalTab = createBottomSideTab("Terminal", icon("/files/console.png"));
     problemsTab = createBottomSideTab("Problems", icon("/files/warning.png"));
-    variablesTab = createBottomSideTab("Variables", icon("/files/watch.png"));
+    variablesTab = createBottomSideTab("Variable Watch", icon("/files/watch.png"));
 
     ToggleGroup group = new ToggleGroup();
     terminalTab.setToggleGroup(group);
@@ -1381,6 +1417,14 @@ public class ZIDEEditor extends Application {
 
     bottom.getStyleClass().add("bottom-panel");
     bottom.setMinHeight(180);
+
+
+    consoleOutputTextArea.addProcessFinishedListener(() ->
+            Platform.runLater(() -> {
+              runBtn.getStyleClass().remove("running");
+              debugBtn.getStyleClass().remove("running");
+            })
+    );
 
     return bottom;
   }

@@ -1,11 +1,14 @@
 package jamiebalfour.zide.editor;
 
+import jamiebalfour.HelperFunctions;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.zpe.core.ZPEHelperFunctions;
 import jamiebalfour.zpe.core.ZPEKit;
 import javafx.application.Platform;
 
 import javax.swing.Timer;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,6 +17,8 @@ public class ZIDESyntaxEditor extends CodeEditorView {
 
   ZIDEEditor owner;
   private List<FunctionHint> customFunctions = new ArrayList<>();
+  private Timer symbolTimer;
+  private volatile int symbolVersion = 0;
 
   public ZIDESyntaxEditor(jamiebalfour.zide.editor.ZIDEEditor editor) {
     super();
@@ -21,16 +26,27 @@ public class ZIDESyntaxEditor extends CodeEditorView {
 
     setInformationWindowClickClickListener((e, x) -> {
       int pos = findByFunctionName(e);
-      if(pos != -1){
+      if (pos != -1) {
         goToLine(customFunctions.get(pos).line);
+      } else {
+        String cat = ZPEKit.getFunctionCategory(e).toLowerCase().replace("/", "").replace(" ", "_");
+        String url = "https://www.jamiebalfour.scot/projects/zpe/documentation/functions/" + cat + "/" + e;
+        System.out.println("Opening URL: " + url);
+        try {
+          HelperFunctions.openWebsite(url);
+        } catch (URISyntaxException ex) {
+          throw new RuntimeException(ex);
+        } catch (IOException ex) {
+          throw new RuntimeException(ex);
+        }
       }
     });
   }
 
-  private int findByFunctionName(String functionName){
+  private int findByFunctionName(String functionName) {
     int i = 0;
-    for(FunctionHint x : customFunctions){
-      if(x.getName().equals(functionName)){
+    for (FunctionHint x : customFunctions) {
+      if (x.getName().equals(functionName)) {
         return i;
       }
       i++;
@@ -39,11 +55,7 @@ public class ZIDESyntaxEditor extends CodeEditorView {
     return -1;
   }
 
-  private Timer symbolTimer;
-
-  private volatile int symbolVersion = 0;
-
-  void onEditorChanged() {
+  void loadAllCitizens() {
     symbolVersion++;
 
     int version = symbolVersion;
@@ -70,8 +82,7 @@ public class ZIDESyntaxEditor extends CodeEditorView {
       output += "<html><div style='padding:10px;width:300px;color:#333;'>";
     }
 
-    ArrayList<AbstractMap.SimpleEntry<String, String>> params =
-            owner.getParams(ZPEKit.getFunctionManualHeader(functionName));
+    ArrayList<AbstractMap.SimpleEntry<String, String>> params = ZIDEEditor.getParams(ZPEKit.getFunctionManualHeader(functionName));
 
     StringBuilder header = new StringBuilder();
 
@@ -81,17 +92,9 @@ public class ZIDESyntaxEditor extends CodeEditorView {
       String type = param.getValue();
 
       if (dark) {
-        header.append("<span style='color: rgb(105, 143, 163);font-style:italic;'>")
-                .append(type)
-                .append("</span> <span style='color:#f60'>")
-                .append(name)
-                .append("</span>");
+        header.append("<span style='color: rgb(105, 143, 163);font-style:italic;'>").append(type).append("</span> <span style='color:#f60'>").append(name).append("</span>");
       } else {
-        header.append("<span style='color: rgb(2, 87, 172);font-style:italic;'>")
-                .append(type)
-                .append("</span> <span style='color:#f60'>")
-                .append(name)
-                .append("</span>");
+        header.append("<span style='color: rgb(2, 87, 172);font-style:italic;'>").append(type).append("</span> <span style='color:#f60'>").append(name).append("</span>");
       }
 
       if (i + 1 < params.size()) {
@@ -100,26 +103,16 @@ public class ZIDESyntaxEditor extends CodeEditorView {
     }
 
     if (dark) {
-      output += "<div style='margin-bottom:5px;'><code style='font-size:10px;'><span style='font-weight:bold;color:rgb(198, 120, 222)'>"
-              + functionName + "</span> (" + header + ") : "
-              + ZPEHelperFunctions.typeByteToString(ZPEKit.getFunctionReturnType(functionName))
-              + "</code></div>";
+      output += "<div style='margin-bottom:5px;'><code style='font-size:10px;'><span style='font-weight:bold;color:rgb(198, 120, 222)'>" + functionName + "</span> (" + header + ") : " + ZPEHelperFunctions.typeByteToString(ZPEKit.getFunctionReturnType(functionName)) + "</code></div>";
     } else {
-      output += "<div style='margin-bottom:5px;'><code style='font-size:10px;'><span style='font-weight:bold;margin-bottom:20px;color:rgb(135, 16, 148)'>"
-              + functionName + "</span> (" + header + ") : "
-              + ZPEHelperFunctions.typeByteToString(ZPEKit.getFunctionReturnType(functionName))
-              + "</code></div>";
+      output += "<div style='margin-bottom:5px;'><code style='font-size:10px;'><span style='font-weight:bold;margin-bottom:20px;color:rgb(135, 16, 148)'>" + functionName + "</span> (" + header + ") : " + ZPEHelperFunctions.typeByteToString(ZPEKit.getFunctionReturnType(functionName)) + "</code></div>";
     }
 
     output += ZPEKit.getFunctionManualEntryAsStyledHtml(functionName, dark);
 
-    output += dark
-            ? "<div style='margin:10px 0; color:#bbb;'>Function version " + ZPEKit.getFunctionVersion(functionName) + "</div>"
-            : "<div style='margin:10px 0; color:#222;'>Function version " + ZPEKit.getFunctionVersion(functionName) + "</div>";
+    output += dark ? "<div style='margin:10px 0; color:#bbb;'>Function version " + ZPEKit.getFunctionVersion(functionName) + "</div>" : "<div style='margin:10px 0; color:#222;'>Function version " + ZPEKit.getFunctionVersion(functionName) + "</div>";
 
-    output += "<div style='font-weight:100;margin-bottom:10px;'>Category: "
-            + ZPEKit.getFunctionCategory(functionName)
-            + "</div>";
+    output += "<div style='font-weight:100;margin-bottom:10px;'>Category: " + ZPEKit.getFunctionCategory(functionName) + "</div>";
 
     output += "<div style='color:#0af'>Click for more information online.</div>";
     output += "</div></html>";
@@ -194,11 +187,7 @@ public class ZIDESyntaxEditor extends CodeEditorView {
   private String escapeHtml(String s) {
     if (s == null) return "";
 
-    return s.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&#39;");
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
   }
 
   private void rebuildSymbols(int version) {
@@ -247,111 +236,12 @@ public class ZIDESyntaxEditor extends CodeEditorView {
     return out.toString();
   }
 
-  public static class FunctionHint {
-
-    private final int line;
-    private final int offset;
-    private final String name;
-    private final String signature;
-    private final String description;
-
-    private final Map<String, String> annotations;
-
-    private final String moduleName;
-    private final String structureName;
-
-    public FunctionHint(String name, String signature, String description,
-
-                        Map<String, String> annotations,
-
-                        String moduleName,
-
-                        String structureName,
-
-                        int line,
-
-                        int offset) {
-
-      this.name = name;
-
-      this.signature = signature;
-
-      this.description = description;
-
-      this.annotations = annotations;
-
-      this.moduleName = moduleName;
-
-      this.structureName = structureName;
-
-      this.line = line;
-
-      this.offset = offset;
-
-    }
-
-    public int getLine() {
-
-      return line;
-
-    }
-
-    public int getOffset() {
-
-      return offset;
-
-    }
-
-    public String getModuleName() { return moduleName; }
-    public String getStructureName() { return structureName; }
-
-    public String getQualifiedName() {
-      StringBuilder sb = new StringBuilder();
-
-      if (moduleName != null && !moduleName.isEmpty()) {
-        sb.append(moduleName).append("::");
-      }
-
-      if (structureName != null && !structureName.isEmpty()) {
-        sb.append(structureName).append("->");
-      }
-
-      sb.append(name);
-
-      return sb.toString();
-    }
-
-    public Map<String, String> getAnnotations() {
-      return annotations;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public String getSignature() {
-      return signature;
-    }
-
-    public String getDescription() {
-      return description;
-    }
-  }
-
   private List<FunctionHint> extractCustomFunctions(String code) {
     String cleanCode = stripComments(code);
 
     List<FunctionHint> functions = new ArrayList<>();
 
-    Pattern pattern = Pattern.compile(
-            "(?m)^\\s*" +
-                    "(?:" +
-                    "(?:module\\s+([A-Za-z_][A-Za-z0-9_]*))" +
-                    "|(?:structure\\s+([A-Za-z_][A-Za-z0-9_]*))" +
-                    "|(?:end\\s+(module|structure))" +
-                    "|(?:(?:public|private)?\\s*function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^)]*)\\))" +
-                    ")"
-    );
+    Pattern pattern = Pattern.compile("(?m)^\\s*" + "(?:" + "(?:module\\s+([A-Za-z_][A-Za-z0-9_]*))" + "|(?:structure\\s+([A-Za-z_][A-Za-z0-9_]*))" + "|(?:end\\s+(module|structure))" + "|(?:(?:public|private)?\\s*function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^)]*)\\))" + ")");
 
     Matcher matcher = pattern.matcher(cleanCode);
 
@@ -391,23 +281,12 @@ public class ZIDESyntaxEditor extends CodeEditorView {
         int offset = matcher.start();
         int line = getLineNumber(code, offset);
 
-        functions.add(new FunctionHint(
-                functionName,
-                functionName + "(" + params.trim() + ")",
-                description,
-                annotations,
-                currentModule,
-                currentStructure,
-                line,
-                offset
-        ));
+        functions.add(new FunctionHint(functionName, functionName + "(" + params.trim() + ")", description, annotations, currentModule, currentStructure, line, offset));
       }
     }
 
     return functions;
   }
-
-
 
   private Map<String, String> findAnnotationsBefore(String code, int functionStart) {
     Map<String, String> data = new LinkedHashMap<>();
@@ -451,8 +330,7 @@ public class ZIDESyntaxEditor extends CodeEditorView {
 
     value = value.trim();
 
-    if ((value.startsWith("\"") && value.endsWith("\""))
-            || (value.startsWith("'") && value.endsWith("'"))) {
+    if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
       return value.substring(1, value.length() - 1);
     }
 
@@ -480,4 +358,89 @@ public class ZIDESyntaxEditor extends CodeEditorView {
 
     return null;
   }
+
+  public static class FunctionHint {
+
+    private final int line;
+    private final int offset;
+    private final String name;
+    private final String signature;
+    private final String description;
+
+    private final Map<String, String> annotations;
+
+    private final String moduleName;
+    private final String structureName;
+
+    public FunctionHint(String name, String signature, String description,
+                        Map<String, String> annotations,
+                        String moduleName,
+                        String structureName,
+                        int line,
+                        int offset) {
+
+      this.name = name;
+      this.signature = signature;
+      this.description = description;
+      this.annotations = annotations;
+      this.moduleName = moduleName;
+      this.structureName = structureName;
+
+      this.line = line;
+      this.offset = offset;
+
+    }
+
+    public int getLine() {
+      return line;
+    }
+
+    public int getOffset() {
+      return offset;
+    }
+
+    public String getModuleName() {
+      return moduleName;
+    }
+
+    public String getStructureName() {
+      return structureName;
+    }
+
+    public String getQualifiedName() {
+      StringBuilder sb = new StringBuilder();
+
+      if (moduleName != null && !moduleName.isEmpty()) {
+        sb.append(moduleName).append("::");
+      }
+
+      if (structureName != null && !structureName.isEmpty()) {
+        sb.append(structureName).append("->");
+      }
+
+      sb.append(name);
+
+      return sb.toString();
+    }
+
+    public Map<String, String> getAnnotations() {
+      return annotations;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public String getSignature() {
+      return signature;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+  }
+
+
+
+
 }
