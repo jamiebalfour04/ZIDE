@@ -47,6 +47,7 @@ public class BalfTitleBar extends Region {
 
   private final Insets padding = new Insets(0, 10, 0, 10);
   private final double barHeight = 32;
+  private boolean enableWindowClose = true;
 
   // Keep references so we can swap max/restore glyph on Windows
   private SVGPath winMaxGlyph;
@@ -71,6 +72,7 @@ public class BalfTitleBar extends Region {
 
     this.enableWindowMinimise = enableWindowMinimise;
     this.enableWindowMaximise = enableWindowMaximise;
+    this.enableWindowClose = exitApplicationOnClose;
 
     getStyleClass().add("balf-titlebar");
     setMinHeight(barHeight);
@@ -262,15 +264,17 @@ public class BalfTitleBar extends Region {
     box.setAlignment(Pos.CENTER_LEFT);
     box.getStyleClass().add("balf-traffic");
 
-    var close = trafficLight("balf-close", Color.web("#ff5f57"));
-    close.setOnMouseClicked(e -> {
-      if (confirmClose()) {
-        Platform.exit();
-        System.exit(0);
-      }
-    });
+    if(enableWindowClose) {
+      var close = trafficLight("balf-close", Color.web("#ff5f57"));
+      close.setOnMouseClicked(e -> {
+        if (confirmClose()) {
+          Platform.exit();
+          System.exit(0);
+        }
+      });
 
-    box.getChildren().add(close);
+      box.getChildren().add(close);
+    }
 
     if(enableWindowMinimise) {
       var minimise = trafficLight("balf-minimise", Color.web("#febc2e"));
@@ -303,24 +307,36 @@ public class BalfTitleBar extends Region {
     box.setAlignment(Pos.CENTER_RIGHT);
     box.getStyleClass().add("balf-win-controls");
 
-    Button min = winButton("balf-win-min", glyphMinimise());
-    Button max = winButton("balf-win-max", glyphMaximise()); // will toggle to restore
+
+
     Button close = winButton("balf-win-close", glyphClose());
 
-    min.setOnAction(e -> stage.setIconified(true));
-    max.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
-    close.setOnAction(e -> {
-      if (confirmClose()) {
-        Platform.exit();
-        System.exit(0);
-      }
-    });
+    if(enableWindowMinimise) {
+      Button min = winButton("balf-win-min", glyphMinimise());
+      min.setOnAction(e -> stage.setIconified(true));
+      box.getChildren().add(min);
+    }
+    if(enableWindowMaximise) {
+      Button max = winButton("balf-win-max", glyphMaximise()); // will toggle to restore
+      max.setOnAction(e -> stage.setMaximized(!stage.isMaximized()));
+      box.getChildren().add(max);
+      // keep handle so we can swap max/restore path
+      winMaxGlyph = (SVGPath) max.getGraphic();
 
-    // keep handle so we can swap max/restore path
-    winMaxGlyph = (SVGPath) max.getGraphic();
+    }
 
-    // Windows buttons are typically flush-right; no extra padding here
-    box.getChildren().addAll(min, max, close);
+    if(enableWindowClose) {
+      close.setOnAction(e -> {
+        if (confirmClose()) {
+          Platform.exit();
+          System.exit(0);
+        }
+      });
+      box.getChildren().add(close);
+    }
+
+
+
     return box;
   }
 

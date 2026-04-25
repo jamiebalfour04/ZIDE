@@ -6,12 +6,15 @@ import jamiebalfour.ui.components.BalfScrollbarPane;
 import javafx.scene.control.Tab;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 
 public class EditorTab extends Tab {
   private final String path;
   private final jamiebalfour.codeeditor.CodeEditorView editor;
   private final BalfScrollbarPane pane;
+  private boolean changes = false;
 
   public EditorTab(String title, String path, jamiebalfour.codeeditor.CodeEditorView editor, BalfScrollbarPane pane, javafx.scene.Node content) {
     super(title, content);
@@ -19,6 +22,24 @@ public class EditorTab extends Tab {
     this.editor = editor;
     this.pane = pane;
     pane.setLightColour(Color.white);
+
+    editor.getDocument().addDocumentListener(new DocumentListener() {
+
+      @Override
+      public void insertUpdate(DocumentEvent e) {
+        changes = true;
+      }
+
+      @Override
+      public void removeUpdate(DocumentEvent e) {
+        changes = true;
+      }
+
+      @Override
+      public void changedUpdate(DocumentEvent e) {
+        changes = true;
+      }
+    });
 
     BalfLafManager.getInstance().addThemeChangeListener(() -> {
       if(BalfLafManager.getInstance().isDarkModeEnabled()){
@@ -111,6 +132,13 @@ public class EditorTab extends Tab {
 
   }
 
+  void setHasChanges(boolean hasChanges) {
+    this.changes = hasChanges;
+  }
+
+  boolean hasChanges() {
+    return changes;
+  }
 
   private void resetScroll() {
     int caretPosition = editor.getCaretPosition();

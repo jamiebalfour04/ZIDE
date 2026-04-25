@@ -1,6 +1,7 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.FileHelperFunctions;
+import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
@@ -10,9 +11,14 @@ import jamiebalfour.ui.components.BalfSearchBox;
 import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.core.ZIDE;
 import jamiebalfour.zpe.core.*;
+import jamiebalfour.zpe.core.exceptions.CompileException;
+import jamiebalfour.zpe.core.types.ZPEList;
+import jamiebalfour.zpe.core.types.ZPENumber;
+import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
+import javafx.animation.*;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -29,18 +35,23 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.input.Dragboard;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import javafx.util.Duration;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -51,7 +62,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -73,11 +86,14 @@ public class ZIDEEditor extends Application {
   CheckMenuItem toggleTheme;
   private TableView<VarRow> varTable;
   private ObservableList<VarRow> varRows;
-  private SplitPane terminalSplit;
   private VBox variablesPane;
-  private ConsoleOutputTextArea.BreakPoint currentBreakpoint;
+  private ZPEDebugger.BreakPoint currentBreakpoint;
   private CheckMenuItem variablesPaneOption;
   MenuItem runProject;
+  MenuItem debugProject;
+  MenuItem stopExecution;
+  private File currentProjectRoot;
+  File projectDir;
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -125,9 +141,15 @@ public class ZIDEEditor extends Application {
 
     BalfTitleBar.addWindowResizing(stage, root);
 
+    projectDir = new File(System.getProperty("user.home") + "/Documents/YASS Projects/");
+
+    if(!projectDir.exists()) {
+      projectDir.mkdirs();
+    }
 
     // Left: project tree
-    Node projectTree = buildProjectTree();
+    Node projectTree = buildProjectTree(projectDir);
+    currentProjectRoot = projectDir;
     Node leftPane = wrapTitled("Project", projectTree);
     //leftPane.setMinWidth(260);
 
@@ -175,70 +197,242 @@ public class ZIDEEditor extends Application {
   private static final Preferences PREFS = Preferences.userNodeForPackage(ZIDEEditor.class);
   private static final String KEY_LAST_DIR = System.getProperty("user.home");//"/Users/jamiebalfour/Documents/";
 
-  private void newFile(){
-    String suggestedName = "Untitled";
-    FileChooser chooser = new FileChooser();
-    chooser.setTitle("New file");
+  private File newFile() {
+    File targetDir = getTargetDirectoryForNewFile();
 
-    chooser.setInitialFileName(suggestedName);
+    if (targetDir == null || !targetDir.exists() || !targetDir.isDirectory()) {
+      new Alert(Alert.AlertType.ERROR, "No valid target folder is selected.").showAndWait();
+      return null;
+    }
 
-    // Example filters — add/remove as you like
-    chooser.getExtensionFilters().addAll(
-            new FileChooser.ExtensionFilter("ZPE Files (*.yas)", "*.yas"),
-            new FileChooser.ExtensionFilter("YASS Webpage Files (*.ywp)", "*.ywp"),
-            new FileChooser.ExtensionFilter("Text Files (*.txt)", "*.txt"),
-            new FileChooser.ExtensionFilter("All Files (*.*)", "*.*")
+    Dialog<File> dialog = new Dialog<>();
+    dialog.initOwner(_stage);
+    dialog.setTitle("New File");
+    dialog.setHeaderText("Create a new file in " + targetDir.getName());
+
+    ButtonType createButtonType = new ButtonType("Create", ButtonBar.ButtonData.OK_DONE);
+    dialog.getDialogPane().getButtonTypes().addAll(createButtonType, ButtonType.CANCEL);
+
+    TextField nameField = new TextField("Untitled");
+
+    ComboBox<String> extensionBox = new ComboBox<>();
+    extensionBox.getItems().addAll(
+            "yas",
+            "ywp",
+            "txt"
     );
+    extensionBox.setValue("yas");
 
+    GridPane grid = new GridPane();
+    grid.setHgap(10);
+    grid.setVgap(10);
+    grid.add(new Label("File name"), 0, 0);
+    grid.add(nameField, 1, 0);
+    grid.add(new Label("Extension"), 0, 1);
+    grid.add(extensionBox, 1, 1);
 
-    // Restore last directory if it still exists
-    String lastDir = PREFS.get(KEY_LAST_DIR, null);
-    if (lastDir != null) {
-      File dir = new File(lastDir);
-      if (dir.exists() && dir.isDirectory()) {
-        chooser.setInitialDirectory(dir);
+    dialog.getDialogPane().setContent(grid);
+
+    Node createButton = dialog.getDialogPane().lookupButton(createButtonType);
+    createButton.setDisable(false);
+
+    nameField.textProperty().addListener((obs, oldVal, newVal) -> {
+      createButton.setDisable(newVal.trim().isEmpty());
+    });
+
+    dialog.setResultConverter(button -> {
+      if (button != createButtonType) {
+        return null;
       }
+
+      String baseName = nameField.getText().trim();
+      String ext = extensionBox.getValue();
+
+      if (baseName.isEmpty()) {
+        return null;
+      }
+
+      String fullName = baseName.endsWith("." + ext) ? baseName : baseName + "." + ext;
+      return new File(targetDir, fullName);
+    });
+
+    Optional<File> result = dialog.showAndWait();
+
+    if (result.isEmpty()) {
+      return null;
     }
 
-    File chosen = chooser.showSaveDialog(_stage);
+    File newFile = result.get();
 
-    // Persist directory for next time
-    if (chosen != null) {
-      File parent = chosen.getParentFile();
-      if (parent != null && parent.exists()) {
-        PREFS.put(KEY_LAST_DIR, parent.getAbsolutePath());
-      }
-      openTab(chosen.getName());
+    if (newFile.exists()) {
+      new Alert(Alert.AlertType.ERROR, "That file already exists.").showAndWait();
+      return null;
     }
 
+    try {
+      if (!newFile.createNewFile()) {
+        new Alert(Alert.AlertType.ERROR, "Failed to create file.").showAndWait();
+        return null;
+      }
 
+      buildProjectTree(currentProjectRoot);
+      openTab(newFile.getName(), newFile.getAbsolutePath());
+      return newFile;
+
+    } catch (IOException ex) {
+      ex.printStackTrace();
+      new Alert(Alert.AlertType.ERROR, "Failed to create file:\n" + ex.getMessage()).showAndWait();
+      return null;
+    }
+  }
+
+  private File getTargetDirectoryForNewFile() {
+    TreeItem<File> selectedItem = projectTree.getSelectionModel().getSelectedItem();
+
+    if (selectedItem == null || selectedItem.getValue() == null) {
+      return currentProjectRoot;
+    }
+
+    File selected = selectedItem.getValue();
+
+    if (selected.isDirectory()) {
+      return selected;
+    }
+
+    return selected.getParentFile();
   }
 
   private MenuBar buildMenuBar() {
     var file = new Menu("_File");
+
+    var newProject = new MenuItem("New Project");
+    newProject.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+N"));
+    newProject.setOnAction(e -> {
+
+      if (currentProjectRoot == null) {
+        new Alert(Alert.AlertType.WARNING, "Please open a folder first.").showAndWait();
+        return;
+      }
+
+      TextInputDialog dialog = new TextInputDialog();
+      dialog.setTitle("New Project");
+      dialog.setHeaderText("Create a new project");
+      dialog.setContentText("Project name:");
+
+      Optional<String> result = dialog.showAndWait();
+
+      result.ifPresent(name -> {
+
+        String trimmed = name.trim();
+
+        if (trimmed.isEmpty()) {
+          new Alert(Alert.AlertType.ERROR, "Project name cannot be empty.").showAndWait();
+          return;
+        }
+
+        File newDir = new File(currentProjectRoot, trimmed);
+
+        if (newDir.exists()) {
+          new Alert(Alert.AlertType.ERROR, "A folder with that name already exists.").showAndWait();
+          return;
+        }
+
+        boolean created = newDir.mkdir();
+
+        if (!created) {
+          new Alert(Alert.AlertType.ERROR, "Failed to create project folder.").showAndWait();
+          return;
+        }
+
+        // Optional: create starter file
+        // new File(newDir, "main.yas").createNewFile();
+
+        buildProjectTree(currentProjectRoot);
+      });
+    });
+
     var newFile = new MenuItem("New File");
     newFile.setAccelerator(KeyCombination.keyCombination("Shortcut+N"));
     newFile.setOnAction(e -> newFile());
 
-    var open = new MenuItem("Open…");
+    var open = new MenuItem("Open project folder");
     open.setAccelerator(KeyCombination.keyCombination("Shortcut+O"));
+    open.setOnAction(e -> {
+      DirectoryChooser chooser = new DirectoryChooser();
+      chooser.setTitle("Open project folder");
+
+      File chosen = chooser.showDialog(_stage);
+      if (chosen != null) {
+        buildProjectTree(chosen);
+        currentProjectRoot = chosen;
+      }
+    });
 
     var save = new MenuItem("Save");
     save.setAccelerator(KeyCombination.keyCombination("Shortcut+S"));
+    save.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      String f = getCurrentTab().getPath();
+
+      try {
+        FileHelperFunctions.writeFile(f, getCurrentTab().getEditor().getText(), false);
+        getCurrentTab().setHasChanges(false);
+      } catch (IOException ex) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText("Error saving file");
+        alert.setContentText(ex.getMessage());
+        alert.showAndWait();
+      }
+
+    });
 
     var exit = new MenuItem("Exit");
     exit.setOnAction(e -> System.exit(0));
 
-    file.getItems().addAll(newFile, open, new SeparatorMenuItem(), save, new SeparatorMenuItem(), exit);
+    file.getItems().addAll(newProject, newFile, open, new SeparatorMenuItem(), save, new SeparatorMenuItem(), exit);
 
     var edit = new Menu("_Edit");
-    edit.getItems().addAll(
-            new MenuItem("Undo"),
-            new MenuItem("Redo"),
-            new SeparatorMenuItem(),
-            new MenuItem("Find…"),
-            new MenuItem("Replace…")
-    );
+
+    var undo = new MenuItem("Undo");
+    undo.setAccelerator(KeyCombination.keyCombination("Shortcut+Z"));
+    undo.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().undo();
+    });
+    var redo = new MenuItem("Redo");
+    redo.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+Z"));
+    redo.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().redo();
+    });
+
+    var cut = new MenuItem("Cut");
+    cut.setAccelerator(KeyCombination.keyCombination("Shortcut+X"));
+    cut.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().cut();
+    });
+    var copy = new MenuItem("Copy");
+    copy.setAccelerator(KeyCombination.keyCombination("Shortcut+C"));
+    copy.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().copy();
+    });
+    var paste = new MenuItem("Paste");
+    paste.setAccelerator(KeyCombination.keyCombination("Shortcut+V"));
+    paste.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().paste();
+    });
+    var selectAll = new MenuItem("Select All");
+    selectAll.setAccelerator(KeyCombination.keyCombination("Shortcut+A"));
+    selectAll.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      getCurrentTab().getEditor().selectAll();
+    });
+
+    edit.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste, selectAll, new SeparatorMenuItem());
 
     var view = new Menu("_View");
     toggleTheme = new CheckMenuItem("Dark theme");
@@ -265,30 +459,89 @@ public class ZIDEEditor extends Application {
 
     });
 
-    var panesMenu = new Menu("Panes");
-    variablesPaneOption = new CheckMenuItem("Variables Pane");
-    variablesPaneOption.setOnAction(e -> {
-      if(variablesPaneOption.isSelected()) {
-        showVariablesPane();
-      } else{
-        hideVariablesPane();
-      }
-    });
 
-    panesMenu.getItems().addAll(variablesPaneOption);
 
     view.getItems().add(toggleTheme);
-    view.getItems().add(panesMenu);
 
     var run = new Menu("_Run");
 
-    runProject = new MenuItem("Run Project");
-
-
+    runProject = new MenuItem("Run");
 
     runProject.setAccelerator(KeyCombination.keyCombination("Shortcut+R"));
     runProject.setOnAction(e -> runCode());
+
+    debugProject = new MenuItem("Debug");
+    debugProject.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+R"));
+    debugProject.setOnAction(e -> debug());
+
+    stopExecution = new MenuItem("Stop Execution");
+    stopExecution.setDisable(true);
+    stopExecution.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+S"));
+    stopExecution.setOnAction(e -> {
+      consoleOutputTextArea.destroyCurrentProcess();
+    });
+
+
     run.getItems().add(runProject);
+    run.getItems().add(debugProject);
+    run.getItems().add(new SeparatorMenuItem());
+    run.getItems().add(stopExecution);
+
+
+
+    var zpeOnlineMenu = new Menu("ZPE Online");
+    var loginToZPEOnlineMenuItem = new MenuItem("Login to ZPE Online");
+    var loadFromZPEOnlineMenuItem = new MenuItem("Load from ZPE Online");
+    var saveToZPEOnlineMenuItem = new MenuItem("Save to ZPE Online");
+
+    loginToZPEOnlineMenuItem.setOnAction(e -> {
+
+      ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
+
+      String username = result.getUsername();
+      String password = result.getPassword();
+
+      try {
+        ZPEMap res = ZPEOnline.loginToZPEOnline(username, password);
+
+        if(Integer.parseInt(res.get("result").toString()) == -1){
+          Alert alert = new Alert(Alert.AlertType.ERROR);
+          alert.setTitle("Error");
+          alert.setHeaderText("Error logging in to ZPE Online");
+          alert.setContentText(res.get("message").toString());
+          alert.showAndWait();
+          return;
+        }
+
+        ZPEList recents = (ZPEList) res.get(new ZPEString("list"));
+
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Success");
+        alert.setHeaderText(null);
+        alert.setContentText("Successfully logged in to ZPE Online");
+        alert.showAndWait();
+
+        loadFromZPEOnlineMenuItem.setVisible(true);
+        saveToZPEOnlineMenuItem.setVisible(true);
+        loginToZPEOnlineMenuItem.setText("Logout of ZPE Online");
+        //addRecentsFromCloud((ZPEList) login.get(new ZPEString("list")));
+      } catch (Exception ex) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText("Error logging in to ZPE Online");
+        alert.setContentText(ex.getMessage());
+        alert.showAndWait();
+      }
+
+
+    });
+
+    zpeOnlineMenu.getItems().addAll(loginToZPEOnlineMenuItem, loadFromZPEOnlineMenuItem, saveToZPEOnlineMenuItem);
+
+
+
+
 
     var help = new Menu("_Help");
 
@@ -318,7 +571,7 @@ public class ZIDEEditor extends Application {
     help.getItems().add(downloadZPERuntimeItem);
     help.getItems().add(downloadZPENative);
 
-    var bar = new MenuBar(file, edit, view, run, help);
+    var bar = new MenuBar(file, edit, view, run, zpeOnlineMenu, help);
     bar.getStyleClass().add("app-menubar");
     return bar;
   }
@@ -336,45 +589,60 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  private void runCode(){
+  private EditorTab getCurrentTab(){
+    return (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+  }
 
-    if(!new File(ZPEInstance.getInstallPath() + "/zpe.jar").exists()) {
-      Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-      alert.setTitle("ZPE Runtime Environment missing");
-      alert.setHeaderText("ZPE Runtime Environment required.");
-      alert.setContentText("ZIDE needs to download a copy of the latest ZPE Runtime Environment before it can run your code. Do you want to continue?");
+  private ObservableList<ProblemRow> problemsRows = FXCollections.observableArrayList();
 
-      ButtonType yes = new ButtonType("Yes", ButtonBar.ButtonData.YES);
-      ButtonType no  = new ButtonType("No", ButtonBar.ButtonData.NO);
+  private boolean verifyCode(){
+    if(getCurrentTab() == null) return false;
+    String code = getCurrentTab().getEditor().getText();
 
-      alert.getButtonTypes().setAll(yes, no);
+    List<YASSDiagnostic> result = ZPEKit.analyseCode(code);
 
-      Optional<ButtonType> result = alert.showAndWait();
+    if(result.isEmpty()) {
+      return true;
+    } else{
+      problemsRows.clear();
 
-      if (result.isPresent() && result.get() == yes) {
-        downloadZPERuntime();
-        return;
-      } else {
-        return;
+      for (YASSDiagnostic d : result) {
+
+        problemsRows.add(new ProblemRow(
+                d.getSeverity().toString(),
+                d.getLine(),
+                d.getMessage()
+        ));
+
       }
+      showProblemsPane();
+      return false;
     }
 
-    try {
+  }
 
+  private void runCode(){
+
+    if (!getZPE()) return;
+
+    if(!verifyCode()) return;
+
+    try {
+      if(getCurrentTab() == null) return;
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
-      EditorTab tab = (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+      EditorTab tab = getCurrentTab();
       runBtn.getStyleClass().add("running");
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
-      consoleOutputTextArea.runAsProcess(tempPath, false, true, "");
+      consoleOutputTextArea.runAsProcess(tempPath, false, false, "");
+      stopExecution.setDisable(false);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private void debugCode(){
-
+  private boolean getZPE() {
     if(!new File(ZPEInstance.getInstallPath() + "/zpe.jar").exists()) {
       Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
       alert.setTitle("ZPE Runtime Environment missing");
@@ -390,15 +658,48 @@ public class ZIDEEditor extends Application {
 
       if (result.isPresent() && result.get() == yes) {
         downloadZPERuntime();
-        return;
+        return true;
       } else {
-        return;
+        return false;
+      }
+    } else{
+      return true;
+    }
+  }
+
+  private String prepareDebugSourceWithBreakpoints(CodeEditorView mainSyntax, String source) {
+    String[] lines = source.split("\\R", -1);
+    StringBuilder out = new StringBuilder();
+
+
+    for (int line = 1; line <= lines.length; line++) {
+      String currentLine = lines[line - 1];
+
+      if (mainSyntax.hasSpecialLine(line)) {
+        out.append("#breakpoint# ");
+      }
+
+      out.append(currentLine);
+
+      if (line < lines.length) {
+        out.append(System.lineSeparator());
       }
     }
 
+    return out.toString();
+  }
+
+  private void debugCode(){
+
+    if (!getZPE()) return;
+    if(getCurrentTab() == null) return;
+
     try {
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
-      EditorTab tab = (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+      EditorTab tab = getCurrentTab();
+      if(tab == null){
+        tab = (EditorTab) editorTabs.getTabs().get(0);
+      }
       debugBtn.getStyleClass().add("running");
 
       stopExecutionBtn.setVisible(true);
@@ -407,7 +708,7 @@ public class ZIDEEditor extends Application {
       debugSeparator.setVisible(true);
 
 
-      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab.getEditor(), tab.getEditor().getText()), false);
       consoleOutputTextArea.runAsProcess(tempPath, true, false, "");
 
     } catch (IOException e) {
@@ -415,24 +716,131 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  private ToolBar buildToolBar() {
-    runBtn = new Button("Run");
-    runBtn.getStyleClass().add("run");
-    runBtn.setOnAction(e -> runCode());
+  public static Button createExpandableToolbarButton(String labelText, String iconPath, Runnable action) {
 
-    var buildBtn = new Button("Build");
+    ImageView icon = new ImageView(new Image(
 
-    debugBtn = new Button("Debug");
-    debugBtn.getStyleClass().add("debug");
-    debugBtn.setOnAction(e -> {
-      consoleOutputTextArea.addBreakPointReachedListener((b, varData) -> {
-        currentBreakpoint = b;
-        showVariablesPane();
-        setVariables(varData);
+            ZIDEEditor.class.getResourceAsStream(iconPath)
+
+    ));
+
+    icon.setFitWidth(16);
+    icon.setFitHeight(16);
+
+    icon.setPreserveRatio(true);
+
+    Label label = new Label(labelText);
+    label.setOpacity(0);
+    label.setManaged(false);
+    label.setVisible(false);
+
+    HBox content = new HBox(8, icon, label);
+    content.setAlignment(Pos.CENTER_LEFT);
+    Button button = new Button();
+    button.setGraphic(content);
+    button.setMinWidth(40);
+    button.setPrefWidth(40);
+    button.setMaxWidth(40);
+    button.setPrefHeight(32);
+
+    button.getStyleClass().add("toolbar-button");
+    button.setOnAction(e -> action.run());
+    double collapsedWidth = 40;
+    double expandedWidth = Math.max(90, 40 + labelText.length() * 7.5);
+    button.setOnMouseEntered(e -> {
+
+      label.setManaged(true);
+      label.setVisible(true);
+
+      Timeline widthAnim = new Timeline(
+
+              new KeyFrame(Duration.millis(180),
+
+                      new KeyValue(button.prefWidthProperty(), expandedWidth),
+
+                      new KeyValue(button.maxWidthProperty(), expandedWidth)
+
+              )
+
+      );
+
+      FadeTransition fadeIn = new FadeTransition(Duration.millis(140), label);
+
+      fadeIn.setToValue(1.0);
+
+      new ParallelTransition(widthAnim, fadeIn).play();
+
+    });
+
+    button.setOnMouseExited(e -> {
+
+      FadeTransition fadeOut = new FadeTransition(Duration.millis(100), label);
+
+      fadeOut.setToValue(0.0);
+
+      fadeOut.setOnFinished(evt -> {
+
+        label.setManaged(false);
+
+        label.setVisible(false);
+
       });
 
-      debugCode();
+      Timeline widthAnim = new Timeline(
+
+              new KeyFrame(Duration.millis(180),
+
+                      new KeyValue(button.prefWidthProperty(), collapsedWidth),
+
+                      new KeyValue(button.maxWidthProperty(), collapsedWidth)
+
+              )
+
+      );
+
+      new ParallelTransition(widthAnim, fadeOut).play();
+
     });
+
+    return button;
+
+  }
+
+  private void debug(){
+    ZPEDebugger.addBreakPointReachedListener((b, varData) -> {
+      currentBreakpoint = b;
+      showVariablesPane();
+      setVariables(varData);
+    });
+
+    debugCode();
+  }
+
+  private ToolBar buildToolBar() {
+    runBtn = createExpandableToolbarButton("Run", "/files/play.png", this::runCode);
+    runBtn.getStyleClass().add("run");
+
+    var buildBtn = createExpandableToolbarButton("Build", "/files/tools.png", this::debug);
+    buildBtn.setOnAction(e -> {
+      if(getCurrentTab() == null) return;
+      try {
+        if(ZPEKit.validateCode(getCurrentTab().getEditor().getText())){
+          Alert alert = new Alert(Alert.AlertType.INFORMATION, "Code builds successfully", ButtonType.OK);
+          alert.setTitle("Successful build");
+          alert.setHeaderText(null);
+          alert.showAndWait();
+        } else{
+          verifyCode();
+        }
+      } catch (CompileException ex) {
+        verifyCode();
+      }
+    });
+
+
+    debugBtn = createExpandableToolbarButton("Debug", "/files/debug.png", this::debug);
+    debugBtn.setGraphicTextGap(6);
+    debugBtn.getStyleClass().add("debug");
 
     var sep1 = new Separator(Orientation.VERTICAL);
 
@@ -443,7 +851,6 @@ public class ZIDEEditor extends Application {
       } else{
         currentBreakpoint.stopExecution();
       }
-
     });
     stopExecutionBtn.setVisible(false);
 
@@ -483,52 +890,108 @@ public class ZIDEEditor extends Application {
     return toolbar;
   }
 
-  private Node buildProjectTree() {
-    var root = new TreeItem<>("MyProject");
-    root.setExpanded(true);
+  private TreeView<File> projectTree;
 
+  private Node buildProjectTree(File projectDir) {
+    if (projectTree == null) {
+      projectTree = new TreeView<>();
+      projectTree.setShowRoot(true);
+      projectTree.getStyleClass().add("project-tree");
 
-    File projectDir = new File(System.getProperty("user.home") + "/Documents/");
+      projectTree.setCellFactory(tv -> new TreeCell<>() {
+        @Override
+        protected void updateItem(File file, boolean empty) {
+          super.updateItem(file, empty);
 
-    var tree = new TreeView<>(loadDirectory(projectDir));
-    tree.setShowRoot(true);
-    tree.getStyleClass().add("project-tree");
-    tree.setCellFactory(tv -> new TreeCell<>() {
-      @Override
-      protected void updateItem(File file, boolean empty) {
-        super.updateItem(file, empty);
+          if (empty || file == null) {
+            setText(null);
+            setGraphic(null);
+            return;
+          }
 
-        if (empty || file == null) {
-          setText(null);
-          setGraphic(null);
-          return;
+          String name = file.getName();
+          setText(name.isEmpty() ? file.getPath() : name);
+        }
+      });
+
+      projectTree.setOnMouseClicked(e -> {
+        if (e.getClickCount() == 2) {
+          var item = projectTree.getSelectionModel().getSelectedItem();
+          if (item != null && item.isLeaf()) {
+            openTab(item.getValue().getName(), item.getValue().getPath());
+          }
+        }
+      });
+
+      projectTree.setOnDragOver(event -> {
+        if (event.getDragboard().hasFiles()) {
+          event.acceptTransferModes(TransferMode.COPY);
+        }
+        event.consume();
+      });
+
+      projectTree.setOnDragDropped(event -> {
+        Dragboard db = event.getDragboard();
+        boolean success = false;
+
+        if (db.hasFiles()) {
+
+          TreeItem<File> targetItem = projectTree.getSelectionModel().getSelectedItem();
+
+          if (targetItem != null) {
+
+            File target = targetItem.getValue();
+
+            // If it's a file, use its parent folder
+            File targetDir = target.isDirectory() ? target : target.getParentFile();
+
+            for (File file : db.getFiles()) {
+              copyFileToDirectory(file, targetDir);
+            }
+
+            refreshTree();
+            success = true;
+          }
         }
 
-        // show just the name (root special-cased if you want)
-        String name = file.getName();
-        setText(name.isEmpty() ? file.getPath() : name);
-      }
-    });
+        event.setDropCompleted(success);
+        event.consume();
+      });
+    }
 
-    // Simple behaviour: double-click opens a new tab (demo)
-    tree.setOnMouseClicked(e -> {
-      if (e.getClickCount() == 2) {
-        var item = tree.getSelectionModel().getSelectedItem();
-        if (item != null && item.isLeaf()) {
-          System.out.println("Opening " + item.getValue());
-          openTab(item.getValue().getName(), item.getValue().getPath());
-        }
-      }
-    });
 
-    return tree;
+
+    projectTree.setRoot(loadDirectory(projectDir));
+    projectTree.getRoot().setExpanded(true);
+
+    return projectTree;
+  }
+
+  private void copyFileToDirectory(File source, File targetDir) {
+    try {
+      File dest = new File(targetDir, source.getName());
+
+      Files.copy(
+              source.toPath(),
+              dest.toPath(),
+              StandardCopyOption.REPLACE_EXISTING
+      );
+
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void refreshTree() {
+    buildProjectTree(projectDir);
   }
 
   private TabPane editorTabs;
 
   // Call this whenever you want the label refreshed
   Runnable refreshRunText = () -> {
-    Tab t = editorTabs.getSelectionModel().getSelectedItem();
+    if(getCurrentTab() == null) return;
+    Tab t = getCurrentTab();
     String tabName = (t == null) ? "" : t.getText();
     runProject.setText(tabName.isBlank() ? "Run" : "Run " + tabName);
   };
@@ -600,6 +1063,9 @@ public class ZIDEEditor extends Application {
   }
 
   private void openTab(String name, String file) {
+    if(new File(file).isDirectory()) {
+      return;
+    }
     // Ensure active-tab behaviour is installed once
     installActiveTabStyling();
 
@@ -627,6 +1093,18 @@ public class ZIDEEditor extends Application {
 
         mainSyntax.setFontSize(14);
 
+        mainSyntax.addLineNumberClickListener(new CodeEditorView.LineNumberClickListener() {
+
+          @Override
+          public void onLineNumberClicked(int lineNumber) {
+            if(mainSyntax.hasSpecialLine(lineNumber)){
+              mainSyntax.removeSpecialLine(lineNumber);
+            } else{
+              mainSyntax.addSpecialLine(lineNumber);
+            }
+
+          }
+        });
 
         Font jbMono = loadAndRegister("/files/JetBrainsMono-Regular.ttf");
         Font editorFont = jbMono.deriveFont(Font.PLAIN, 14);
@@ -728,7 +1206,7 @@ public class ZIDEEditor extends Application {
         mainSyntax.setTooltipInfo(s, getTooltipFunctionInfo(s));
       }
 
-      mainSyntax.resetKeywords(ZPEKit.getKeywordSet());
+      mainSyntax.resetKeywords(ZPEKit.getKeywordSet(mainSyntax));
       mainSyntax.setQuotes("\"'`");
       mainSyntax.setVariableSymbol("$");
 
@@ -795,9 +1273,12 @@ public class ZIDEEditor extends Application {
 
 
     closeBtn.setOnAction(e -> {
-      if (hasContent.get() && !confirmClose(title)) {
-        return;
+      if(tab.hasChanges()){
+        if (hasContent.get() && !confirmClose(title)) {
+          return;
+        }
       }
+
       TabPane pane = tab.getTabPane();
       if (pane != null) pane.getTabs().remove(tab);
     });
@@ -814,60 +1295,218 @@ public class ZIDEEditor extends Application {
     return tab;
   }
 
-  private Node buildTerminal() {
-    var title = new Label("Terminal");
+  private ToggleButton terminalTab;
+  private ToggleButton problemsTab;
+  private ToggleButton variablesTab;
+
+  private StackPane bottomContentStack;
+  private Node terminalView;
+  private Node problemsView;
+  private Node variablesView;
+
+  private Node wrapWithHeader(String titleText, Node content) {
+    Label title = new Label(titleText);
     title.getStyleClass().add("pane-title");
 
-    // --- LEFT: Swing console ---
-    SwingNode terminalNode = new SwingNode();
-
-
-      consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
-
-
-
-      consoleOutputTextArea.addProcessFinishedListener(() ->
-              Platform.runLater(() -> {
-                runBtn.getStyleClass().remove("running");
-                debugBtn.getStyleClass().remove("running");
-              })
-      );
-
-      consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
-      consoleScrollbar.setLightColour(Color.WHITE);
-      consoleScrollbar.setDarkColour(Color.BLACK);
-      consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());
-      consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
-
-      terminalNode.setContent(consoleScrollbar);
-
-
-    VBox terminalContainer = new VBox(terminalNode);
-    VBox.setVgrow(terminalNode, Priority.ALWAYS);
-
-    // --- RIGHT: Variables pane (created but NOT added yet) ---
-    variablesPane = buildVariablesPane(); // method below
-
-    // --- SplitPane ---
-    terminalSplit = new SplitPane();
-    terminalSplit.setOrientation(Orientation.HORIZONTAL);
-    terminalSplit.getItems().add(terminalContainer); // 👈 only terminal initially
-
-    // --- Header ---
-    var header = new HBox(title);
+    HBox header = new HBox(title);
+    header.setStyle("-fx-background-color: #fff;");
     header.setAlignment(Pos.CENTER_LEFT);
     header.getStyleClass().add("pane-header");
 
-    var box = new VBox(header, terminalSplit);
-    VBox.setVgrow(terminalSplit, Priority.ALWAYS);
-    box.getStyleClass().add("terminal-pane");
-    box.setMinHeight(180);
+    VBox box = new VBox(header, content);
+    VBox.setVgrow(content, Priority.ALWAYS);
 
     return box;
   }
 
+  private Node buildTerminal() {
+
+    // --- Terminal view ---
+    SwingNode terminalNode = new SwingNode();
+
+    consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
+
+    consoleOutputTextArea.addProcessFinishedListener(() ->
+            Platform.runLater(() -> {
+              runBtn.getStyleClass().remove("running");
+              debugBtn.getStyleClass().remove("running");
+            })
+    );
+
+    consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
+    consoleScrollbar.setLightColour(Color.WHITE);
+    consoleScrollbar.setDarkColour(Color.BLACK);
+    consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());
+    consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
+
+    terminalNode.setContent(consoleScrollbar);
+
+    VBox terminalContainer = new VBox(terminalNode);
+    VBox.setVgrow(terminalNode, Priority.ALWAYS);
+
+    terminalView =  wrapWithHeader("Terminal", terminalContainer);
+
+    // --- Problems view ---
+    problemsView = wrapWithHeader("Problems", buildProblemsPane());
+
+    // --- Variables view ---
+    variablesView = wrapWithHeader("Variables", buildVariablesPane());
+
+    // --- Content stack ---
+    bottomContentStack = new StackPane(terminalView, problemsView, variablesView);
+    bottomContentStack.getStyleClass().add("bottom-content-stack");
+
+    problemsView.setVisible(false);
+    problemsView.setManaged(false);
+
+    variablesView.setVisible(false);
+    variablesView.setManaged(false);
+
+    // --- Vertical tabs ---
+    terminalTab = createBottomSideTab("Terminal", icon("/files/console.png"));
+    problemsTab = createBottomSideTab("Problems", icon("/files/warning.png"));
+    variablesTab = createBottomSideTab("Variables", icon("/files/watch.png"));
+
+    ToggleGroup group = new ToggleGroup();
+    terminalTab.setToggleGroup(group);
+    problemsTab.setToggleGroup(group);
+    variablesTab.setToggleGroup(group);
+
+    terminalTab.setSelected(true);
+
+    terminalTab.setOnAction(e -> showBottomPanel(terminalView));
+    problemsTab.setOnAction(e -> showBottomPanel(problemsView));
+    variablesTab.setOnAction(e -> showBottomPanel(variablesView));
+
+    VBox tabs = new VBox(terminalTab, problemsTab, variablesTab);
+    tabs.getStyleClass().add("bottom-side-tabs");
+    tabs.setFillWidth(true);
+
+    // --- Main bottom pane ---
+    HBox bottom = new HBox(tabs, bottomContentStack);
+    HBox.setHgrow(bottomContentStack, Priority.ALWAYS);
+
+    bottom.getStyleClass().add("bottom-panel");
+    bottom.setMinHeight(180);
+
+    return bottom;
+  }
+
+  private Node icon(String path) {
+    Image img = new Image(getClass().getResourceAsStream(path));
+    ImageView iv = new ImageView(img);
+    iv.setFitWidth(16);
+    iv.setFitHeight(16);
+    return iv;
+  }
+
+  private ToggleButton createBottomSideTab(String tooltipText, Node icon) {
+    ToggleButton button = new ToggleButton();
+    button.getStyleClass().add("bottom-side-tab");
+
+    button.setGraphic(icon);
+    button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+    button.setTooltip(new Tooltip(tooltipText));
+
+    button.setMinSize(38, 38);
+    button.setPrefSize(38, 38);
+    button.setMaxSize(38, 38);
+
+    return button;
+  }
+
+  private void showBottomPanel(Node selected) {
+    for (Node node : bottomContentStack.getChildren()) {
+      boolean visible = node == selected;
+      node.setVisible(visible);
+      node.setManaged(visible);
+    }
+  }
+
+  private TableView<ProblemRow> problemsTable;
+  private Node buildProblemsPane() {
+    problemsTable = new TableView<>();
+    problemsTable.setItems(problemsRows);
+    problemsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+    TableColumn<ProblemRow, String> typeCol = new TableColumn<>("Type");
+    typeCol.setCellValueFactory(v -> v.getValue().severityProperty());
+
+    TableColumn<ProblemRow, String> lineCol = new TableColumn<>("Line");
+    lineCol.setCellValueFactory(v -> v.getValue().lineProperty());
+
+    TableColumn<ProblemRow, String> msgCol = new TableColumn<>("Message");
+    msgCol.setCellValueFactory(v -> v.getValue().messageProperty());
+    msgCol.setPrefWidth(400);
+
+    typeCol.setMinWidth(80);
+    typeCol.setMaxWidth(80);
+
+    lineCol.setMinWidth(60);
+    lineCol.setMaxWidth(60);
+
+    msgCol.setPrefWidth(1000); // big so it dominates
+
+    problemsTable.getColumns().setAll(typeCol, lineCol, msgCol);
+
+    problemsTable.setRowFactory(tv -> {
+      TableRow<ProblemRow> row = new TableRow<>();
+
+      row.setOnMouseClicked(e -> {
+        if (e.getClickCount() == 2 && !row.isEmpty()) {
+          int line = Integer.parseInt(row.getItem().lineProperty().get());
+          getCurrentTab().getEditor().goToLine(line);
+        }
+      });
+
+      return row;
+    });
+
+    problemsTable.setRowFactory(tv -> new TableRow<>() {
+      @Override
+      protected void updateItem(ProblemRow item, boolean empty) {
+        super.updateItem(item, empty);
+
+        if (empty || item == null) {
+          setStyle("");
+        } else {
+          if ("ERROR".equals(item.getSeverity())) {
+            setStyle("-fx-background-color: #ffecec;");
+          } else if ("WARNING".equals(item.getSeverity())) {
+            setStyle("-fx-background-color: #fff6e5;");
+          } else {
+            setStyle("");
+          }
+        }
+      }
+    });
+
+    return problemsTable;
+  }
+
+  public class ProblemRow {
+
+    private final SimpleStringProperty severity;
+    private final SimpleStringProperty line;
+    private final SimpleStringProperty message;
+
+    public ProblemRow(String severity, int line, String message) {
+      this.severity = new SimpleStringProperty(severity);
+      this.line = new SimpleStringProperty(String.valueOf(line));
+      this.message = new SimpleStringProperty(message);
+    }
+
+    public StringProperty severityProperty() { return severity; }
+    public StringProperty lineProperty() { return line; }
+    public StringProperty messageProperty() { return message; }
+    public String getSeverity() {
+      return severity.get();
+    }
+  }
+
   private VBox buildVariablesPane() {
     varRows = FXCollections.observableArrayList();
+
     varTable = new TableView<>(varRows);
     varTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
@@ -892,14 +1531,7 @@ public class ZIDEEditor extends Application {
 
     varTable.getColumns().setAll(cName, cType, cFunc, cValue);
 
-    var title = new Label("Variables");
-    title.getStyleClass().add("pane-title");
-
-    var header = new HBox(title);
-    header.setAlignment(Pos.CENTER_LEFT);
-    header.getStyleClass().add("pane-header");
-
-    var box = new VBox(header, varTable);
+    VBox box = new VBox(varTable);
     VBox.setVgrow(varTable, Priority.ALWAYS);
     box.getStyleClass().add("variables-pane");
     box.setMinWidth(320);
@@ -907,19 +1539,27 @@ public class ZIDEEditor extends Application {
     return box;
   }
 
+  private void showProblemsPane() {
+    Platform.runLater(() -> {
+      problemsTab.setSelected(true);
+      showBottomPanel(problemsView);
+    });
+  }
+
   private void showVariablesPane() {
     Platform.runLater(() -> {
-      if (!terminalSplit.getItems().contains(variablesPane)) {
-        terminalSplit.getItems().add(variablesPane);
-        terminalSplit.setDividerPositions(0.72);
-      }
+      variablesTab.setSelected(true);
+      showBottomPanel(variablesView);
     });
+
     variablesPaneOption.setSelected(true);
   }
 
-  private void hideVariablesPane() {
-    Platform.runLater(() -> terminalSplit.getItems().remove(variablesPane));
-    variablesPaneOption.setSelected(false);
+  private void showConsolePane() {
+    Platform.runLater(() -> {
+      terminalTab.setSelected(true);
+      showBottomPanel(terminalView);
+    });
   }
 
   public void setVariables(ZPEMap vars) {
@@ -956,7 +1596,7 @@ public class ZIDEEditor extends Application {
     centre.setStyle("-fx-font-size: 13px;");
 
     rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-      CodeEditorView c = ((EditorTab) editorTabs.getSelectionModel().getSelectedItem()).getEditor();
+      CodeEditorView c = getCurrentTab().getEditor();
       setLanguage("yass", c);
     });
 

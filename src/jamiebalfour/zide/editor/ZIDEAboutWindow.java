@@ -48,8 +48,9 @@ public final class ZIDEAboutWindow {
 
     Label name = new Label("ZIDE");
     name.getStyleClass().add("about-title");
+    name.setFont(new javafx.scene.text.Font(20));
 
-    Label version = new Label("Version " + getVersion());
+    Label version = new Label("ZIDE Version " + getVersion());
     version.getStyleClass().add("about-version");
 
     Label zpe_version = new Label("ZPE Version " + ZPECore.getVersionNumber() + " [" + ZPECore.getVersionName() + "]");
@@ -94,7 +95,7 @@ public final class ZIDEAboutWindow {
     VBox root = new VBox(titleBar, content);
     root.getStyleClass().add("about-root");
 
-    Scene scene = new Scene(root, 420, 260);
+    Scene scene = new Scene(root, 420, 280);
 
     stage.setScene(scene);
     stage.showAndWait();

@@ -4,6 +4,8 @@
       <root url="jar://$USER_HOME$/Sync/Programs/ZPE/zpe.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../ZPE-Programming-Environment/src" />
+    </SOURCES>
   </library>
 </component>
