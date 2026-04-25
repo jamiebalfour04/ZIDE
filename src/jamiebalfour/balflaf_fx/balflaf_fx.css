@@ -150,3 +150,55 @@
 .jb-menu-button:pressed {
     -fx-background-color: #cfcfcf;
 }
+
+
+.glass-menu-popup {
+    -fx-background-color: rgba(245, 245, 245, 0.88);
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
+    -fx-border-color: rgba(220,220,220,0.55);
+    -fx-border-radius: 14px;
+    -fx-border-width: 1px;
+}
+
+.glass-menu-item {
+    -fx-background-radius: 8px;
+}
+
+.glass-menu-item:hover {
+    -fx-background-color: rgba(255, 128, 0, 0.94);
+}
+
+.glass-menu-item:hover .glass-menu-item-text,
+.glass-menu-item:hover .glass-menu-shortcut {
+    -fx-text-fill: white;
+}
+
+.glass-menu-item-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #202020;
+}
+
+.glass-menu-shortcut {
+    -fx-font-size: 13px;
+    -fx-text-fill: #555555;
+}
+
+.glass-menu-separator {
+    -fx-background-color: rgba(0,0,0,0.18);
+}
+
+.glass-menu-title {
+    -fx-font-size: 13px;
+    -fx-text-fill: #222;
+    -fx-background-radius: 7px;
+}
+
+.glass-menu-title:hover {
+    -fx-background-color: #dddddd;
+    -fx-background-radius: 7px;
+}
+
+.glass-menu-title:hover {
+    -fx-background-color: rgba(0,0,0,0.08);
+}

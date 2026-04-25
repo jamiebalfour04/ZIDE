@@ -25,7 +25,11 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
+import java.awt.event.InputEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.Objects;
@@ -285,12 +289,29 @@ public class BalfTitleBar extends Region {
 
 
     if(enableWindowMaximise) {
+
       var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
-      zoom.setOnMouseClicked(e -> stage.setMaximized(!stage.isMaximized()));
+      zoom.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
+        boolean ctrlDown = e.isControlDown();
+        boolean metaDown = e.isMetaDown();
+
+        if (ctrlDown && metaDown) {
+          enterMacFullScreen();
+        } else {
+          stage.setMaximized(!stage.isMaximized());
+        }
+
+        e.consume();
+      });
       box.getChildren().add(zoom);
     }
 
     return box;
+  }
+
+  private void enterMacFullScreen() {
+    stage.setFullScreenExitHint("");
+    stage.setFullScreen(!stage.isFullScreen());
   }
 
   private Circle trafficLight(String styleClass, Color fill) {

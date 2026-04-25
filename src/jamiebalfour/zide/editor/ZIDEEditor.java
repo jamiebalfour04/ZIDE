@@ -1,8 +1,8 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.FileHelperFunctions;
-import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
+import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
@@ -12,9 +12,6 @@ import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.core.ZIDE;
 import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.core.exceptions.CompileException;
-import jamiebalfour.zpe.core.types.ZPEList;
-import jamiebalfour.zpe.core.types.ZPENumber;
-import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -37,22 +34,21 @@ import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Dragboard;
-import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
+import javax.swing.Timer;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -69,6 +65,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ZIDEEditor extends Application {
 
@@ -83,7 +81,7 @@ public class ZIDEEditor extends Application {
   Button stepOverButton;
   Button continueButton;
   Separator debugSeparator;
-  CheckMenuItem toggleTheme;
+  CheckMenuItem toggleTheme = new CheckMenuItem("Dark theme");
   private TableView<VarRow> varTable;
   private ObservableList<VarRow> varRows;
   private VBox variablesPane;
@@ -94,6 +92,7 @@ public class ZIDEEditor extends Application {
   MenuItem stopExecution;
   private File currentProjectRoot;
   File projectDir;
+
 
 
   public static Font loadAndRegister(String resourcePath) {
@@ -112,6 +111,27 @@ public class ZIDEEditor extends Application {
 
   public static void begin(String[] args){
     launch(args);
+  }
+
+  private File chooseOutputFile(Stage owner, File currentFile, FileChooser.ExtensionFilter... filters) {
+    FileChooser chooser = new FileChooser();
+    chooser.setTitle("Save compiled application");
+
+    String baseName = currentFile == null
+            ? "application"
+            : currentFile.getName().replaceFirst("\\.[^.]+$", "");
+
+    chooser.setInitialFileName(baseName);
+
+    chooser.getExtensionFilters().addAll(filters);
+
+    File selected = chooser.showSaveDialog(owner);
+
+    if (selected == null) {
+      return null;
+    }
+
+    return selected;
   }
 
   @Override
@@ -302,278 +322,249 @@ public class ZIDEEditor extends Application {
     return selected.getParentFile();
   }
 
-  private MenuBar buildMenuBar() {
-    var file = new Menu("_File");
 
-    var newProject = new MenuItem("New Project");
-    newProject.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+N"));
-    newProject.setOnAction(e -> {
+  private BalfGlassMenuBar buildMenuBar() {
+    BalfGlassMenuBar bar = new BalfGlassMenuBar();
 
-      if (currentProjectRoot == null) {
-        new Alert(Alert.AlertType.WARNING, "Please open a folder first.").showAndWait();
+    bar.menu("File")
+            .item("New Project", "⇧⌘N", this::newProject)
+            .item("New File", "⌘N", this::newFile)
+            .item("Open project folder", "⌘O", this::openProjectFolder)
+            .separator()
+            .item("Save", "⌘S", this::saveCurrentFile)
+            .separator()
+            .item("Exit", "", () -> System.exit(0));
+
+    bar.menu("Edit")
+            .item("Undo", "⌘Z", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().undo();
+            })
+            .item("Redo", "⇧⌘Z", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().redo();
+            })
+            .separator()
+            .item("Cut", "⌘X", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().cut();
+            })
+            .item("Copy", "⌘C", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().copy();
+            })
+            .item("Paste", "⌘V", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().paste();
+            })
+            .item("Select All", "⌘A", () -> {
+              if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
+            });
+
+    bar.menu("View")
+            .checkItem("Dark theme", toggleTheme != null && toggleTheme.isSelected(), selected -> {
+              BalfLafManager.getInstance().toggleDarkMode(selected);
+
+              var scene = _stage.getScene();
+              scene.getRoot().pseudoClassStateChanged(
+                      javafx.css.PseudoClass.getPseudoClass("dark"),
+                      selected
+              );
+
+              for (Tab t : editorTabs.getTabs()) {
+                EditorTab tab = (EditorTab) t;
+
+                if (selected) {
+                  tab.switchOnDarkMode();
+                } else {
+                  tab.switchOffDarkMode();
+                }
+
+                int scrollPosition = tab.getScrollPane().getVerticalScrollBar().getValue();
+                SwingUtilities.invokeLater(() ->
+                        tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition)
+                );
+              }
+            });
+
+    bar.menu("Run")
+            .item("Run", "F5", this::runCode)
+            .item("Debug", "⇧⌘R", this::debug)
+            .separator()
+            .item("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess())
+            .separator()
+            .item("Compile", "", this::compileProject)
+            .item("Compile Native", "", this::compileNative);
+
+    bar.menu("ZPE Online")
+            .item("Login to ZPE Online", "", this::loginToZPEOnline)
+            .item("Load from ZPE Online", "", () -> {})
+            .item("Save to ZPE Online", "", () -> {});
+
+    bar.menu("Help")
+            .item("About", "", () -> ZIDEAboutWindow.show(_stage))
+            .separator()
+            .item("Download ZPE Runtime Environment", "", this::downloadZPERuntime)
+            .item("Download ZPE Native", "", this::downloadZPENative);
+
+    return bar;
+  }
+
+
+
+  private void openProjectFolder() {
+    DirectoryChooser chooser = new DirectoryChooser();
+    chooser.setTitle("Open project folder");
+
+    File chosen = chooser.showDialog(_stage);
+    if (chosen != null) {
+      buildProjectTree(chosen);
+      currentProjectRoot = chosen;
+    }
+  }
+
+  private void saveCurrentFile() {
+    if (getCurrentTab() == null) return;
+
+    try {
+      FileHelperFunctions.writeFile(
+              getCurrentTab().getPath(),
+              getCurrentTab().getEditor().getText(),
+              false
+      );
+      getCurrentTab().setHasChanges(false);
+    } catch (IOException ex) {
+      Alert alert = new Alert(Alert.AlertType.ERROR);
+      alert.setTitle("Error");
+      alert.setHeaderText("Error saving file");
+      alert.setContentText(ex.getMessage());
+      alert.showAndWait();
+    }
+  }
+
+  private void newProject() {
+    if (currentProjectRoot == null) {
+      new Alert(Alert.AlertType.WARNING, "Please open a folder first.").showAndWait();
+      return;
+    }
+
+    TextInputDialog dialog = new TextInputDialog();
+    dialog.setTitle("New Project");
+    dialog.setHeaderText("Create a new project");
+    dialog.setContentText("Project name:");
+
+    Optional<String> result = dialog.showAndWait();
+
+    result.ifPresent(name -> {
+      String trimmed = name.trim();
+
+      if (trimmed.isEmpty()) {
+        new Alert(Alert.AlertType.ERROR, "Project name cannot be empty.").showAndWait();
         return;
       }
 
-      TextInputDialog dialog = new TextInputDialog();
-      dialog.setTitle("New Project");
-      dialog.setHeaderText("Create a new project");
-      dialog.setContentText("Project name:");
+      File newDir = new File(currentProjectRoot, trimmed);
 
-      Optional<String> result = dialog.showAndWait();
-
-      result.ifPresent(name -> {
-
-        String trimmed = name.trim();
-
-        if (trimmed.isEmpty()) {
-          new Alert(Alert.AlertType.ERROR, "Project name cannot be empty.").showAndWait();
-          return;
-        }
-
-        File newDir = new File(currentProjectRoot, trimmed);
-
-        if (newDir.exists()) {
-          new Alert(Alert.AlertType.ERROR, "A folder with that name already exists.").showAndWait();
-          return;
-        }
-
-        boolean created = newDir.mkdir();
-
-        if (!created) {
-          new Alert(Alert.AlertType.ERROR, "Failed to create project folder.").showAndWait();
-          return;
-        }
-
-        // Optional: create starter file
-        // new File(newDir, "main.yas").createNewFile();
-
-        buildProjectTree(currentProjectRoot);
-      });
-    });
-
-    var newFile = new MenuItem("New File");
-    newFile.setAccelerator(KeyCombination.keyCombination("Shortcut+N"));
-    newFile.setOnAction(e -> newFile());
-
-    var open = new MenuItem("Open project folder");
-    open.setAccelerator(KeyCombination.keyCombination("Shortcut+O"));
-    open.setOnAction(e -> {
-      DirectoryChooser chooser = new DirectoryChooser();
-      chooser.setTitle("Open project folder");
-
-      File chosen = chooser.showDialog(_stage);
-      if (chosen != null) {
-        buildProjectTree(chosen);
-        currentProjectRoot = chosen;
-      }
-    });
-
-    var save = new MenuItem("Save");
-    save.setAccelerator(KeyCombination.keyCombination("Shortcut+S"));
-    save.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      String f = getCurrentTab().getPath();
-
-      try {
-        FileHelperFunctions.writeFile(f, getCurrentTab().getEditor().getText(), false);
-        getCurrentTab().setHasChanges(false);
-      } catch (IOException ex) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText("Error saving file");
-        alert.setContentText(ex.getMessage());
-        alert.showAndWait();
+      if (newDir.exists()) {
+        new Alert(Alert.AlertType.ERROR, "A folder with that name already exists.").showAndWait();
+        return;
       }
 
-    });
-
-    var exit = new MenuItem("Exit");
-    exit.setOnAction(e -> System.exit(0));
-
-    file.getItems().addAll(newProject, newFile, open, new SeparatorMenuItem(), save, new SeparatorMenuItem(), exit);
-
-    var edit = new Menu("_Edit");
-
-    var undo = new MenuItem("Undo");
-    undo.setAccelerator(KeyCombination.keyCombination("Shortcut+Z"));
-    undo.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().undo();
-    });
-    var redo = new MenuItem("Redo");
-    redo.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+Z"));
-    redo.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().redo();
-    });
-
-    var cut = new MenuItem("Cut");
-    cut.setAccelerator(KeyCombination.keyCombination("Shortcut+X"));
-    cut.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().cut();
-    });
-    var copy = new MenuItem("Copy");
-    copy.setAccelerator(KeyCombination.keyCombination("Shortcut+C"));
-    copy.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().copy();
-    });
-    var paste = new MenuItem("Paste");
-    paste.setAccelerator(KeyCombination.keyCombination("Shortcut+V"));
-    paste.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().paste();
-    });
-    var selectAll = new MenuItem("Select All");
-    selectAll.setAccelerator(KeyCombination.keyCombination("Shortcut+A"));
-    selectAll.setOnAction(e -> {
-      if(getCurrentTab() == null) return;
-      getCurrentTab().getEditor().selectAll();
-    });
-
-    edit.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste, selectAll, new SeparatorMenuItem());
-
-    var view = new Menu("_View");
-    toggleTheme = new CheckMenuItem("Dark theme");
-    toggleTheme.setOnAction(e -> {
-      BalfLafManager.getInstance().toggleDarkMode(toggleTheme.isSelected());
-      var scene = toggleTheme.getParentPopup().getOwnerWindow().getScene();
-      scene.getRoot().pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("dark"),
-              toggleTheme.isSelected());
-
-      for (Tab t : editorTabs.getTabs()) {
-        EditorTab tab = (EditorTab) t;
-        if(toggleTheme.isSelected()) {
-          tab.switchOnDarkMode();
-        } else{
-          tab.switchOffDarkMode();
-        }
-        int scrollPosition = tab.getScrollPane().getVerticalScrollBar().getValue();
-        SwingUtilities.invokeLater(() -> tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition));
-
+      if (!newDir.mkdir()) {
+        new Alert(Alert.AlertType.ERROR, "Failed to create project folder.").showAndWait();
+        return;
       }
 
-
-
-
+      buildProjectTree(currentProjectRoot);
     });
+  }
 
+  private void compileProject() {
+    if (getCurrentTab() == null) {
+      showError("Error compiling project", "No project open");
+      return;
+    }
 
+    File outputLocation = chooseOutputFile(
+            _stage,
+            null,
+            new FileChooser.ExtensionFilter("YASS Executable", "*.yex")
+    );
 
-    view.getItems().add(toggleTheme);
+    if (outputLocation == null) return;
 
-    var run = new Menu("_Run");
+    try {
+      ZPEKit.compile(
+              getCurrentTab().getEditor().getText(),
+              outputLocation.getAbsolutePath(),
+              "",
+              "",
+              true
+      );
+    } catch (IOException | CompileException ex) {
+      showError("Error compiling project", ex.getMessage());
+    }
+  }
 
-    runProject = new MenuItem("Run");
+  private void compileNative() {
+    if (getCurrentTab() == null) {
+      showError("Error compiling project", "No project open");
+      return;
+    }
 
-    runProject.setAccelerator(KeyCombination.keyCombination("Shortcut+R"));
-    runProject.setOnAction(e -> runCode());
+    File outputLocation = chooseOutputFile(
+            _stage,
+            null,
+            new FileChooser.ExtensionFilter("YASS Native", "*")
+    );
 
-    debugProject = new MenuItem("Debug");
-    debugProject.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+R"));
-    debugProject.setOnAction(e -> debug());
+    if (outputLocation == null) return;
 
-    stopExecution = new MenuItem("Stop Execution");
-    stopExecution.setDisable(true);
-    stopExecution.setAccelerator(KeyCombination.keyCombination("Shortcut+Shift+S"));
-    stopExecution.setOnAction(e -> {
-      consoleOutputTextArea.destroyCurrentProcess();
-    });
+    ZPEKit.compileNativeBinary(
+            getCurrentTab().getEditor().getText(),
+            "",
+            outputLocation.getAbsolutePath(),
+            true
+    );
+  }
 
+  private void loginToZPEOnline() {
+    ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
 
-    run.getItems().add(runProject);
-    run.getItems().add(debugProject);
-    run.getItems().add(new SeparatorMenuItem());
-    run.getItems().add(stopExecution);
+    String username = result.getUsername();
+    String password = result.getPassword();
 
+    try {
+      ZPEMap res = ZPEOnline.loginToZPEOnline(username, password);
 
-
-    var zpeOnlineMenu = new Menu("ZPE Online");
-    var loginToZPEOnlineMenuItem = new MenuItem("Login to ZPE Online");
-    var loadFromZPEOnlineMenuItem = new MenuItem("Load from ZPE Online");
-    var saveToZPEOnlineMenuItem = new MenuItem("Save to ZPE Online");
-
-    loginToZPEOnlineMenuItem.setOnAction(e -> {
-
-      ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
-
-      String username = result.getUsername();
-      String password = result.getPassword();
-
-      try {
-        ZPEMap res = ZPEOnline.loginToZPEOnline(username, password);
-
-        if(Integer.parseInt(res.get("result").toString()) == -1){
-          Alert alert = new Alert(Alert.AlertType.ERROR);
-          alert.setTitle("Error");
-          alert.setHeaderText("Error logging in to ZPE Online");
-          alert.setContentText(res.get("message").toString());
-          alert.showAndWait();
-          return;
-        }
-
-        ZPEList recents = (ZPEList) res.get(new ZPEString("list"));
-
-
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Success");
-        alert.setHeaderText(null);
-        alert.setContentText("Successfully logged in to ZPE Online");
-        alert.showAndWait();
-
-        loadFromZPEOnlineMenuItem.setVisible(true);
-        saveToZPEOnlineMenuItem.setVisible(true);
-        loginToZPEOnlineMenuItem.setText("Logout of ZPE Online");
-        //addRecentsFromCloud((ZPEList) login.get(new ZPEString("list")));
-      } catch (Exception ex) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText("Error logging in to ZPE Online");
-        alert.setContentText(ex.getMessage());
-        alert.showAndWait();
+      if (Integer.parseInt(res.get("result").toString()) == -1) {
+        showError("Error logging in to ZPE Online", res.get("message").toString());
+        return;
       }
 
+      new Alert(Alert.AlertType.INFORMATION, "Successfully logged in to ZPE Online").showAndWait();
 
-    });
+    } catch (Exception ex) {
+      showError("Error logging in to ZPE Online", ex.getMessage());
+    }
+  }
 
-    zpeOnlineMenu.getItems().addAll(loginToZPEOnlineMenuItem, loadFromZPEOnlineMenuItem, saveToZPEOnlineMenuItem);
+  private void downloadZPENative() {
+    try {
+      downloadWithPopup(
+              "Latest ZPEX Native Binary",
+              _stage,
+              "https://www.jamiebalfour.scot/downloads/1-zpe/zpe-native-aarch64",
+              Path.of(ZPEInstance.getInstallPath() + "/zpe-aarch64"),
+              false,
+              true
+      );
+    } catch (Exception ex) {
+      showError("Error downloading ZPE Native", ex.getMessage());
+    }
+  }
 
-
-
-
-
-    var help = new Menu("_Help");
-
-
-    var downloadZPERuntimeItem = new MenuItem("Download ZPE Runtime Environment");
-    downloadZPERuntimeItem.setOnAction(e -> downloadZPERuntime());
-
-    var downloadZPENative = new MenuItem("Download ZPE Native");
-    downloadZPENative.setOnAction(e -> {
-      //
-      try {
-        downloadWithPopup("Latest ZPEX Native Binary", _stage, "https://www.jamiebalfour.scot/downloads/1-zpe/zpe-native-aarch64", Path.of(ZPEInstance.getInstallPath() + "/zpe-aarch64"), false, true);
-      } catch(Exception ex) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Error");
-        alert.setHeaderText("Error downloading ZPE Native");
-        alert.setContentText(ex.getMessage());
-        alert.showAndWait();
-      }
-    });
-
-    MenuItem aboutMenuItem = new MenuItem("About");
-    help.getItems().add(aboutMenuItem);
-    aboutMenuItem.setOnAction(e -> ZIDEAboutWindow.show(_stage));
-
-    help.getItems().add(new SeparatorMenuItem());
-    help.getItems().add(downloadZPERuntimeItem);
-    help.getItems().add(downloadZPENative);
-
-    var bar = new MenuBar(file, edit, view, run, zpeOnlineMenu, help);
-    bar.getStyleClass().add("app-menubar");
-    return bar;
+  private void showError(String header, String message) {
+    Alert alert = new Alert(Alert.AlertType.ERROR);
+    alert.setTitle("Error");
+    alert.setHeaderText(header);
+    alert.setContentText(message);
+    alert.showAndWait();
   }
 
   private void downloadZPERuntime(){
@@ -1089,7 +1080,7 @@ public class ZIDEEditor extends Application {
 
 
       try {
-        jamiebalfour.codeeditor.CodeEditorView mainSyntax = new jamiebalfour.codeeditor.CodeEditorView();
+        ZIDESyntaxEditor mainSyntax = new ZIDESyntaxEditor(this);
 
         mainSyntax.setFontSize(14);
 
@@ -1164,7 +1155,9 @@ public class ZIDEEditor extends Application {
           private void update() {
             // always EDT already, but keep it simple
             hasNonBlankContent.set(!mainSyntax.getText().isBlank());
+            mainSyntax.onEditorChanged();
           }
+
           @Override public void insertUpdate(DocumentEvent e) { update(); }
           @Override public void removeUpdate(DocumentEvent e) { update(); }
           @Override public void changedUpdate(DocumentEvent e) { update(); }
@@ -1198,15 +1191,15 @@ public class ZIDEEditor extends Application {
 
   }
 
-  private void setLanguage(String lang, CodeEditorView mainSyntax) {
+  private void setLanguage(String lang, ZIDESyntaxEditor mainSyntax) {
     if(lang.equals("yass")) {
       String[] keywords = ZPEKit.getBuiltInFunctions();
 
       for (String s : keywords) {
-        mainSyntax.setTooltipInfo(s, getTooltipFunctionInfo(s));
+        mainSyntax.setTooltipInfo(s, mainSyntax.getBuiltInFunctionTooltip(s));
       }
 
-      mainSyntax.resetKeywords(ZPEKit.getKeywordSet(mainSyntax));
+      mainSyntax.setKeywords(ZPEKit.getKeywordSet(mainSyntax));
       mainSyntax.setQuotes("\"'`");
       mainSyntax.setVariableSymbol("$");
 
@@ -1596,7 +1589,7 @@ public class ZIDEEditor extends Application {
     centre.setStyle("-fx-font-size: 13px;");
 
     rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-      CodeEditorView c = getCurrentTab().getEditor();
+      ZIDESyntaxEditor c = (ZIDESyntaxEditor) getCurrentTab().getEditor();
       setLanguage("yass", c);
     });
 
@@ -1679,11 +1672,11 @@ public class ZIDEEditor extends Application {
     return item.getChildren().size() == 1 && item.getChildren().get(0).getValue() == null;
   }
 
-  private String getTooltipFunctionInfo(String functionName) {
+
+  /*private String getTooltipFunctionInfo(String functionName) {
     String output = "";
 
-
-    if (toggleTheme.isSelected()) {
+    if (toggleTheme != null && toggleTheme.isSelected()) {
       output += "<html><div style='padding:10px;width:300px;color:#ddd;'>";
     } else {
       output += "<html><div style='padding:10px;width:300px;color:#333;'>";
@@ -1734,7 +1727,7 @@ public class ZIDEEditor extends Application {
     output += "</div></html>";
 
     return output;
-  }
+  }*/
 
   static ArrayList<AbstractMap.SimpleEntry<String, String>> getParams(String function) {
 
@@ -1896,4 +1889,6 @@ public class ZIDEEditor extends Application {
     public StringProperty functionProperty() { return function; }
     public StringProperty valueProperty() { return value; }
   }
+
+
 }
