@@ -13,6 +13,7 @@ public class ZIDE {
         System.out.println("ZIDE Help coming soon...");
       } else if (args[0].equals("-g")) {
         ZIDEEditor.begin(args);
+
       } else if (args[0].equals("--version")) {
         System.out.println("ZIDE version " + getMajorVersion() + "." + getMinorVersion() + "." + getBuildNumber());
       }

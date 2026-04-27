@@ -25,20 +25,40 @@ public class BalfGlassMenuBar extends HBox {
 
   public GlassMenu menu(String title) {
     Label label = createMenuTitle(title);
+
+    StackPane hitBox = new StackPane(label);
+    hitBox.getStyleClass().add("glass-menu-title-hitbox");
+    hitBox.setAlignment(Pos.CENTER);
+    hitBox.setPickOnBounds(true);
+    hitBox.setMinHeight(30);
+    hitBox.setPrefHeight(30);
+
+
     GlassMenu menu = new GlassMenu(label);
-    getChildren().add(label);
-    attachMenu(label, menu.popup);
+
+    getChildren().add(hitBox);
+    attachMenu(hitBox, menu.popup);
+
     return menu;
   }
 
   private Label createMenuTitle(String text) {
     Label label = new Label(text);
     label.getStyleClass().add("glass-menu-title");
+
     label.setPadding(new Insets(4, 10, 4, 10));
+    label.setMinHeight(28);
+    label.setPrefHeight(28);
+    label.setMaxHeight(Double.MAX_VALUE);
+
+
+    label.setAlignment(Pos.CENTER);
+    label.setPickOnBounds(true);
+
     return label;
   }
 
-  private void attachMenu(Label owner, Popup popup) {
+  private void attachMenu(Node owner, Popup popup) {
     owner.setOnMouseEntered(e -> {
       if (activeMenu != null && activeMenu != popup) {
         showMenu(owner, popup);
@@ -47,6 +67,7 @@ public class BalfGlassMenuBar extends HBox {
 
     owner.setOnMouseClicked(e -> {
       if (activeMenu == popup && popup.isShowing()) {
+        hideActiveMenu();
         e.consume();
         return;
       }
@@ -56,21 +77,17 @@ public class BalfGlassMenuBar extends HBox {
     });
   }
 
-  private void showMenu(Label owner, Popup popup) {
+  private void showMenu(Node owner, Popup popup) {
     if (activeMenu == popup && popup.isShowing()) {
       return;
     }
 
-    if (activeMenu != null) {
-      activeMenu.hide();
-    }
+    hideActiveMenu();
 
-    Point2D p = owner.localToScreen(-20, owner.getHeight() - 12);
-
+    Point2D p = owner.localToScreen(-20, owner.getBoundsInLocal().getHeight() - 10);
     popup.show(owner.getScene().getWindow(), p.getX(), p.getY());
 
     activeMenu = popup;
-    activeMenuOwner = owner;
   }
 
   public class GlassMenu {
@@ -82,12 +99,37 @@ public class BalfGlassMenuBar extends HBox {
       this.owner = owner;
       this.popup = new Popup();
       this.popup.setAutoHide(true);
+      this.popup.setConsumeAutoHidingEvents(false);
 
+      StackPane root = new StackPane();
+
+// Shadow layer (non-interactive)
+      Region shadow = new Region();
+      shadow.getStyleClass().add("glass-menu-shadow");
+      shadow.setMouseTransparent(true);
+
+// Actual menu content
       this.box = new VBox(1);
       this.box.getStyleClass().add("glass-menu-popup");
       this.box.setPadding(new Insets(6));
 
-      this.popup.getContent().add(box);
+// Stack them
+      root.getChildren().addAll(shadow, box);
+
+// Add to popup
+      this.popup.getContent().add(root);
+
+      this.popup.setOnHidden(e -> {
+        if (activeMenu == this.popup) {
+          activeMenu = null;
+          activeMenuOwner = null;
+        }
+      });
+      this.popup.setOnHidden(e -> {
+        if (activeMenu == this.popup) {
+          hideActiveMenu();
+        }
+      });
     }
 
     public GlassMenu item(String text, String shortcut, Runnable action) {
@@ -140,8 +182,8 @@ public class BalfGlassMenuBar extends HBox {
       row.setOnMouseClicked(e -> {
         action.run();
 
-        if (hideAfterClick && activeMenu != null) {
-          activeMenu.hide();
+        if (hideAfterClick) {
+          hideActiveMenu();
         }
 
         e.consume();
@@ -185,7 +227,20 @@ public class BalfGlassMenuBar extends HBox {
     if (activeMenu != null) {
       activeMenu.hide();
       activeMenu = null;
-      activeMenuOwner = null;
+    }
+
+    setActiveOwner(null);
+  }
+
+  private void setActiveOwner(Label owner) {
+    if (activeMenuOwner != null) {
+      activeMenuOwner.getStyleClass().remove("active");
+    }
+
+    activeMenuOwner = owner;
+
+    if (activeMenuOwner != null && !activeMenuOwner.getStyleClass().contains("active")) {
+      activeMenuOwner.getStyleClass().add("active");
     }
   }
 }

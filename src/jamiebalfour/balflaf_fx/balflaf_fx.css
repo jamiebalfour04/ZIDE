@@ -12,7 +12,6 @@
 .balf-titlebar {
     -fx-border-color: rgba(0,0,0,0.08);
     -fx-border-width: 0 0 1 0;
-    -fx-background-color: #517;
 }
 
 .balf-title {
@@ -151,16 +150,6 @@
     -fx-background-color: #cfcfcf;
 }
 
-
-.glass-menu-popup {
-    -fx-background-color: rgba(245, 245, 245, 0.88);
-    -fx-background-radius: 8px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
-    -fx-border-color: rgba(220,220,220,0.55);
-    -fx-border-radius: 14px;
-    -fx-border-width: 1px;
-}
-
 .glass-menu-item {
     -fx-background-radius: 8px;
 }
@@ -199,6 +188,22 @@
     -fx-background-radius: 7px;
 }
 
+.glass-menu-title.active {
+    -fx-background-color: rgba(0, 0, 0, 0.08);
+    -fx-background-radius: 6px;
+}
+
 .glass-menu-title:hover {
     -fx-background-color: rgba(0,0,0,0.08);
+}
+
+.glass-menu-shadow {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
+}
+
+.glass-menu-popup {
+    -fx-background-color: rgba(255,255,255,0.92);
+    -fx-background-radius: 10;
 }

@@ -30,14 +30,17 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.image.*;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
@@ -47,11 +50,12 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -74,6 +78,7 @@ public class ZIDEEditor extends Application {
   ConsoleOutputTextArea consoleOutputTextArea;
   BalfScrollbarPane consoleScrollbar;
   Button runBtn;
+  Button buildBtn;
   Button debugBtn;
   Button stopExecutionBtn;
   Button stepOverButton;
@@ -84,12 +89,12 @@ public class ZIDEEditor extends Application {
   private ObservableList<VarRow> varRows;
   private VBox variablesPane;
   private ZPEDebugger.BreakPoint currentBreakpoint;
-  private CheckMenuItem variablesPaneOption;
   MenuItem runProject;
   MenuItem debugProject;
   MenuItem stopExecution = new MenuItem("Stop Execution");
   private File currentProjectRoot;
   File projectDir;
+  final Label statusLabel = new Label("Ready");
 
 
 
@@ -134,14 +139,24 @@ public class ZIDEEditor extends Application {
 
   @Override
   public void start(Stage stage) {
+
+    stage.getIcons().add(new Image(
+
+            getClass().getResourceAsStream("/files/ZIDE mini macos.png")
+
+    ));
     stage.initStyle(StageStyle.UNDECORATED);
 
     _stage = stage;
 
-    stage.getIcons().add(
+    stage.setMinWidth(600);
+    stage.setMinHeight(400);
+
+  /*  stage.getIcons().add(
             new Image(Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png")))
     );
-
+*/
+    //Application.setUserAgentStylesheet(STYLESHEET_CASPIAN);
 
     runtime = new ZPERuntimeEnvironment();
 
@@ -174,8 +189,8 @@ public class ZIDEEditor extends Application {
     // Center: editor tabs
     var editors = buildEditorTabs();
 
-    // Bottom: terminal + status bar
-    var terminal = buildTerminal();
+    // Bottom: console + status bar
+    var console = buildconsole();
 
     consoleOutputTextArea.addProcessFinishedListener(() -> {
       stopExecutionBtn.setVisible(false);
@@ -184,16 +199,62 @@ public class ZIDEEditor extends Application {
       debugSeparator.setVisible(false);
       clearRows();
     });
-    var bottom = new VBox(terminal, buildStatusBar());
-    VBox.setVgrow(terminal, Priority.ALWAYS);
+    var bottom = new VBox(console, buildStatusBar());
+    VBox.setVgrow(console, Priority.ALWAYS);
 
     // Split layout: left + center, then center + bottom
     var horizontalSplit = new SplitPane(leftPane, editors);
-    horizontalSplit.setDividerPositions(0.22);
+    setLeftSplitWidth(horizontalSplit, 260);
 
     var verticalSplit = new SplitPane(horizontalSplit, bottom);
     verticalSplit.setOrientation(Orientation.VERTICAL);
-    verticalSplit.setDividerPositions(0.72);
+
+    // store height in pixels (e.g. console height)
+    final double[] bottomHeight = {250};
+
+    // set initial position after layout
+    Platform.runLater(() -> {
+      verticalSplit.setDividerPositions(
+              1.0 - (bottomHeight[0] / verticalSplit.getHeight())
+      );
+    });
+
+// when user drags → update pixel height
+    verticalSplit.getDividers().get(0).positionProperty().addListener((obs, oldVal, newVal) -> {
+      double total = verticalSplit.getHeight();
+      bottomHeight[0] = (1.0 - newVal.doubleValue()) * total;
+    });
+
+// when window resizes → keep pixel height
+    verticalSplit.heightProperty().addListener((obs, oldVal, newVal) -> {
+      if (newVal.doubleValue() > 0) {
+        verticalSplit.setDividerPositions(
+                1.0 - (bottomHeight[0] / newVal.doubleValue())
+        );
+      }
+    });
+
+
+
+// store width in pixels
+    final double[] leftWidth = {260};
+
+// set initial width AFTER layout
+    Platform.runLater(() -> {
+      horizontalSplit.setDividerPositions(leftWidth[0] / horizontalSplit.getWidth());
+    });
+
+// when user drags divider → update pixel width
+    horizontalSplit.getDividers().get(0).positionProperty().addListener((obs, oldVal, newVal) -> {
+      leftWidth[0] = newVal.doubleValue() * horizontalSplit.getWidth();
+    });
+
+// when window resizes → keep pixel width
+    horizontalSplit.widthProperty().addListener((obs, oldVal, newVal) -> {
+      if (newVal.doubleValue() > 0) {
+        horizontalSplit.setDividerPositions(leftWidth[0] / newVal.doubleValue());
+      }
+    });
 
     root.setCenter(verticalSplit);
 
@@ -210,6 +271,18 @@ public class ZIDEEditor extends Application {
     if (isMac) {
       root.getStyleClass().add("mac-window");
     }
+  }
+
+  private void setLeftSplitWidth(SplitPane splitPane, double pixels) {
+    Platform.runLater(() -> {
+      double total = splitPane.getWidth();
+
+      if (total <= 0) {
+        return;
+      }
+
+      splitPane.setDividerPositions(pixels / total);
+    });
   }
 
   private static final Preferences PREFS = Preferences.userNodeForPackage(ZIDEEditor.class);
@@ -323,6 +396,7 @@ public class ZIDEEditor extends Application {
 
   private BalfGlassMenuBar buildMenuBar() {
     BalfGlassMenuBar bar = new BalfGlassMenuBar();
+    bar.getStyleClass().add("main-menu-bar");
 
     bar.menu("File")
             .item("New Project", "⇧⌘N", this::newProject)
@@ -361,6 +435,8 @@ public class ZIDEEditor extends Application {
             .checkItem("Dark theme", toggleTheme != null && toggleTheme.isSelected(), selected -> {
               BalfLafManager.getInstance().toggleDarkMode(selected);
 
+              invertImages();
+
               var scene = _stage.getScene();
               scene.getRoot().pseudoClassStateChanged(
                       javafx.css.PseudoClass.getPseudoClass("dark"),
@@ -391,7 +467,11 @@ public class ZIDEEditor extends Application {
             .separator()
             .item("Compile", "", this::compileProject)
             .item("Compile Native", "", this::compileNative);
-
+    bar.menu("Git")
+                    .item("Clone", "", this::cloneRepo)
+                    .separator()
+                    .item("Commit", "", null)
+                    .item("Push", "", null);
     bar.menu("ZPE Online")
             .item("Login to ZPE Online", "", this::loginToZPEOnline)
             .item("Load from ZPE Online", "", () -> {})
@@ -435,6 +515,81 @@ public class ZIDEEditor extends Application {
       alert.setHeaderText("Error saving file");
       alert.setContentText(ex.getMessage());
       alert.showAndWait();
+    }
+  }
+
+
+  private String askForRepoUrl() {
+    TextInputDialog dialog = new TextInputDialog();
+    dialog.setTitle("Clone Repository");
+    dialog.setHeaderText("Clone from GitHub");
+    dialog.setContentText("Repository URL:");
+
+    Optional<String> result = dialog.showAndWait();
+
+    return result.orElse(null);
+  }
+
+  private String getFolderName(String repoUrl) {
+    // remove trailing slash if present
+    repoUrl = repoUrl.endsWith("/") ? repoUrl.substring(0, repoUrl.length() - 1) : repoUrl;
+
+    String[] parts = repoUrl.split("/");
+
+    if (parts.length < 2) return "repo";
+
+    // second last part = owner/org
+    return parts[parts.length - 2];
+  }
+
+  private void cloneRepo() {
+    try {
+      // Ask for repo URL
+      String repoUrl = askForRepoUrl();
+
+      if (repoUrl == null || repoUrl.trim().isEmpty()) {
+        return;
+      }
+
+      repoUrl = repoUrl.trim();
+
+      // Extract repo name
+      String repoName = repoUrl.substring(repoUrl.lastIndexOf("/") + 1)
+              .replace(".git", "");
+
+      // Build destination path
+      File baseDir = new File(System.getProperty("user.home"),
+              "Documents/YASS Projects");
+
+      if (!baseDir.exists()) {
+        baseDir.mkdirs();
+      }
+
+      String folderName = getFolderName(repoUrl);
+      File destination = new File(baseDir, folderName);
+
+      if(!new File(destination.getAbsolutePath()).exists()) {
+        //new File(destination.getAbsolutePath()).mkdirs();
+      }
+
+      // Clone
+      Git.cloneRepository()
+              .setURI(repoUrl)
+              .setDirectory(destination)
+              .setCredentialsProvider(new UsernamePasswordCredentialsProvider("", ""))
+              .call()
+              .close();
+
+
+      // Optional: open in your IDE
+      buildProjectTree(currentProjectRoot);
+
+    } catch (Exception e) {
+      e.printStackTrace();
+      JOptionPane.showMessageDialog(null,
+              "Clone failed:\n" + e.getMessage(),
+              "Error",
+              JOptionPane.ERROR_MESSAGE);
     }
   }
 
@@ -516,12 +671,15 @@ public class ZIDEEditor extends Application {
 
     if (outputLocation == null) return;
 
-    ZPEKit.compileNativeBinary(
-            getCurrentTab().getEditor().getText(),
-            "",
-            outputLocation.getAbsolutePath(),
-            true
-    );
+    if(ZPEKit.compileNativeBinary(getCurrentTab().getEditor().getText(),"", outputLocation.getAbsolutePath(),true)){
+      Alert a = new Alert(Alert.AlertType.INFORMATION, "Successfully compiled native binary");
+      a.setHeaderText(null);
+      a.showAndWait();
+    } else{
+      Alert a = new Alert(Alert.AlertType.ERROR, "Failed to compile native binary");
+      a.setHeaderText(null);
+      a.showAndWait();
+    }
   }
 
   private void loginToZPEOnline() {
@@ -642,7 +800,15 @@ public class ZIDEEditor extends Application {
       runBtn.getStyleClass().add("running");
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
+      consoleOutputTextArea.addProcessFinishedListener(() -> {
+        Platform.runLater(() -> {
+          System.out.println("Finished");
+          statusLabel.setText("Ready");
+        });
+      });
+      statusLabel.setText("Executing code");
       consoleOutputTextArea.runAsProcess(tempPath, false, false, "");
+
       //stopExecution.setDisable(false);
 
     } catch (IOException e) {
@@ -709,6 +875,7 @@ public class ZIDEEditor extends Application {
         tab = (EditorTab) editorTabs.getTabs().get(0);
       }
       debugBtn.getStyleClass().add("running");
+      invertImageView(getToolbarButtonIcon(debugBtn));
 
       stopExecutionBtn.setVisible(true);
       stepOverButton.setVisible(true);
@@ -718,7 +885,10 @@ public class ZIDEEditor extends Application {
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab.getEditor(), tab.getEditor().getText()), false);
       consoleOutputTextArea.runAsProcess(tempPath, true, false, "");
-
+      consoleOutputTextArea.addProcessFinishedListener(() -> {
+        System.out.println("Finished");
+        invertImageView(getToolbarButtonIcon(debugBtn));
+      });
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -825,10 +995,10 @@ public class ZIDEEditor extends Application {
   }
 
   private ToolBar buildToolBar() {
-    runBtn = createExpandableToolbarButton("Run", "/files/play.png", this::runCode);
+    runBtn = createExpandableToolbarButton("Run", "/files/controller-play.png", this::runCode);
     runBtn.getStyleClass().add("run");
 
-    var buildBtn = createExpandableToolbarButton("Build", "/files/tools.png", this::debug);
+    buildBtn = createExpandableToolbarButton("Build", "/files/tools.png", this::debug);
     buildBtn.setOnAction(e -> {
       if(getCurrentTab() == null) return;
       try {
@@ -846,45 +1016,26 @@ public class ZIDEEditor extends Application {
     });
 
 
-    debugBtn = createExpandableToolbarButton("Debug", "/files/debug.png", this::debug);
+    debugBtn = createExpandableToolbarButton("Debug", "/files/bug.png", this::debug);
     debugBtn.setGraphicTextGap(6);
     debugBtn.getStyleClass().add("debug");
 
     var sep1 = new Separator(Orientation.VERTICAL);
 
-    stopExecutionBtn = new Button("Stop");
-    stopExecutionBtn.setOnAction(e -> {
-      if(currentBreakpoint == null){
-        consoleOutputTextArea.destroyCurrentProcess();
-      } else{
-        currentBreakpoint.stopExecution();
-      }
-    });
+    stopExecutionBtn = createExpandableToolbarButton("Stop", "/files/stop.png", this::stopExecution);
     stopExecutionBtn.setVisible(false);
 
-    stepOverButton = new Button("Step Over");
-    stepOverButton.setOnAction(e -> {
-      if(currentBreakpoint == null){
-        return;
-      }
-      currentBreakpoint.stepOver();
-    });
+    stepOverButton = createExpandableToolbarButton("Step Over", "/files/stepover.png", this::stepOver);
     stepOverButton.setVisible(false);
 
-    continueButton = new Button("Continue");
-    continueButton.setOnAction(e -> {
-      if(currentBreakpoint == null){
-        return;
-      }
-      currentBreakpoint.resume();
-    });
+    continueButton = createExpandableToolbarButton("Continue", "/files/continue.png", this::continueDebug);
     continueButton.setVisible(false);
 
     debugSeparator = new Separator(Orientation.VERTICAL);
     debugSeparator.setVisible(false);
 
     var search = new TextField();
-    search.setPromptText("Search…");
+    search.setPromptText("Search");
     search.getStyleClass().add("search-field");
     search.setMaxWidth(280);
 
@@ -899,6 +1050,27 @@ public class ZIDEEditor extends Application {
   }
 
   private TreeView<File> projectTree;
+
+  private void continueDebug(){
+    if(currentBreakpoint == null){
+      return;
+    }
+    currentBreakpoint.resume();
+  }
+
+  private void stepOver(){
+    if(currentBreakpoint == null){
+      return;
+    }
+    currentBreakpoint.stepOver();
+  }
+
+  private void stopExecution(){
+    if(currentBreakpoint == null){
+      return;
+    }
+    currentBreakpoint.stopExecution();
+  }
 
   private Node buildProjectTree(File projectDir) {
     if (projectTree == null) {
@@ -1330,34 +1502,108 @@ public class ZIDEEditor extends Application {
     return tab;
   }
 
-  private ToggleButton terminalTab;
+  private ToggleButton consoleTab;
   private ToggleButton problemsTab;
   private ToggleButton variablesTab;
+  private ToggleButton profileTab;
 
   private StackPane bottomContentStack;
-  private Node terminalView;
+  private Node consoleView;
   private Node problemsView;
   private Node variablesView;
+  private Node profileView;
 
-  private Node wrapWithHeader(String titleText, Node content) {
+  private Node wrapWithHeader(String titleText, Node content, Node... actions) {
     Label title = new Label(titleText);
     title.getStyleClass().add("pane-title");
 
-    HBox header = new HBox(title);
-    header.setStyle("-fx-background-color: #fff;");
+    Region spacer = new Region();
+    HBox.setHgrow(spacer, Priority.ALWAYS);
+
+    HBox header = new HBox(8);
     header.setAlignment(Pos.CENTER_LEFT);
     header.getStyleClass().add("pane-header");
+    header.getChildren().addAll(title, spacer);
+    header.getChildren().addAll(actions);
 
     VBox box = new VBox(header, content);
     VBox.setVgrow(content, Priority.ALWAYS);
+    box.getStyleClass().add("pane-wrapper");
 
     return box;
   }
 
-  private Node buildTerminal() {
+  private Button panelIconButton(String iconPath, String tooltip, Runnable action) {
+    ImageView icon = new ImageView(new Image(
+            Objects.requireNonNull(getClass().getResourceAsStream(iconPath))
+    ));
 
-    // --- Terminal view ---
-    SwingNode terminalNode = new SwingNode();
+    icon.setFitWidth(14);   // tweak: 12–16 is sweet spot
+    icon.setFitHeight(14);
+    icon.setPreserveRatio(true);
+    icon.setSmooth(true);
+    icon.getStyleClass().add("panel-icon");
+
+    Button btn = new Button();
+    btn.setGraphic(icon);
+    btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+    btn.setTooltip(new Tooltip(tooltip));
+
+    btn.setMinSize(14, 14);
+    btn.setPrefSize(14, 14);
+    btn.setMaxSize(14, 14);
+
+    icon.setFitWidth(12);
+    icon.setFitHeight(12);
+
+    btn.getStyleClass().add("panel-icon-button");
+    btn.setFocusTraversable(false);
+
+    btn.setOnAction(e -> action.run());
+
+    return btn;
+  }
+
+  private LineChart<Number, Number> profilerChart;
+  private XYChart.Series<Number, Number> memorySeries;
+
+  private Node buildProfilerPane() {
+    NumberAxis xAxis = new NumberAxis();
+    xAxis.setLabel("Time (ms)");
+    xAxis.setForceZeroInRange(true);
+
+    NumberAxis yAxis = new NumberAxis();
+    yAxis.setLabel("Memory (MB)");
+    yAxis.setForceZeroInRange(true);
+
+    profilerChart = new LineChart<>(xAxis, yAxis);
+    profilerChart.setAnimated(false);
+    profilerChart.setCreateSymbols(false);
+    profilerChart.setLegendVisible(false);
+    profilerChart.getStyleClass().add("profiler-chart");
+
+    memorySeries = new XYChart.Series<>();
+    memorySeries.setName("Memory");
+    profilerChart.getData().add(memorySeries);
+
+    VBox content = new VBox(profilerChart);
+    VBox.setVgrow(profilerChart, Priority.ALWAYS);
+    content.getStyleClass().add("profiler-pane");
+    return content;
+  }
+
+  private void clearProfiler() {
+    Platform.runLater(() -> {
+      if (memorySeries != null) {
+        memorySeries.getData().clear();
+      }
+    });
+  }
+
+  private Node buildconsole() {
+
+    // --- console view ---
+    SwingNode consoleNode = new SwingNode();
 
     consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
 
@@ -1368,21 +1614,27 @@ public class ZIDEEditor extends Application {
     consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());
     consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
 
-    terminalNode.setContent(consoleScrollbar);
+    consoleNode.setContent(consoleScrollbar);
 
-    VBox terminalContainer = new VBox(terminalNode);
-    VBox.setVgrow(terminalNode, Priority.ALWAYS);
+    VBox consoleContainer = new VBox(consoleNode);
+    VBox.setVgrow(consoleNode, Priority.ALWAYS);
 
-    terminalView =  wrapWithHeader("Terminal", terminalContainer);
+    consoleView =  wrapWithHeader("Console", consoleContainer);
 
     // --- Problems view ---
     problemsView = wrapWithHeader("Problems", buildProblemsPane());
 
     // --- Variables view ---
-    variablesView = wrapWithHeader("Variable Watch", buildVariablesPane());
+    variablesView = wrapWithHeader("Variable Watch", buildVariablesPane(),
+            panelIconButton("/files/stepover.png", "Step over", this::stepOver),
+            panelIconButton("/files/continue.png", "Continue debugging", this::continueDebug),
+            panelIconButton("/files/stop.png", "Stop execution", this::stopExecution)
+    );
+
+    profileView = wrapWithHeader("Profiling", buildProfilerPane(), panelIconButton("/files/bin.png", "Clear profiler", this::clearProfiler));
 
     // --- Content stack ---
-    bottomContentStack = new StackPane(terminalView, problemsView, variablesView);
+    bottomContentStack = new StackPane(consoleView, problemsView, variablesView, profileView);
     bottomContentStack.getStyleClass().add("bottom-content-stack");
 
     problemsView.setVisible(false);
@@ -1391,23 +1643,30 @@ public class ZIDEEditor extends Application {
     variablesView.setVisible(false);
     variablesView.setManaged(false);
 
+    profileView.setVisible(false);
+    profileView.setManaged(false);
+
     // --- Vertical tabs ---
-    terminalTab = createBottomSideTab("Terminal", icon("/files/console.png"));
+    consoleTab = createBottomSideTab("Console", icon("/files/console.png"));
     problemsTab = createBottomSideTab("Problems", icon("/files/warning.png"));
     variablesTab = createBottomSideTab("Variable Watch", icon("/files/watch.png"));
+    profileTab = createBottomSideTab("Profiling", icon("/files/profiling.png"));
 
     ToggleGroup group = new ToggleGroup();
-    terminalTab.setToggleGroup(group);
+    consoleTab.setToggleGroup(group);
     problemsTab.setToggleGroup(group);
     variablesTab.setToggleGroup(group);
+    profileTab.setToggleGroup(group);
 
-    terminalTab.setSelected(true);
 
-    terminalTab.setOnAction(e -> showBottomPanel(terminalView));
+    consoleTab.setSelected(true);
+
+    consoleTab.setOnAction(e -> showBottomPanel(consoleView));
     problemsTab.setOnAction(e -> showBottomPanel(problemsView));
     variablesTab.setOnAction(e -> showBottomPanel(variablesView));
+    profileTab.setOnAction(e -> showBottomPanel(profileView));
 
-    VBox tabs = new VBox(terminalTab, problemsTab, variablesTab);
+    VBox tabs = new VBox(consoleTab, problemsTab, variablesTab, profileTab);
     tabs.getStyleClass().add("bottom-side-tabs");
     tabs.setFillWidth(true);
 
@@ -1589,13 +1848,12 @@ public class ZIDEEditor extends Application {
       showBottomPanel(variablesView);
     });
 
-    variablesPaneOption.setSelected(true);
   }
 
   private void showConsolePane() {
     Platform.runLater(() -> {
-      terminalTab.setSelected(true);
-      showBottomPanel(terminalView);
+      consoleTab.setSelected(true);
+      showBottomPanel(consoleView);
     });
   }
 
@@ -1626,7 +1884,6 @@ public class ZIDEEditor extends Application {
   }
 
   private Node buildStatusBar() {
-    var left = new Label("Ready");
     var centre = new Label("ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion() + " build " + ZIDE.getBuildNumber() + " © Jamie Balfour 2024 - 2026.");
     rightFooterLabel = new Label("Text");
 
@@ -1637,7 +1894,7 @@ public class ZIDEEditor extends Application {
       setLanguage("yass", c);
     });
 
-    var bar = new HBox(left, new Region(), centre, new Region(), rightFooterLabel);
+    var bar = new HBox(statusLabel, new Region(), centre, new Region(), rightFooterLabel);
     HBox.setHgrow(bar.getChildren().get(1), Priority.ALWAYS);
     HBox.setHgrow(bar.getChildren().get(3), Priority.ALWAYS);
 
@@ -1932,6 +2189,67 @@ public class ZIDEEditor extends Application {
     public StringProperty typeProperty() { return type; }
     public StringProperty functionProperty() { return function; }
     public StringProperty valueProperty() { return value; }
+  }
+
+  void invertImages(){
+    invertImageView(getToolbarButtonIcon(runBtn));
+    invertImageView(getToolbarButtonIcon(buildBtn));
+    invertImageView(getToolbarButtonIcon(debugBtn));
+    invertImageView(getToggleButtonIcon(consoleTab));
+    invertImageView(getToggleButtonIcon(variablesTab));
+    invertImageView(getToggleButtonIcon(problemsTab));
+    invertImageView(getToggleButtonIcon(profileTab));
+  }
+
+  private void invertImageView(ImageView imageView) {
+    Image image = imageView.getImage();
+
+    WritableImage inverted = new WritableImage(
+            (int) image.getWidth(),
+            (int) image.getHeight()
+    );
+
+    PixelReader reader = image.getPixelReader();
+    PixelWriter writer = inverted.getPixelWriter();
+
+    for (int y = 0; y < image.getHeight(); y++) {
+      for (int x = 0; x < image.getWidth(); x++) {
+        javafx.scene.paint.Color c = reader.getColor(x, y);
+
+        writer.setColor(x, y, javafx.scene.paint.Color.color(
+                1.0 - c.getRed(),
+                1.0 - c.getGreen(),
+                1.0 - c.getBlue(),
+                c.getOpacity()
+        ));
+      }
+    }
+
+    imageView.setImage(inverted);
+  }
+
+  private static ImageView getToolbarButtonIcon(Button button) {
+    Node graphic = button.getGraphic();
+
+    if (graphic instanceof HBox box && !box.getChildren().isEmpty()) {
+      Node first = box.getChildren().get(0);
+
+      if (first instanceof ImageView imageView) {
+        return imageView;
+      }
+    }
+
+    return null;
+  }
+
+  private static ImageView getToggleButtonIcon(ToggleButton button) {
+    Node graphic = button.getGraphic();
+
+    if (graphic instanceof ImageView imageView) {
+      return imageView;
+    }
+
+    return null;
   }
 
 

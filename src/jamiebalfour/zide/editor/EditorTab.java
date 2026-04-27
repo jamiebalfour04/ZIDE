@@ -103,6 +103,8 @@ public class EditorTab extends Tab {
     editor.setAutoCompleteItemBackgroundColor(new Color(30, 39, 75, 255));
     resetScroll();
 
+
+
   }
 
   void switchOffDarkMode() {

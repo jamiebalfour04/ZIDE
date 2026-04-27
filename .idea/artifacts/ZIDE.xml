@@ -17,20 +17,22 @@
       <element id="directory" name="META-INF">
         <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />
       </element>
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/CodeEditorView.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/CodeEditorView.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/ZPE/zpe.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx-swt.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.base.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.controls.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.fxml.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.graphics.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.media.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.swing.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/javafx.web.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/jdk.jsobject.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.input.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.richtext.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx-swt.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.base.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.controls.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.fxml.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.graphics.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.media.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.swing.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/javafx.web.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/jdk.jsobject.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/jfx.incubator.input.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/jfx/jfx.incubator.richtext.jar" path-in-jar="/" />
       <element id="module-output" name="ZIDE" />
+      <element id="extracted-dir" path="$JARs$/slf4j-api-2.0.13.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/org.eclipse.jgit-6.10.0.202406032230-r.unsigned.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

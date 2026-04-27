@@ -6,6 +6,7 @@ import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.geometry.Side;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
@@ -24,6 +25,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
@@ -298,7 +300,7 @@ public class BalfTitleBar extends Region {
         if (ctrlDown && metaDown) {
           enterMacFullScreen();
         } else {
-          stage.setMaximized(!stage.isMaximized());
+          toggleMacZoom(stage);
         }
 
         e.consume();
@@ -307,6 +309,43 @@ public class BalfTitleBar extends Region {
     }
 
     return box;
+  }
+
+  private boolean zoomed = false;
+
+  private double oldX;
+  private double oldY;
+  private double oldW;
+  private double oldH;
+
+
+  private void toggleMacZoom(Stage stage) {
+    if (!zoomed) {
+      oldX = stage.getX();
+      oldY = stage.getY();
+      oldW = stage.getWidth();
+      oldH = stage.getHeight();
+
+      Screen screen = Screen.getScreensForRectangle(
+              stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight()
+      ).get(0);
+
+      Rectangle2D bounds = screen.getVisualBounds();
+
+      stage.setX(bounds.getMinX());
+      stage.setY(bounds.getMinY());
+      stage.setWidth(bounds.getWidth());
+      stage.setHeight(bounds.getHeight());
+
+      zoomed = true;
+    } else {
+      stage.setX(oldX);
+      stage.setY(oldY);
+      stage.setWidth(oldW);
+      stage.setHeight(oldH);
+
+      zoomed = false;
+    }
   }
 
   private void enterMacFullScreen() {
@@ -414,17 +453,29 @@ public class BalfTitleBar extends Region {
       dragOffsetY = e.getSceneY();
     });
     setOnMouseDragged(e -> {
-      if (!stage.isMaximized()) {
-        stage.setX(e.getScreenX() - dragOffsetX);
-        stage.setY(e.getScreenY() - dragOffsetY);
+      System.out.println(stage.isMaximized());
+      if (!((!HelperFunctions.isMac() && stage.isMaximized()) || (HelperFunctions.isMac() && !zoomed))) {
+        if(isMac()){
+          toggleMacZoom(stage);
+        } else {
+          stage.setMaximized(!stage.isMaximized());
+        }
       }
+
+      stage.setX(e.getScreenX() - dragOffsetX);
+      stage.setY(e.getScreenY() - dragOffsetY);
+
     });
   }
 
   private void enableDoubleClickZoom(Stage stage) {
     setOnMouseClicked(e -> {
       if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
-        stage.setMaximized(!stage.isMaximized());
+        if(isMac()){
+          toggleMacZoom(stage);
+        } else{
+          stage.setMaximized(!stage.isMaximized());
+        }
       }
     });
   }
@@ -436,16 +487,10 @@ public class BalfTitleBar extends Region {
 
   private Button createJBMenu() {
 
-    ImageView logo = new ImageView(new Image(
-            Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png"))
-    ));
-    logo.setFitHeight(14);
-    logo.setPreserveRatio(true);
-
     Label jbChevron = new Label("⌄");
     jbChevron.getStyleClass().add("jb-chevron");
 
-    HBox content = new HBox(8, logo, jbChevron);
+    HBox content = new HBox(8, jbChevron);
     content.setAlignment(Pos.CENTER);
     content.getStyleClass().add("jb-menu-content");
 

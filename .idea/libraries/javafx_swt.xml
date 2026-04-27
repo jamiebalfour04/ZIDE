@@ -1,17 +1,14 @@
 <component name="libraryTable">
   <library name="javafx-swt">
     <CLASSES>
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx-swt.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.base.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.controls.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.fxml.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.graphics.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.media.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.swing.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/javafx.web.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jdk.jsobject.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.input.jar!/" />
-      <root url="jar://$USER_HOME$/Sync/Programs/JARs/jfx/jfx.incubator.richtext.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx-swt.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.base.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.controls.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.fxml.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.graphics.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.media.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.swing.jar!/" />
+      <root url="jar://$JARs$/jfx21/javafx.web.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

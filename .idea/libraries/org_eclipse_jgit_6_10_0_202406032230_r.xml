@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="org.eclipse.jgit-6.10.0.202406032230-r">
+    <CLASSES>
+      <root url="jar://$JARs$/slf4j-api-2.0.13.jar!/" />
+      <root url="jar://$JARs$/org.eclipse.jgit-6.10.0.202406032230-r.unsigned.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
