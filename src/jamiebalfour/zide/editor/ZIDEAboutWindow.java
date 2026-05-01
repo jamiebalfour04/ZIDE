@@ -30,10 +30,12 @@ public final class ZIDEAboutWindow {
     stage.initStyle(StageStyle.UNDECORATED);
     stage.setResizable(false);
 
+
     // ---- Titlebar ----
     BalfTitleBar titleBar = new BalfTitleBar(stage, "About ZIDE", null, false);
 
     titleBar.setMinHeight(32);
+    titleBar.styleProperty().set("-fx-background-color: #517;");
     // ---- Content ----
     VBox content = new VBox(14);
     content.setPadding(new javafx.geometry.Insets(18, 18, 18, 18));

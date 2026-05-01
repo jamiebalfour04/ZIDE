@@ -1,6 +1,7 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.FileHelperFunctions;
+import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
@@ -57,9 +58,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -84,7 +83,8 @@ public class ZIDEEditor extends Application {
   Button stepOverButton;
   Button continueButton;
   Separator debugSeparator;
-  CheckMenuItem toggleTheme = new CheckMenuItem("Dark theme");
+  BalfGlassMenuBar.GlassCheckMenuItem darkThemeMenuItem;
+  BalfGlassMenuBar.GlassCheckMenuItem wordWrapMenuItem;
   private TableView<VarRow> varTable;
   private ObservableList<VarRow> varRows;
   private VBox variablesPane;
@@ -95,6 +95,11 @@ public class ZIDEEditor extends Application {
   private File currentProjectRoot;
   File projectDir;
   final Label statusLabel = new Label("Ready");
+  final static String INSTALL_PATH = HelperFunctions.getAppDataDirectory("jamiebalfour/zide", System.getProperty("user.home") + "/jb/zide").getAbsolutePath() + "/"; //;
+  Properties MAIN_PROPERTIES;
+  boolean USE_WORD_WRAP = false;
+  Node loadFromOnline;
+  Node saveToOnline;
 
 
 
@@ -113,7 +118,7 @@ public class ZIDEEditor extends Application {
   }
 
   public static void begin(String[] args){
-    launch(args);
+    Application.launch(ZIDEEditor.class, args);
   }
 
   private File chooseOutputFile(Stage owner, File currentFile, FileChooser.ExtensionFilter... filters) {
@@ -137,6 +142,17 @@ public class ZIDEEditor extends Application {
     return selected;
   }
 
+  private void saveProps(){
+    FileOutputStream output = null;
+    try {
+      output = new FileOutputStream(INSTALL_PATH + "/zide.properties");
+      // save properties to project root folder
+      MAIN_PROPERTIES.store(output, "ZIDE Properties");
+    } catch (IOException e) {
+      //Ignore
+    }
+  }
+
   @Override
   public void start(Stage stage) {
 
@@ -148,6 +164,27 @@ public class ZIDEEditor extends Application {
     stage.initStyle(StageStyle.UNDECORATED);
 
     _stage = stage;
+
+    if(!(new File(INSTALL_PATH).exists())){
+      try {
+        new File(INSTALL_PATH).mkdirs();
+      } catch (Exception e) {}
+    }
+
+    try{
+      MAIN_PROPERTIES = HelperFunctions.readProperties(INSTALL_PATH + "/zide.properties");
+    } catch (Exception ex) {
+      MAIN_PROPERTIES = new Properties();
+      saveProps();
+
+    }
+
+
+    if(MAIN_PROPERTIES.containsKey("ENABLE_WORD_WRAP")){
+      if(MAIN_PROPERTIES.getProperty("ENABLED_WORD_WRAP").equals("true")){
+        USE_WORD_WRAP = true;
+      }
+    }
 
     stage.setMinWidth(600);
     stage.setMinHeight(400);
@@ -398,43 +435,53 @@ public class ZIDEEditor extends Application {
     BalfGlassMenuBar bar = new BalfGlassMenuBar();
     bar.getStyleClass().add("main-menu-bar");
 
-    bar.menu("File")
-            .item("New Project", "⇧⌘N", this::newProject)
-            .item("New File", "⌘N", this::newFile)
-            .item("Open project folder", "⌘O", this::openProjectFolder)
-            .separator()
-            .item("Save", "⌘S", this::saveCurrentFile)
-            .separator()
-            .item("Exit", "", () -> System.exit(0));
+    var file = bar.menu("File");
+    file.createItem("New Project", "⇧⌘N", this::newProject, true);
+    file.createItem("New File", "⌘N", this::newFile, true);
+    file.createItem("Open project folder", "⌘O", this::openProjectFolder, true);
+    file.separator();
+    file.createItem("Save", "⌘S", this::saveCurrentFile, true);
+    file.separator();
+    file.createItem("Exit", "", () -> System.exit(0), true);
 
-    bar.menu("Edit")
-            .item("Undo", "⌘Z", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().undo();
-            })
-            .item("Redo", "⇧⌘Z", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().redo();
-            })
-            .separator()
-            .item("Cut", "⌘X", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().cut();
-            })
-            .item("Copy", "⌘C", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().copy();
-            })
-            .item("Paste", "⌘V", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().paste();
-            })
-            .separator()
-            .item("Select All", "⌘A", () -> {
-              if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
-            })
-            .item("Format document", "", this::beautifyCurrentDocument);
+    var edit = bar.menu("Edit");
 
+    edit.createItem("Undo", "⌘Z", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().undo();
+    }, true);
 
-    bar.menu("View")
-            .checkItem("Dark theme", toggleTheme != null && toggleTheme.isSelected(), selected -> {
+    edit.createItem("Redo", "⇧⌘Z", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().redo();
+    }, true);
+
+    edit.separator();
+
+    edit.createItem("Cut", "⌘X", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().cut();
+    }, true);
+
+    edit.createItem("Copy", "⌘C", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().copy();
+    }, true);
+
+    edit.createItem("Paste", "⌘V", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().paste();
+    }, true);
+
+    edit.separator();
+
+    edit.createItem("Select All", "⌘A", () -> {
+      if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
+    });
+
+    edit.createItem("Format document", "", this::beautifyCurrentDocument);
+
+    var viewMenu = bar.menu("View");
+
+    darkThemeMenuItem = viewMenu.checkItem("Dark theme",
+            false,
+            selected -> {
               BalfLafManager.getInstance().toggleDarkMode(selected);
-
               invertImages();
 
               var scene = _stage.getScene();
@@ -453,35 +500,59 @@ public class ZIDEEditor extends Application {
                 }
 
                 int scrollPosition = tab.getScrollPane().getVerticalScrollBar().getValue();
+
                 SwingUtilities.invokeLater(() ->
                         tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition)
                 );
               }
             });
 
-    bar.menu("Script")
-            .item("Run", "F5", this::runCode)
-            .item("Debug", "⇧⌘R", this::debug)
-            .separator()
-            .item("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess())
-            .separator()
-            .item("Compile", "", this::compileProject)
-            .item("Compile Native", "", this::compileNative);
-    bar.menu("Git")
-                    .item("Clone", "", this::cloneRepo)
-                    .separator()
-                    .item("Commit", "", null)
-                    .item("Push", "", null);
-    bar.menu("ZPE Online")
-            .item("Login to ZPE Online", "", this::loginToZPEOnline)
-            .item("Load from ZPE Online", "", () -> {})
-            .item("Save to ZPE Online", "", () -> {});
+    wordWrapMenuItem = viewMenu.checkItem("Word-wrap", USE_WORD_WRAP, selected -> {
 
-    bar.menu("Help")
-            .item("About", "", () -> ZIDEAboutWindow.show(_stage))
-            .separator()
-            .item("Download ZPE Runtime Environment", "", this::downloadZPERuntime)
-            .item("Download ZPE Native", "", this::downloadZPENative);
+      USE_WORD_WRAP = selected;
+
+      MAIN_PROPERTIES.setProperty("USE_WORD_WRAP", selected.toString());
+
+      saveProps();
+
+    });
+
+
+    var script = bar.menu("Script");
+
+    script.createItem("Run", "F5", this::runCode);
+    script.createItem("Debug", "⇧⌘R", this::debug);
+    script.separator();
+    script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
+    script.separator();
+    script.createItem("Compile", "", this::compileProject);
+    script.createItem("Compile Native", "", this::compileNative);
+
+
+    var git = bar.menu("Git");
+
+    git.createItem("Clone", "", this::cloneRepo);
+    git.separator();
+    git.createItem("Commit", "", null);
+    git.createItem("Push", "", null);
+
+
+    var zpeOnline = bar.menu("ZPE Online");
+
+    zpeOnline.createItem("Login to ZPE Online", "", this::loginToZPEOnline);
+    loadFromOnline = zpeOnline.createItem("Load from ZPE Online", "", () -> {});
+    saveToOnline = zpeOnline.createItem("Save to ZPE Online", "", () -> {});
+
+
+    loadFromOnline.setDisable(true);
+    saveToOnline.setDisable(true);
+
+    var help = bar.menu("Help");
+
+    help.createItem("About", "", () -> ZIDEAboutWindow.show(_stage));
+    help.separator();
+    help.createItem("Download ZPE Runtime Environment", "", this::downloadZPERuntime);
+    help.createItem("Download ZPE Native", "", this::downloadZPENative);
 
     return bar;
   }
@@ -684,7 +755,7 @@ public class ZIDEEditor extends Application {
 
   private void loginToZPEOnline() {
     ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
-
+    if(result == null) return;
     String username = result.getUsername();
     String password = result.getPassword();
 
@@ -1268,8 +1339,11 @@ public class ZIDEEditor extends Application {
     // Build Swing UI on EDT
 
 
+
+
       try {
-        ZIDESyntaxEditor mainSyntax = new ZIDESyntaxEditor(this);
+
+        ZIDESyntaxEditor mainSyntax = new ZIDESyntaxEditor(this, USE_WORD_WRAP);
 
         mainSyntax.setFontSize(14);
 
@@ -1340,7 +1414,12 @@ public class ZIDEEditor extends Application {
         scrollPane.setDarkColour(dark);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        if(!USE_WORD_WRAP){
+          scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        } else{
+          scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        }
+
 
         mainSyntax.repaint();
         mainSyntax.requestFocus();
@@ -1410,7 +1489,7 @@ public class ZIDEEditor extends Application {
       String[] keywords = ZPEKit.getBuiltInFunctions();
 
       for (String s : keywords) {
-        mainSyntax.setTooltipInfo(s, mainSyntax.getBuiltInFunctionTooltip(s));
+        mainSyntax.setTooltipInfo(s, name -> ZIDESyntaxEditor.getBuiltInFunctionTooltip(s, mainSyntax));
       }
 
       mainSyntax.setKeywords(ZPEKit.getKeywordSet(mainSyntax));
@@ -1473,7 +1552,7 @@ public class ZIDEEditor extends Application {
     closeBtn.setPrefSize(10, 10);
     closeBtn.setMaxSize(10, 10);
 
-    if(toggleTheme.isSelected()){
+    if(darkThemeMenuItem.isSelected()){
       tab.switchOnDarkMode();
     }
 

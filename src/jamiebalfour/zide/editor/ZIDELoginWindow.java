@@ -32,6 +32,7 @@ public final class ZIDELoginWindow {
 
     // ---- Titlebar ----
     BalfTitleBar titleBar = new BalfTitleBar(stage, "Sign in to " + service, null, false, false, false, false);
+    titleBar.styleProperty().set("-fx-background-color: #517;");
     titleBar.setMinHeight(32);
 
     // ---- Content ----

@@ -20,8 +20,8 @@ public class ZIDESyntaxEditor extends CodeEditorView {
   private Timer symbolTimer;
   private volatile int symbolVersion = 0;
 
-  public ZIDESyntaxEditor(jamiebalfour.zide.editor.ZIDEEditor editor) {
-    super();
+  public ZIDESyntaxEditor(jamiebalfour.zide.editor.ZIDEEditor editor, boolean wordWrap) {
+    super(wordWrap);
     owner = editor;
 
     setInformationWindowClickClickListener((e, x) -> {
@@ -71,10 +71,10 @@ public class ZIDESyntaxEditor extends CodeEditorView {
   }
 
 
-  String getBuiltInFunctionTooltip(String functionName) {
+  static String getBuiltInFunctionTooltip(String functionName, ZIDESyntaxEditor owner) {
     String output = "";
 
-    boolean dark = owner.toggleTheme != null && owner.toggleTheme.isSelected();
+    boolean dark = owner.owner.darkThemeMenuItem.isSelected();
 
     if (dark) {
       output += "<html><div style='padding:10px;width:300px;color:#ddd;'>";
@@ -122,7 +122,7 @@ public class ZIDESyntaxEditor extends CodeEditorView {
 
   private String getUserDefinedFunctionTooltip(FunctionHint function) {
 
-    boolean dark = owner.toggleTheme != null && owner.toggleTheme.isSelected();
+    boolean dark = owner.darkThemeMenuItem.isSelected();
 
     String textColour = dark ? "#ddd" : "#333";
     String nameColour = dark ? "rgb(198, 120, 222)" : "rgb(135, 16, 148)";
@@ -202,13 +202,13 @@ public class ZIDESyntaxEditor extends CodeEditorView {
       Platform.runLater(() -> {
         for (FunctionHint f : functions) {
           addAutoCompleteItem(f.getName(), CodeEditorView.AutoCompleteItemType.Function);
-          setTooltipInfo(f.getName(), getUserDefinedFunctionTooltip(f));
+          setTooltipInfo(f.getName(), name -> getUserDefinedFunctionTooltip(f));
 
           String qualified = f.getQualifiedName();
 
           if (!qualified.equals(f.getName())) {
             addAutoCompleteItem(qualified, CodeEditorView.AutoCompleteItemType.Function);
-            setTooltipInfo(qualified, getUserDefinedFunctionTooltip(f));
+            setTooltipInfo(qualified, name -> getUserDefinedFunctionTooltip(f));
           }
         }
       });

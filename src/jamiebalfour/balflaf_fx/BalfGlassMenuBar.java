@@ -132,23 +132,91 @@ public class BalfGlassMenuBar extends HBox {
       });
     }
 
-    public GlassMenu item(String text, String shortcut, Runnable action) {
-      box.getChildren().add(createItem(text, shortcut, action, true));
-      return this;
+    public GlassCheckMenuItem checkItem(String text, boolean selected, Consumer<Boolean> action) {
+      GlassCheckMenuItem item = new GlassCheckMenuItem(text, selected, action);
+      box.getChildren().add(item.getNode());
+      return item;
     }
 
-    public GlassMenu item(String text, Runnable action) {
-      return item(text, "", action);
-    }
+    public class GlassMenuItem {
 
-    public GlassMenu itemNoHide(String text, String shortcut, Runnable action) {
-      box.getChildren().add(createItem(text, shortcut, action, false));
-      return this;
-    }
+      private final HBox row;
+      private final Label title;
+      private final Label keys;
+      private final Runnable action;
+      private final boolean hideAfterClick;
 
-    public GlassMenu checkItem(String text, boolean selected, Consumer<Boolean> action) {
-      box.getChildren().add(createCheckItem(text, selected, action));
-      return this;
+      private GlassMenuItem(String text, String shortcut, Runnable action, boolean hideAfterClick) {
+        this.action = action;
+        this.hideAfterClick = hideAfterClick;
+
+        row = new HBox();
+        row.getStyleClass().add("glass-menu-item");
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setMinWidth(200);
+        row.setPadding(new Insets(3, 8, 3, 6));
+
+        title = new Label(text);
+        title.getStyleClass().add("glass-menu-item-text");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        keys = new Label(shortcut == null ? "" : shortcut);
+        keys.getStyleClass().add("glass-menu-shortcut");
+
+        row.getChildren().addAll(title, spacer, keys);
+
+        row.setOnMouseClicked(e -> {
+          if (row.isDisabled()) {
+            e.consume();
+            return;
+          }
+
+          if (this.action != null) {
+            this.action.run();
+          }
+
+          if (this.hideAfterClick) {
+            hideActiveMenu();
+          }
+
+          e.consume();
+        });
+      }
+
+      public Node getNode() {
+        return row;
+      }
+
+      public void setText(String text) {
+        title.setText(text);
+      }
+
+      public String getText() {
+        return title.getText();
+      }
+
+      public void setShortcut(String shortcut) {
+        keys.setText(shortcut == null ? "" : shortcut);
+      }
+
+      public String getShortcut() {
+        return keys.getText();
+      }
+
+      public void setVisible(boolean visible) {
+        row.setVisible(visible);
+        row.setManaged(visible);
+      }
+
+      public void setDisable(boolean disabled) {
+        row.setDisable(disabled);
+      }
+
+      public boolean isDisabled() {
+        return row.isDisabled();
+      }
     }
 
     public GlassMenu separator() {
@@ -161,7 +229,11 @@ public class BalfGlassMenuBar extends HBox {
       return this;
     }
 
-    private Node createItem(String text, String shortcut, Runnable action, boolean hideAfterClick) {
+    public Node createItem(String text, String shortcut, Runnable action) {
+      return createItem(text, shortcut, action, true);
+    }
+
+    public Node createItem(String text, String shortcut, Runnable action, boolean hideAfterClick) {
       HBox row = new HBox();
       row.getStyleClass().add("glass-menu-item");
       row.setAlignment(Pos.CENTER_LEFT);
@@ -180,7 +252,9 @@ public class BalfGlassMenuBar extends HBox {
       row.getChildren().addAll(title, spacer, keys);
 
       row.setOnMouseClicked(e -> {
-        action.run();
+        if (action != null) {
+          action.run();
+        }
 
         if (hideAfterClick) {
           hideActiveMenu();
@@ -188,6 +262,8 @@ public class BalfGlassMenuBar extends HBox {
 
         e.consume();
       });
+
+      box.getChildren().add(row);
 
       return row;
     }
@@ -223,6 +299,8 @@ public class BalfGlassMenuBar extends HBox {
     }
   }
 
+
+
   private void hideActiveMenu() {
     if (activeMenu != null) {
       activeMenu.hide();
@@ -241,6 +319,162 @@ public class BalfGlassMenuBar extends HBox {
 
     if (activeMenuOwner != null && !activeMenuOwner.getStyleClass().contains("active")) {
       activeMenuOwner.getStyleClass().add("active");
+    }
+  }
+
+  public static class GlassCheckMenuItem {
+
+    private final HBox row;
+    private final Label tick;
+    private final Label title;
+    private final Consumer<Boolean> action;
+
+    private boolean selected;
+
+    private GlassCheckMenuItem(String text, boolean selected, Consumer<Boolean> action) {
+      this.selected = selected;
+      this.action = action;
+
+      row = new HBox();
+      row.getStyleClass().add("glass-menu-item");
+      row.setAlignment(Pos.CENTER_LEFT);
+      row.setMinWidth(200);
+      row.setPadding(new Insets(3, 8, 3, 6));
+
+      tick = new Label(selected ? "✓" : "");
+      tick.setMinWidth(22);
+      tick.getStyleClass().add("glass-menu-check");
+
+      title = new Label(text);
+      title.getStyleClass().add("glass-menu-item-text");
+
+      row.getChildren().addAll(tick, title);
+
+      row.setOnMouseClicked(e -> {
+        setSelected(!this.selected);
+
+        if (this.action != null) {
+          this.action.accept(this.selected);
+        }
+
+        //hideActiveMenu();
+        e.consume();
+      });
+    }
+
+    public Node getNode() {
+      return row;
+    }
+
+    public boolean isSelected() {
+      return selected;
+    }
+
+    public void setSelected(boolean selected) {
+      this.selected = selected;
+      tick.setText(selected ? "✓" : "");
+    }
+
+    public void setText(String text) {
+      title.setText(text);
+    }
+
+    public String getText() {
+      return title.getText();
+    }
+
+    public void setVisible(boolean visible) {
+      row.setVisible(visible);
+      row.setManaged(visible);
+    }
+
+    public void setDisable(boolean disabled) {
+      row.setDisable(disabled);
+    }
+
+    public boolean isDisabled() {
+      return row.isDisabled();
+    }
+  }
+
+  public class GlassMenuItem {
+
+    private final HBox row;
+    private final Label title;
+    private final Label keys;
+    private final Runnable action;
+    private final boolean hideAfterClick;
+
+    private GlassMenuItem(String text, String shortcut, Runnable action, boolean hideAfterClick) {
+      this.action = action;
+      this.hideAfterClick = hideAfterClick;
+
+      row = new HBox();
+      row.getStyleClass().add("glass-menu-item");
+      row.setAlignment(Pos.CENTER_LEFT);
+      row.setMinWidth(200);
+      row.setPadding(new Insets(3, 8, 3, 6));
+
+      title = new Label(text);
+      title.getStyleClass().add("glass-menu-item-text");
+
+      Region spacer = new Region();
+      HBox.setHgrow(spacer, Priority.ALWAYS);
+
+      keys = new Label(shortcut == null ? "" : shortcut);
+      keys.getStyleClass().add("glass-menu-shortcut");
+
+      row.getChildren().addAll(title, spacer, keys);
+
+      row.setOnMouseClicked(e -> {
+        if (row.isDisabled()) {
+          e.consume();
+          return;
+        }
+
+        if (this.action != null) {
+          this.action.run();
+        }
+
+        if (this.hideAfterClick) {
+          hideActiveMenu();
+        }
+
+        e.consume();
+      });
+    }
+
+    public Node getNode() {
+      return row;
+    }
+
+    public void setText(String text) {
+      title.setText(text);
+    }
+
+    public String getText() {
+      return title.getText();
+    }
+
+    public void setShortcut(String shortcut) {
+      keys.setText(shortcut == null ? "" : shortcut);
+    }
+
+    public String getShortcut() {
+      return keys.getText();
+    }
+
+    public void setVisible(boolean visible) {
+      row.setVisible(visible);
+      row.setManaged(visible);
+    }
+
+    public void setDisable(boolean disabled) {
+      row.setDisable(disabled);
+    }
+
+    public boolean isDisabled() {
+      return row.isDisabled();
     }
   }
 }
