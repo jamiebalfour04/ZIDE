@@ -5,6 +5,7 @@ import jamiebalfour.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
+import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
 import jamiebalfour.ui.components.BalfScrollbarPane;
@@ -13,6 +14,8 @@ import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.core.ZIDE;
 import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.core.exceptions.CompileException;
+import jamiebalfour.zpe.core.types.ZPEList;
+import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -39,6 +42,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.*;
 import javafx.scene.image.Image;
@@ -59,6 +63,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.io.*;
+import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -100,6 +105,9 @@ public class ZIDEEditor extends Application {
   boolean USE_WORD_WRAP = false;
   Node loadFromOnline;
   Node saveToOnline;
+  String username = null;
+  String password = null;
+  boolean loggedIn = false;
 
 
 
@@ -528,6 +536,9 @@ public class ZIDEEditor extends Application {
     script.createItem("Compile", "", this::compileProject);
     script.createItem("Compile Native", "", this::compileNative);
 
+    var tools = bar.menu("Tools");
+
+
 
     var git = bar.menu("Git");
 
@@ -540,7 +551,9 @@ public class ZIDEEditor extends Application {
     var zpeOnline = bar.menu("ZPE Online");
 
     zpeOnline.createItem("Login to ZPE Online", "", this::loginToZPEOnline);
+    zpeOnline.separator();
     loadFromOnline = zpeOnline.createItem("Load from ZPE Online", "", () -> {});
+    loadFromOnline.setOnMouseClicked(e -> loadFromUsersCloudFX());
     saveToOnline = zpeOnline.createItem("Save to ZPE Online", "", () -> {});
 
 
@@ -613,6 +626,16 @@ public class ZIDEEditor extends Application {
     return parts[parts.length - 2];
   }
 
+  void loadFromUsersCloudFX() {
+    ZPEList files = getUsersCloudFileList();
+
+    if (files == null) {
+      return;
+    }
+
+    showZPEOnlineBrowser(new HashMap<String, String>(), files);
+  }
+
   private void cloneRepo() {
     try {
       // Ask for repo URL
@@ -662,6 +685,200 @@ public class ZIDEEditor extends Application {
               "Error",
               JOptionPane.ERROR_MESSAGE);
     }
+  }
+
+  private ZPEList getUsersCloudFileList() {
+    if (username.isEmpty() || password.isEmpty()) {
+      if (!loggedIn) {
+        return null;
+      }
+    }
+
+    try {
+      Map<String, String> arguments = new HashMap<>();
+      arguments.put("username", username);
+      arguments.put("password", password);
+
+      String response = HelperFunctions.makePOSTRequest(
+              ZPEInstance.getOnlinePathProperty() + "/get.php?type=list&version=10",
+              arguments
+      );
+
+      ZenithJSONParser parser = new ZenithJSONParser();
+      ZPEMap json = (ZPEMap) parser.jsonDecode(response, false);
+
+      if (!json.containsKey(new ZPEString("result"))) {
+        return null;
+      }
+
+      int result = HelperFunctions.stringToInteger(
+              json.get(new ZPEString("result")).toString()
+      );
+
+      if (result != 1) {
+        return null;
+      }
+
+      return (ZPEList) json.get(new ZPEString("list"));
+
+    } catch (Exception e) {
+      ZPE.log(e.getMessage());
+      return null;
+    }
+  }
+
+  private Node createZPEOnlineFileCard(String name, String id, Runnable openAction) {
+    VBox card = new VBox(8);
+    card.getStyleClass().add("zpe-online-file-card");
+    card.setPadding(new Insets(14));
+    card.setPrefWidth(220);
+    card.setUserData(name);
+
+    Label icon = new Label("☁");
+    icon.getStyleClass().add("zpe-online-file-icon");
+
+    Label nameLabel = new Label(name);
+    nameLabel.getStyleClass().add("zpe-online-file-name");
+    nameLabel.setWrapText(true);
+
+    Label idLabel = new Label("ID: " + id);
+    idLabel.getStyleClass().add("zpe-online-file-meta");
+
+    Button openButton = new Button("Open");
+    openButton.getStyleClass().add("zpe-online-open-button");
+    openButton.setMaxWidth(Double.MAX_VALUE);
+    openButton.setOnAction(e -> openAction.run());
+
+    card.setOnMouseClicked(e -> {
+      if (e.getClickCount() == 2) {
+        openAction.run();
+      }
+    });
+
+    card.getChildren().addAll(icon, nameLabel, idLabel, openButton);
+
+    return card;
+  }
+
+  void loadFromCloudFile(String file, Map<String, String> arguments, ZPEMap selections, boolean publicrepo) {
+    jamiebalfour.parsers.json.ZenithJSONParser p = new jamiebalfour.parsers.json.ZenithJSONParser();
+
+
+    arguments.put("id", selections.get(new ZPEString(file)).toString());
+    String s;
+    try {
+      if (!publicrepo) {
+        s = HelperFunctions
+                .makePOSTRequest(ZPEInstance.getOnlinePathProperty() + "/get.php?type=file&version=10", arguments);
+      } else {
+        s = HelperFunctions
+                .makePOSTRequest(ZPEInstance.getOnlinePathProperty() + "/public.php?type=file&version=10", arguments);
+      }
+
+
+      ZPEMap results = (ZPEMap) p.jsonDecode(s, false);
+
+      // Turn JSON to results
+      String code;
+      code = URLDecoder.decode(results.get(new ZPEString("string")).toString(), "UTF-8");
+
+      code = code.replace("\\n", System.lineSeparator());
+      openTab(file);
+      getCurrentTab().getEditor().clearUndoRedoManagers();
+      getCurrentTab().getEditor().setText(code);
+
+      //lastCloudFileOpened = file;
+      //lastFileOpened = "";
+
+      //setTitleBarText(file);
+      //setTitle("ZPE Editor");
+
+      if (publicrepo) {
+        //lastCloudFileOpened = "";
+      }
+    } catch (Exception e) {
+      //JOptionPane.showMessageDialog(_frame, "File cannot be opened.", "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+  }
+
+  private void loadZPEOnlineFile(Map<String, String> arguments, String id, String name) {
+    try {
+      Map<String, String> loadArgs = new HashMap<>(arguments);
+      loadArgs.put("id", id);
+
+
+      loadFromCloudFile(id, loadArgs, new ZPEMap(), false);
+
+    } catch (Exception e) {
+      ZPE.log(e.getMessage());
+    }
+  }
+
+  private void showZPEOnlineBrowser(Map<String, String> arguments, ZPEList files) {
+    Stage dialog = new Stage();
+    dialog.initOwner(_stage);
+    dialog.setTitle("Load from ZPE Online");
+
+    VBox root = new VBox(14);
+    root.setPadding(new Insets(18));
+    root.getStyleClass().add("zpe-online-browser");
+
+    Label title = new Label("Load from ZPE Online");
+    title.getStyleClass().add("zpe-online-title");
+
+    TextField search = new TextField();
+    search.setPromptText("Search your cloud files...");
+    search.getStyleClass().add("zpe-online-search");
+
+    FlowPane fileGrid = new FlowPane();
+    fileGrid.setHgap(12);
+    fileGrid.setVgap(12);
+    fileGrid.setPadding(new Insets(4));
+
+    ScrollPane scrollPane = new ScrollPane(fileGrid);
+    scrollPane.setFitToWidth(true);
+    scrollPane.getStyleClass().add("zpe-online-scroll");
+
+    ArrayList<Node> cards = new ArrayList<>();
+
+    for (Object item : files) {
+      ZPEMap file = (ZPEMap) item;
+
+      String name = file.get(new ZPEString("name")).toString();
+      String id = file.get(new ZPEString("id")).toString();
+
+      Node card = createZPEOnlineFileCard(name, id, () -> {
+        dialog.close();
+        loadZPEOnlineFile(arguments, id, name);
+      });
+
+      cards.add(card);
+      fileGrid.getChildren().add(card);
+    }
+
+    search.textProperty().addListener((obs, oldText, newText) -> {
+      String q = newText == null ? "" : newText.toLowerCase();
+
+      fileGrid.getChildren().setAll(
+              cards.stream()
+                      .filter(card -> {
+                        Object name = card.getUserData();
+                        return name != null && name.toString().toLowerCase().contains(q);
+                      })
+                      .toList()
+      );
+    });
+
+    root.getChildren().addAll(title, search, scrollPane);
+
+    Scene scene = new Scene(root, 760, 520);
+    scene.getStylesheets().add(
+            getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
+    );
+
+    dialog.setScene(scene);
+    dialog.show();
   }
 
   private void newProject() {
@@ -756,8 +973,8 @@ public class ZIDEEditor extends Application {
   private void loginToZPEOnline() {
     ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
     if(result == null) return;
-    String username = result.getUsername();
-    String password = result.getPassword();
+    username = result.getUsername();
+    password = result.getPassword();
 
     try {
       ZPEMap res = ZPEOnline.loginToZPEOnline(username, password);
@@ -766,6 +983,8 @@ public class ZIDEEditor extends Application {
         showError("Error logging in to ZPE Online", res.get("message").toString());
         return;
       }
+      loadFromOnline.setDisable(false);
+      loggedIn = true;
 
       new Alert(Alert.AlertType.INFORMATION, "Successfully logged in to ZPE Online").showAndWait();
 
@@ -1403,9 +1622,8 @@ public class ZIDEEditor extends Application {
         // Wrapper + padding
         BalfPanel wrapper = new BalfPanel(new BorderLayout());
         wrapper.setOpaque(true);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
+        wrapper.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         wrapper.setBackground(Color.white);
-        wrapper.setDarkColour(dark);
         wrapper.setLightColour(Color.white);
 
 
@@ -1428,8 +1646,14 @@ public class ZIDEEditor extends Application {
         scrollPane.getVerticalScrollBar().addAdjustmentListener(e -> mainSyntax.hideTooltip());
 
         mainSyntax.setWrapper(scrollPane);
+        mainSyntax.setMinimapEnabled(true);
 
-        wrapper.add(scrollPane, BorderLayout.CENTER);
+        JPanel editorWithMinimapPanel = new JPanel(new BorderLayout());
+        editorWithMinimapPanel.setOpaque(false);
+        editorWithMinimapPanel.add(scrollPane, BorderLayout.CENTER);
+        editorWithMinimapPanel.add(mainSyntax.getMinimapComponent(), BorderLayout.EAST);
+
+        wrapper.add(editorWithMinimapPanel, BorderLayout.CENTER);
 
 
         // Load file (still on EDT)
@@ -1486,31 +1710,8 @@ public class ZIDEEditor extends Application {
 
   private void setLanguage(String lang, ZIDESyntaxEditor mainSyntax) {
     if(lang.equals("yass")) {
-      String[] keywords = ZPEKit.getBuiltInFunctions();
 
-      for (String s : keywords) {
-        mainSyntax.setTooltipInfo(s, name -> ZIDESyntaxEditor.getBuiltInFunctionTooltip(s, mainSyntax));
-      }
-
-      mainSyntax.setKeywords(ZPEKit.getKeywordSet(mainSyntax));
-      mainSyntax.setQuotes("\"'`");
-      mainSyntax.setVariableSymbol("$");
-
-      for (String keyword : ZPEKit.getKeywords()) {
-        mainSyntax.addAutoCompleteItem(keyword, CodeEditorView.AutoCompleteItemType.Keyword);
-      }
-      for (String keyword : ZPEKit.getTypeKeywords()) {
-        mainSyntax.addAutoCompleteItem(keyword, CodeEditorView.AutoCompleteItemType.Type);
-      }
-      for (String function : keywords) {
-        mainSyntax.addAutoCompleteItem(function, CodeEditorView.AutoCompleteItemType.Function);
-      }
-      for (String s : ZPEInstance.getBuiltInStructuresNames()) {
-        mainSyntax.addAutoCompleteItem(s, CodeEditorView.AutoCompleteItemType.Type);
-      }
-
-
-      for (String s : ZPEKit.getAllCommands()) {
+      for (String s : ZPEKit.getAllFunctions()) {
         BalfSearchBox.SearchSuggestion suggestion = new BalfSearchBox.SearchSuggestion(s + " " + ZPEKit.getFunctionManualEntry(s), s);
       }
 

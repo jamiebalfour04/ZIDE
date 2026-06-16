@@ -98,8 +98,6 @@ public class EditorTab extends Tab {
     editor.setAttributeColor(CodeEditorView.ATTR_TYPE.Special,     new Color(0, 200, 0)); // Green
 
 
-    editor.setDarkMode(true);
-
     //autoCompleteItemForeColor = new Color(255, 255, 255, 255);
     editor.setAutoCompleteItemBackgroundColor(new Color(30, 39, 75, 255));
     resetScroll();
@@ -127,8 +125,6 @@ public class EditorTab extends Tab {
     editor.setCaretColor(Color.black);
     //autoCompleteItemForeColor = new Color(31, 31, 31, 255);
     //autoCompleteItemBackgroundColor = new Color(241, 241, 241, 255);
-
-    editor.setDarkMode(false);
 
     editor.setAutoCompleteItemBackgroundColor(new Color(241, 241, 241, 255));
 

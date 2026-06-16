@@ -636,3 +636,56 @@
 .panel-icon-button:pressed {
     -fx-background-color: rgba(255,255,255,0.16);
 }
+
+.zpe-online-browser {
+    -fx-background-color: -fx-background;
+}
+
+.zpe-online-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+}
+
+.zpe-online-search {
+    -fx-pref-height: 36px;
+    -fx-font-size: 14px;
+}
+
+.zpe-online-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.zpe-online-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.zpe-online-file-card {
+    -fx-background-color: rgba(255,255,255,0.08);
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-border-color: rgba(255,255,255,0.14);
+    -fx-cursor: hand;
+}
+
+.zpe-online-file-card:hover {
+    -fx-background-color: rgba(255,255,255,0.14);
+}
+
+.zpe-online-file-icon {
+    -fx-font-size: 28px;
+}
+
+.zpe-online-file-name {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.zpe-online-file-meta {
+    -fx-opacity: 0.65;
+    -fx-font-size: 11px;
+}
+
+.zpe-online-open-button {
+    -fx-background-radius: 10px;
+}
