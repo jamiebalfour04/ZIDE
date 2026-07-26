@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="BalfClassLibrary">
+    <CLASSES>
+      <root url="jar://$JARs$/BalfClassLibrary.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.skin.TextFieldSkin;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -51,7 +52,15 @@ public final class ZIDELoginWindow {
     form.setVgap(10);
 
     TextField username = new TextField();
+    username.setPromptText("Username");
     PasswordField password = new PasswordField();
+    password.setPromptText("Password");
+    password.setSkin(new TextFieldSkin(password) {
+      @Override
+      protected String maskText(String text) {
+        return "•".repeat(text.length());
+      }
+    });
 
     form.add(new Label("Username"), 0, 0);
     form.add(username, 1, 0);

@@ -1,7 +1,7 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.FileHelperFunctions;
-import jamiebalfour.HelperFunctions;
+import jamiebalfour.helpers.FileHelperFunctions;
+import jamiebalfour.helpers.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
@@ -16,6 +16,8 @@ import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.core.exceptions.CompileException;
 import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEString;
+import jamiebalfour.zpe.gui.YASSCodeEditor;
+import jamiebalfour.zpe.gui.ZPEMacroInterface;
 import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -47,11 +49,15 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.*;
 import javafx.scene.image.Image;
 import javafx.scene.input.Dragboard;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.TransferMode;
 import javafx.scene.layout.*;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
+import javafx.stage.Popup;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
@@ -69,6 +75,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -164,11 +171,7 @@ public class ZIDEEditor extends Application {
   @Override
   public void start(Stage stage) {
 
-    stage.getIcons().add(new Image(
-
-            getClass().getResourceAsStream("/files/ZIDE mini macos.png")
-
-    ));
+    stage.getIcons().add(new Image(getClass().getResourceAsStream("/files/ZIDE mini macos.png")));
     stage.initStyle(StageStyle.UNDECORATED);
 
     _stage = stage;
@@ -309,6 +312,7 @@ public class ZIDEEditor extends Application {
 
     stage.setTitle("ZIDE");
     stage.setScene(scene);
+    registerKeyboardShortcuts(scene);
     stage.show();
 
     boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
@@ -328,6 +332,29 @@ public class ZIDEEditor extends Application {
 
       splitPane.setDividerPositions(pixels / total);
     });
+  }
+
+  private void registerKeyboardShortcuts(Scene scene) {
+    scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN),
+            this::newFile
+    );
+    scene.getAccelerators().put(
+            new KeyCodeCombination(
+                    KeyCode.N,
+                    KeyCombination.SHORTCUT_DOWN,
+                    KeyCombination.SHIFT_DOWN
+            ),
+            this::newProject
+    );
+    scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.O, KeyCombination.SHORTCUT_DOWN),
+            this::openProjectFolder
+    );
+    scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.S, KeyCombination.SHORTCUT_DOWN),
+            this::saveCurrentFile
+    );
   }
 
   private static final Preferences PREFS = Preferences.userNodeForPackage(ZIDEEditor.class);
@@ -533,10 +560,24 @@ public class ZIDEEditor extends Application {
     script.separator();
     script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
     script.separator();
-    script.createItem("Compile", "", this::compileProject);
+    script.createItem("Compile to ZEX", "", this::compileProject);
     script.createItem("Compile Native", "", this::compileNative);
+    script.separator();
+    List<String> transpilers = ZPEKit.listTranspilerNames();
+    if (!transpilers.isEmpty()) {
+      for (String language : transpilers) {
+        String transpilerName = ZPEKit.getTranspilerByName(language).transpilerName();
+        script.createItem(
+                "Transpile to " + language + " (" + transpilerName + ")",
+                "",
+                () -> transpileCurrentFile(language)
+        );
+      }
+    }
 
     var tools = bar.menu("Tools");
+
+    tools.createItem("Open Macro Scripting Interface", "", this::openMSI);
 
 
 
@@ -553,6 +594,7 @@ public class ZIDEEditor extends Application {
     zpeOnline.createItem("Login to ZPE Online", "", this::loginToZPEOnline);
     zpeOnline.separator();
     loadFromOnline = zpeOnline.createItem("Load from ZPE Online", "", () -> {});
+
     loadFromOnline.setOnMouseClicked(e -> loadFromUsersCloudFX());
     saveToOnline = zpeOnline.createItem("Save to ZPE Online", "", () -> {});
 
@@ -627,13 +669,16 @@ public class ZIDEEditor extends Application {
   }
 
   void loadFromUsersCloudFX() {
+    HashMap<String, String> arguments = new HashMap<>();
+    arguments.put("username", username);
+    arguments.put("password", password);
     ZPEList files = getUsersCloudFileList();
 
     if (files == null) {
       return;
     }
 
-    showZPEOnlineBrowser(new HashMap<String, String>(), files);
+    showZPEOnlineBrowser(arguments, files);
   }
 
   private void cloneRepo() {
@@ -764,7 +809,7 @@ public class ZIDEEditor extends Application {
     jamiebalfour.parsers.json.ZenithJSONParser p = new jamiebalfour.parsers.json.ZenithJSONParser();
 
 
-    arguments.put("id", selections.get(new ZPEString(file)).toString());
+    arguments.put("id", new ZPEString(file).toString());
     String s;
     try {
       if (!publicrepo) {
@@ -783,7 +828,7 @@ public class ZIDEEditor extends Application {
       code = URLDecoder.decode(results.get(new ZPEString("string")).toString(), "UTF-8");
 
       code = code.replace("\\n", System.lineSeparator());
-      openTab(file);
+      openTab(arguments.get("name"));
       getCurrentTab().getEditor().clearUndoRedoManagers();
       getCurrentTab().getEditor().setText(code);
 
@@ -806,6 +851,7 @@ public class ZIDEEditor extends Application {
     try {
       Map<String, String> loadArgs = new HashMap<>(arguments);
       loadArgs.put("id", id);
+      loadArgs.put("name", name);
 
 
       loadFromCloudFile(id, loadArgs, new ZPEMap(), false);
@@ -970,6 +1016,65 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  private void transpileCurrentFile(String language) {
+    EditorTab currentTab = getCurrentTab();
+    if (currentTab == null) {
+      showError("Transpilation failed", "No file is open.");
+      return;
+    }
+
+    var transpiler = ZPEKit.getTranspilerByName(language);
+    if (transpiler == null) {
+      showError("Transpilation failed", "The " + language + " transpiler is not available.");
+      return;
+    }
+
+    String extension = transpiler.getFileExtension();
+    File sourceFile = new File(currentTab.getPath());
+    FileChooser chooser = new FileChooser();
+    chooser.setTitle("Transpile to " + language);
+    chooser.setInitialFileName(
+            sourceFile.getName().replaceFirst("\\.[^.]+$", "") + "." + extension
+    );
+    if (sourceFile.getParentFile() != null && sourceFile.getParentFile().isDirectory()) {
+      chooser.setInitialDirectory(sourceFile.getParentFile());
+    }
+    chooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter(
+                    language + " files (*." + extension + ")",
+                    "*." + extension
+            )
+    );
+
+    File selectedFile = chooser.showSaveDialog(_stage);
+    if (selectedFile == null) {
+      return;
+    }
+
+    String outputPath = selectedFile.getAbsolutePath();
+    if (!outputPath.toLowerCase(Locale.ROOT).endsWith("." + extension.toLowerCase(Locale.ROOT))) {
+      outputPath += "." + extension;
+    }
+
+    try {
+      String transpiledCode = ZPEKit.transpileCode(
+              currentTab.getEditor().getText(),
+              "",
+              transpiler
+      );
+      FileHelperFunctions.writeFile(outputPath, transpiledCode, false);
+
+      Alert success = new Alert(Alert.AlertType.INFORMATION);
+      success.initOwner(_stage);
+      success.setTitle("Transpilation complete");
+      success.setHeaderText("Code transpiled to " + language);
+      success.setContentText("Saved at:\n" + outputPath);
+      success.showAndWait();
+    } catch (Exception ex) {
+      showError("Transpilation failed", ex.getMessage());
+    }
+  }
+
   private void loginToZPEOnline() {
     ZIDELoginWindow.LoginResult result = ZIDELoginWindow.show(_stage, " ZPE Online");
     if(result == null) return;
@@ -1035,26 +1140,43 @@ public class ZIDEEditor extends Application {
 
   private ObservableList<ProblemRow> problemsRows = FXCollections.observableArrayList();
 
+  void updateProblems(EditorTab tab, List<YASSDiagnostic> diagnostics) {
+    int errorCount = 0;
+    int warningCount = 0;
+    for (YASSDiagnostic diagnostic : diagnostics) {
+      if ("ERROR".equals(diagnostic.getSeverity().toString())) {
+        errorCount++;
+      } else if ("WARNING".equals(diagnostic.getSeverity().toString())) {
+        warningCount++;
+      }
+    }
+    tab.setDiagnosticCounts(errorCount, warningCount);
+
+    if (tab != getCurrentTab()) {
+      return;
+    }
+
+    problemsRows.clear();
+    for (YASSDiagnostic diagnostic : diagnostics) {
+      problemsRows.add(new ProblemRow(
+              diagnostic.getSeverity().toString(),
+              diagnostic.getLine(),
+              diagnostic.getColumn(),
+              diagnostic.getMessage()
+      ));
+    }
+  }
+
   private boolean verifyCode(){
     if(getCurrentTab() == null) return false;
     String code = getCurrentTab().getEditor().getText();
 
-    List<YASSDiagnostic> result = ZPEKit.analyseCode(code);
+    List<YASSDiagnostic> result = ZPEKit.analyseCode(code, 0, code.length());
+    updateProblems(getCurrentTab(), result);
 
     if(result.isEmpty()) {
       return true;
     } else{
-      problemsRows.clear();
-
-      for (YASSDiagnostic d : result) {
-
-        problemsRows.add(new ProblemRow(
-                d.getSeverity().toString(),
-                d.getLine(),
-                d.getMessage()
-        ));
-
-      }
       showProblemsPane();
       return false;
     }
@@ -1064,7 +1186,7 @@ public class ZIDEEditor extends Application {
   public void beautifyCurrentDocument() {
 
       if(getCurrentTab() == null) return;
-      ZIDESyntaxEditor doc = getCurrentTab().getEditor();
+      YASSCodeEditor doc = getCurrentTab().getEditor();
       String code = doc.getText();
 
       String formatted = ZPEKit.beautifyCode(code);
@@ -1083,6 +1205,11 @@ public class ZIDEEditor extends Application {
 
     if(!verifyCode()) return;
 
+    Platform.runLater(() -> {
+      consoleTab.setSelected(true);
+      showBottomPanel(consoleView);
+    });
+
     try {
       if(getCurrentTab() == null) return;
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
@@ -1092,18 +1219,37 @@ public class ZIDEEditor extends Application {
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
       consoleOutputTextArea.addProcessFinishedListener(() -> {
         Platform.runLater(() -> {
-          System.out.println("Finished");
           statusLabel.setText("Ready");
         });
       });
       statusLabel.setText("Executing code");
-      consoleOutputTextArea.runAsProcess(tempPath, false, false, "");
+      consoleOutputTextArea.runAsProcess(tempPath, false, true, "");
 
       //stopExecution.setDisable(false);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  ZPEMacroInterface macroInterface = null;
+  private void openMSI() {
+    if(getCurrentTab() == null) {
+      Alert alert = new Alert(Alert.AlertType.WARNING);
+      alert.setTitle("No tab selected");
+      alert.setHeaderText("Select a file to open the macro editor.");
+      alert.setContentText("Please open a file to open the macro editor.");
+      alert.showAndWait();
+      return;
+    }
+    ZPERuntimeEnvironment z = new ZPERuntimeEnvironment();
+    if(macroInterface == null) {
+      macroInterface = new ZPEMacroInterface(z, new ZPEObject[]{new YASSCodeEditor.EditorObject(z, ZPEKit.getGlobalFunction(z), (getCurrentTab().getEditor()))}, null);
+    } else{
+      macroInterface.setAlwaysOnTop(true);
+      macroInterface.setAlwaysOnTop(false);
+    }
+    macroInterface.setVisible(true);
   }
 
   private boolean getZPE() {
@@ -1164,6 +1310,7 @@ public class ZIDEEditor extends Application {
       if(tab == null){
         tab = (EditorTab) editorTabs.getTabs().get(0);
       }
+
       debugBtn.getStyleClass().add("running");
       invertImageView(getToolbarButtonIcon(debugBtn));
 
@@ -1174,10 +1321,11 @@ public class ZIDEEditor extends Application {
 
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab.getEditor(), tab.getEditor().getText()), false);
-      consoleOutputTextArea.runAsProcess(tempPath, true, false, "");
+      beginProfilerSession();
+      consoleOutputTextArea.runAsProcess(tempPath, true, true, "");
       consoleOutputTextArea.addProcessFinishedListener(() -> {
-        System.out.println("Finished");
         invertImageView(getToolbarButtonIcon(debugBtn));
+        endProfilerSession();
       });
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -1275,10 +1423,14 @@ public class ZIDEEditor extends Application {
   }
 
   private void debug(){
+    stepping = false;
     ZPEDebugger.addBreakPointReachedListener((b, varData) -> {
+      if(!stepping) {
+        showVariablesPane();
+        setVariables(varData);
+      }
       currentBreakpoint = b;
-      showVariablesPane();
-      setVariables(varData);
+
     });
 
     debugCode();
@@ -1340,11 +1492,13 @@ public class ZIDEEditor extends Application {
   }
 
   private TreeView<File> projectTree;
+  boolean stepping = false;
 
   private void continueDebug(){
     if(currentBreakpoint == null){
       return;
     }
+    stepping = false;
     currentBreakpoint.resume();
   }
 
@@ -1352,6 +1506,7 @@ public class ZIDEEditor extends Application {
     if(currentBreakpoint == null){
       return;
     }
+    stepping = true;
     currentBreakpoint.stepOver();
   }
 
@@ -1486,6 +1641,10 @@ public class ZIDEEditor extends Application {
     editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
       if (newTab == null) return;
 
+      if (newTab instanceof EditorTab) {
+        ((EditorTab) newTab).scheduleAnalysis();
+      }
+
       Object ud = newTab.getUserData();
       String path = (ud == null) ? null : ud.toString();
 
@@ -1533,18 +1692,22 @@ public class ZIDEEditor extends Application {
   }
 
   private void openTab(String name, String file) {
-    if(new File(file).isDirectory()) {
-      return;
+    if(file != null) {
+      if (new File(file).isDirectory()) {
+        return;
+      }
     }
     // Ensure active-tab behaviour is installed once
     installActiveTabStyling();
 
     // If tab already exists, select it
-    for (Tab t : editorTabs.getTabs()) {
-      String txt = t.getId();
-      if (file.equals(txt)) {
-        editorTabs.getSelectionModel().select(t);
-        return;
+    if(file != null) {
+      for (Tab t : editorTabs.getTabs()) {
+        String txt = t.getId();
+        if (file.equals(txt)) {
+          editorTabs.getSelectionModel().select(t);
+          return;
+        }
       }
     }
 
@@ -1562,7 +1725,7 @@ public class ZIDEEditor extends Application {
 
       try {
 
-        ZIDESyntaxEditor mainSyntax = new ZIDESyntaxEditor(this, USE_WORD_WRAP);
+        YASSCodeEditor mainSyntax = new YASSCodeEditor(true);
 
         mainSyntax.setFontSize(14);
 
@@ -1666,7 +1829,7 @@ public class ZIDEEditor extends Application {
         mainSyntax.setCaretPosition(0);
 
         // Track “has content” safely
-        hasNonBlankContent.set(!mainSyntax.getText().isBlank());
+        hasNonBlankContent.set(mainSyntax.getText() != null && !mainSyntax.getText().isBlank());
 
         mainSyntax.getDocument().addDocumentListener(new DocumentListener() {
           private void update() {
@@ -1708,7 +1871,7 @@ public class ZIDEEditor extends Application {
 
   }
 
-  private void setLanguage(String lang, ZIDESyntaxEditor mainSyntax) {
+  private void setLanguage(String lang, YASSCodeEditor mainSyntax) {
     if(lang.equals("yass")) {
 
       for (String s : ZPEKit.getAllFunctions()) {
@@ -1734,9 +1897,8 @@ public class ZIDEEditor extends Application {
     return alert.showAndWait().orElse(cancel) == close;
   }
 
-  private Tab createEditorTab(String title, ZIDESyntaxEditor syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
-    EditorTab tab = new EditorTab(title, path, syntax, scrollPane, content);
-    tab.setContent(content);
+  private Tab createEditorTab(String title, YASSCodeEditor syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
+    EditorTab tab = new EditorTab(this, title, path, syntax, scrollPane, content);
 
     // Disable JavaFX built-in close button
     tab.setClosable(false);
@@ -1767,7 +1929,10 @@ public class ZIDEEditor extends Application {
       }
 
       TabPane pane = tab.getTabPane();
-      if (pane != null) pane.getTabs().remove(tab);
+      if (pane != null) {
+        tab.dispose();
+        pane.getTabs().remove(tab);
+      }
     });
 
     HBox header = new HBox(titleLabel, closeBtn);
@@ -1845,7 +2010,29 @@ public class ZIDEEditor extends Application {
   }
 
   private LineChart<Number, Number> profilerChart;
+  private LineChart<Number, Number> cpuProfilerChart;
   private XYChart.Series<Number, Number> memorySeries;
+  private XYChart.Series<Number, Number> nonHeapMemorySeries;
+  private XYChart.Series<Number, Number> cpuSeries;
+  private StackPane profilerChartStack;
+  private javafx.scene.shape.Line profilerHoverLine;
+  private Label profilerHoverDetails;
+  private Popup profilerInfoPopup;
+  private Button profilerMetricButton;
+  private boolean showingCpuProfiler;
+  private Label profilerInactiveMessage;
+  private HBox profilerStatistics;
+  private Label profilerMemoryLabel;
+  private Label profilerCpuLabel;
+  private Label profilerThreadLabel;
+  private Label profilerTimeLabel;
+  private volatile boolean profilingActive;
+  private boolean profilerHasRun;
+  private final ConcurrentLinkedQueue<ZPEDebugger.ProfileSample> pendingProfileSamples =
+          new ConcurrentLinkedQueue<>();
+  private final AtomicBoolean profileUpdateScheduled = new AtomicBoolean(false);
+  private final List<ZPEDebugger.ProfileSample> profilerSamples = new ArrayList<>();
+  private static final int MAX_PROFILE_POINTS = 6000;
 
   private Node buildProfilerPane() {
     NumberAxis xAxis = new NumberAxis();
@@ -1859,25 +2046,515 @@ public class ZIDEEditor extends Application {
     profilerChart = new LineChart<>(xAxis, yAxis);
     profilerChart.setAnimated(false);
     profilerChart.setCreateSymbols(false);
-    profilerChart.setLegendVisible(false);
+    profilerChart.setLegendVisible(true);
     profilerChart.getStyleClass().add("profiler-chart");
 
     memorySeries = new XYChart.Series<>();
-    memorySeries.setName("Memory");
-    profilerChart.getData().add(memorySeries);
+    memorySeries.setName("Heap used");
 
-    VBox content = new VBox(profilerChart);
-    VBox.setVgrow(profilerChart, Priority.ALWAYS);
-    content.getStyleClass().add("profiler-pane");
-    return content;
+    nonHeapMemorySeries = new XYChart.Series<>();
+    nonHeapMemorySeries.setName("Non-heap used");
+
+    profilerChart.getData().addAll(memorySeries, nonHeapMemorySeries);
+
+    NumberAxis cpuXAxis = new NumberAxis();
+    cpuXAxis.setLabel("Time (ms)");
+    cpuXAxis.setForceZeroInRange(true);
+
+    NumberAxis cpuYAxis = new NumberAxis(0.0, 100.0, 10.0);
+    cpuYAxis.setLabel("CPU usage (%)");
+
+    cpuProfilerChart = new LineChart<>(cpuXAxis, cpuYAxis);
+    cpuProfilerChart.setAnimated(false);
+    cpuProfilerChart.setCreateSymbols(false);
+    cpuProfilerChart.setLegendVisible(false);
+    cpuProfilerChart.getStyleClass().add("cpu-profiler-chart");
+
+    cpuSeries = new XYChart.Series<>();
+    cpuSeries.setName("CPU usage");
+    cpuProfilerChart.getData().add(cpuSeries);
+
+    cpuProfilerChart.setVisible(false);
+    cpuProfilerChart.setManaged(false);
+
+    profilerHoverLine = new javafx.scene.shape.Line();
+    profilerHoverLine.getStyleClass().add("profiler-hover-line");
+    profilerHoverLine.setManaged(false);
+    profilerHoverLine.setMouseTransparent(true);
+    profilerHoverLine.setVisible(false);
+
+    profilerHoverDetails = new Label();
+    profilerHoverDetails.getStyleClass().add("profiler-hover-details");
+    profilerHoverDetails.setManaged(false);
+    profilerHoverDetails.setMouseTransparent(true);
+    profilerHoverDetails.setVisible(false);
+
+    profilerChartStack = new StackPane(
+            profilerChart,
+            cpuProfilerChart,
+            profilerHoverLine,
+            profilerHoverDetails
+    );
+    profilerChartStack.setOnMouseMoved(this::inspectProfilerAtMouse);
+    profilerChartStack.setOnMouseExited(e -> hideProfilerInspection());
+    VBox.setVgrow(profilerChartStack, Priority.ALWAYS);
+
+    profilerMemoryLabel = new Label("Heap —");
+    profilerCpuLabel = new Label("CPU —");
+    profilerThreadLabel = new Label("Threads —");
+    profilerTimeLabel = new Label("Time —");
+
+    profilerMemoryLabel.getStyleClass().add("profiler-stat");
+    profilerCpuLabel.getStyleClass().add("profiler-stat");
+    profilerThreadLabel.getStyleClass().add("profiler-stat");
+    profilerTimeLabel.getStyleClass().add("profiler-stat");
+
+    profilerStatistics = new HBox(
+            18,
+            profilerMemoryLabel,
+            profilerCpuLabel,
+            profilerThreadLabel,
+            profilerTimeLabel
+    );
+    profilerStatistics.setAlignment(Pos.CENTER_LEFT);
+    profilerStatistics.getStyleClass().add("profiler-statistics");
+
+    VBox content = new VBox(profilerStatistics, profilerChartStack);
+    VBox.setVgrow(profilerChartStack, Priority.ALWAYS);
+
+    profilerInactiveMessage = new Label("Debug the script to see live time statistics");
+    profilerInactiveMessage.getStyleClass().add("profiler-inactive-message");
+    profilerInactiveMessage.setMouseTransparent(true);
+
+    StackPane profilerStack = new StackPane(content, profilerInactiveMessage);
+    profilerStack.getStyleClass().add("profiler-pane");
+
+    ZPEDebugger.addProfileSampleListener(this::receiveProfileSample);
+    setProfilerActive(false);
+
+    return profilerStack;
   }
 
   private void clearProfiler() {
     Platform.runLater(() -> {
+      pendingProfileSamples.clear();
+      profilerSamples.clear();
+      hideProfilerInspection();
       if (memorySeries != null) {
         memorySeries.getData().clear();
       }
+      if (nonHeapMemorySeries != null) {
+        nonHeapMemorySeries.getData().clear();
+      }
+      if (cpuSeries != null) {
+        cpuSeries.getData().clear();
+      }
+      if (!profilingActive) {
+        resetProfilerLabels();
+      }
     });
+  }
+
+  private void beginProfilerSession() {
+    profilingActive = true;
+    profilerHasRun = true;
+    pendingProfileSamples.clear();
+
+    Platform.runLater(() -> {
+      profilerSamples.clear();
+      hideProfilerInspection();
+      if (memorySeries != null) {
+        memorySeries.getData().clear();
+      }
+      if (nonHeapMemorySeries != null) {
+        nonHeapMemorySeries.getData().clear();
+      }
+      if (cpuSeries != null) {
+        cpuSeries.getData().clear();
+      }
+      resetProfilerLabels();
+      setProfilerActive(true);
+    });
+  }
+
+  private void endProfilerSession() {
+    profilingActive = false;
+    Platform.runLater(() -> setProfilerActive(false));
+  }
+
+  private void setProfilerActive(boolean active) {
+    if (profilerChart == null
+            || cpuProfilerChart == null
+            || profilerInactiveMessage == null
+            || profilerStatistics == null) {
+      return;
+    }
+
+    //profilerChart.setOpacity(active ? 1.0 : 0.28);
+    //cpuProfilerChart.setOpacity(active ? 1.0 : 0.28);
+    //profilerStatistics.setOpacity(active ? 1.0 : 0.28);
+    boolean showInitialMessage = !active && !profilerHasRun;
+    profilerInactiveMessage.setVisible(showInitialMessage);
+    profilerInactiveMessage.setManaged(showInitialMessage);
+  }
+
+  private void resetProfilerLabels() {
+    if (profilerMemoryLabel != null) {
+      profilerMemoryLabel.setText("Heap —");
+    }
+    if (profilerCpuLabel != null) {
+      profilerCpuLabel.setText("CPU —");
+    }
+    if (profilerThreadLabel != null) {
+      profilerThreadLabel.setText("Threads —");
+    }
+    if (profilerTimeLabel != null) {
+      profilerTimeLabel.setText("Time —");
+    }
+  }
+
+  private void receiveProfileSample(ZPEDebugger.ProfileSample sample) {
+    if (!profilingActive || sample == null) {
+      return;
+    }
+
+    pendingProfileSamples.offer(sample);
+    scheduleProfileUpdate();
+  }
+
+  private void scheduleProfileUpdate() {
+    if (profileUpdateScheduled.compareAndSet(false, true)) {
+      Platform.runLater(this::drainProfileSamples);
+    }
+  }
+
+  private void drainProfileSamples() {
+    ZPEDebugger.ProfileSample sample;
+    ZPEDebugger.ProfileSample latest = null;
+
+    while ((sample = pendingProfileSamples.poll()) != null) {
+      latest = sample;
+      addProfilePoint(sample);
+    }
+
+    if (latest != null) {
+      updateProfilerLabels(latest);
+    }
+
+    profileUpdateScheduled.set(false);
+    if (!pendingProfileSamples.isEmpty()) {
+      scheduleProfileUpdate();
+    }
+  }
+
+  private void addProfilePoint(ZPEDebugger.ProfileSample sample) {
+    if (memorySeries == null || nonHeapMemorySeries == null || cpuSeries == null) {
+      return;
+    }
+
+    double elapsedMilliseconds = sample.elapsedNanoseconds / 1_000_000.0;
+    double heapMegabytes = sample.heapUsed / (1024.0 * 1024.0);
+    double nonHeapMegabytes = sample.nonHeapUsed / (1024.0 * 1024.0);
+
+    profilerSamples.add(sample);
+    memorySeries.getData().add(
+            new XYChart.Data<>(elapsedMilliseconds, heapMegabytes)
+    );
+    nonHeapMemorySeries.getData().add(
+            new XYChart.Data<>(elapsedMilliseconds, nonHeapMegabytes)
+    );
+    if (sample.processCpuLoad >= 0.0) {
+      cpuSeries.getData().add(
+              new XYChart.Data<>(elapsedMilliseconds, sample.processCpuLoad * 100.0)
+      );
+    }
+
+    int excess = memorySeries.getData().size() - MAX_PROFILE_POINTS;
+    if (excess > 0) {
+      memorySeries.getData().remove(0, excess);
+      nonHeapMemorySeries.getData().remove(0, excess);
+      profilerSamples.subList(0, excess).clear();
+    }
+
+    int cpuExcess = cpuSeries.getData().size() - MAX_PROFILE_POINTS;
+    if (cpuExcess > 0) {
+      cpuSeries.getData().remove(0, cpuExcess);
+    }
+  }
+
+  private void inspectProfilerAtMouse(MouseEvent event) {
+    if (profilerSamples.isEmpty()
+            || profilerChartStack == null
+            || profilerHoverLine == null
+            || profilerHoverDetails == null) {
+      hideProfilerInspection();
+      return;
+    }
+
+    LineChart<Number, Number> activeChart = showingCpuProfiler
+            ? cpuProfilerChart
+            : profilerChart;
+    Node plotBackground = activeChart.lookup(".chart-plot-background");
+    if (plotBackground == null) {
+      hideProfilerInspection();
+      return;
+    }
+
+    javafx.geometry.Bounds plotBounds =
+            plotBackground.localToScene(plotBackground.getBoundsInLocal());
+    double sceneX = event.getSceneX();
+    double sceneY = event.getSceneY();
+
+    if (!plotBounds.contains(sceneX, sceneY)) {
+      hideProfilerInspection();
+      return;
+    }
+
+    NumberAxis timeAxis = (NumberAxis) activeChart.getXAxis();
+    javafx.geometry.Point2D axisPoint = timeAxis.sceneToLocal(sceneX, sceneY);
+    Number timeValue = timeAxis.getValueForDisplay(axisPoint.getX());
+    if (timeValue == null) {
+      hideProfilerInspection();
+      return;
+    }
+
+    ZPEDebugger.ProfileSample sample =
+            findNearestProfileSample(timeValue.doubleValue() * 1_000_000.0);
+    if (sample == null) {
+      hideProfilerInspection();
+      return;
+    }
+
+    javafx.geometry.Point2D lineTop =
+            profilerChartStack.sceneToLocal(sceneX, plotBounds.getMinY());
+    javafx.geometry.Point2D lineBottom =
+            profilerChartStack.sceneToLocal(sceneX, plotBounds.getMaxY());
+
+    profilerHoverLine.setStartX(lineTop.getX());
+    profilerHoverLine.setEndX(lineBottom.getX());
+    profilerHoverLine.setStartY(lineTop.getY());
+    profilerHoverLine.setEndY(lineBottom.getY());
+    profilerHoverLine.setVisible(true);
+
+    profilerHoverDetails.setText(profileInspectionText(sample));
+    profilerHoverDetails.setVisible(true);
+    profilerHoverDetails.applyCss();
+    profilerHoverDetails.autosize();
+
+    double preferredX = lineTop.getX() + 10.0;
+    double maximumX = Math.max(8.0,
+            profilerChartStack.getWidth() - profilerHoverDetails.getWidth() - 8.0);
+    if (preferredX > maximumX) {
+      preferredX = lineTop.getX() - profilerHoverDetails.getWidth() - 10.0;
+    }
+
+    profilerHoverDetails.relocate(
+            Math.max(8.0, Math.min(preferredX, maximumX)),
+            Math.max(8.0, lineTop.getY() + 8.0)
+    );
+  }
+
+  private ZPEDebugger.ProfileSample findNearestProfileSample(double elapsedNanoseconds) {
+    int low = 0;
+    int high = profilerSamples.size() - 1;
+
+    while (low <= high) {
+      int middle = (low + high) >>> 1;
+      long sampleTime = profilerSamples.get(middle).elapsedNanoseconds;
+      if (sampleTime < elapsedNanoseconds) {
+        low = middle + 1;
+      } else if (sampleTime > elapsedNanoseconds) {
+        high = middle - 1;
+      } else {
+        return profilerSamples.get(middle);
+      }
+    }
+
+    if (low <= 0) {
+      return profilerSamples.get(0);
+    }
+    if (low >= profilerSamples.size()) {
+      return profilerSamples.get(profilerSamples.size() - 1);
+    }
+
+    ZPEDebugger.ProfileSample before = profilerSamples.get(low - 1);
+    ZPEDebugger.ProfileSample after = profilerSamples.get(low);
+    return elapsedNanoseconds - before.elapsedNanoseconds
+            <= after.elapsedNanoseconds - elapsedNanoseconds
+            ? before
+            : after;
+  }
+
+  private String profileInspectionText(ZPEDebugger.ProfileSample sample) {
+    String functionName = sample.functionName == null || sample.functionName.isEmpty()
+            ? "—"
+            : sample.functionName;
+    double heapMegabytes = sample.heapUsed / (1024.0 * 1024.0);
+    String cpu = sample.processCpuLoad < 0.0
+            ? "warming up"
+            : String.format(Locale.ROOT, "%.1f%%", sample.processCpuLoad * 100.0);
+
+    return "Function: " + functionName
+            + "\n" + formatProfilerTime(sample.elapsedNanoseconds)
+            + String.format(Locale.ROOT, "\nHeap %.1f MB   CPU %s   Threads %d",
+            heapMegabytes,
+            cpu,
+            sample.threadCount);
+  }
+
+  private void hideProfilerInspection() {
+    if (profilerHoverLine != null) {
+      profilerHoverLine.setVisible(false);
+    }
+    if (profilerHoverDetails != null) {
+      profilerHoverDetails.setVisible(false);
+    }
+  }
+
+  private Button buildProfilerMetricButton() {
+    profilerMetricButton = new Button("CPU");
+    profilerMetricButton.getStyleClass().add("profiler-switch-button");
+    profilerMetricButton.setTooltip(new Tooltip("Show CPU usage"));
+    profilerMetricButton.setFocusTraversable(false);
+    profilerMetricButton.setOnAction(e -> switchProfilerMetric());
+    return profilerMetricButton;
+  }
+
+  private Button buildProfilerInfoButton() {
+    Button button = new Button("i");
+    button.getStyleClass().add("profiler-info-button");
+    button.setTooltip(new Tooltip("About profiling"));
+    button.setFocusTraversable(false);
+    button.setOnAction(e -> toggleProfilerInformation(button));
+    return button;
+  }
+
+  private void toggleProfilerInformation(Button owner) {
+    if (profilerInfoPopup != null && profilerInfoPopup.isShowing()) {
+      profilerInfoPopup.hide();
+      return;
+    }
+
+    Label title = new Label("About profiling");
+    title.getStyleClass().add("profiler-info-title");
+
+    Label introduction = profilerInformationLabel(
+            "Profiling collects timing, memory, CPU, thread and currently executing "
+                    + "function samples while your program runs. Collecting and transmitting "
+                    + "this information adds work and may affect the runtime's performance."
+    );
+
+    Label sampling = profilerInformationLabel(
+            "ZPE samples every 10 ms and sends batches every 100 ms. ZPEX samples every "
+                    + "1 ms and sends batches every 6 ms so that very fast native execution "
+                    + "is easier to inspect."
+    );
+
+    Label guidance = profilerInformationLabel(
+            "Samples are observations rather than an exact execution trace, and very short "
+                    + "functions may still run between them. Use a normal Run—not a profiling "
+                    + "session—for representative performance measurements."
+    );
+
+    VBox card = new VBox(8, title, introduction, sampling, guidance);
+    card.getStyleClass().add("profiler-info-card");
+    if (BalfLafManager.getInstance().isDarkModeEnabled()) {
+      card.getStyleClass().add("dark");
+    }
+    card.getStylesheets().add(
+            Objects.requireNonNull(getClass().getResource("/zide.css")).toExternalForm()
+    );
+
+    Popup popup = new Popup();
+    popup.setAutoFix(true);
+    popup.setAutoHide(true);
+    popup.setHideOnEscape(true);
+    popup.setConsumeAutoHidingEvents(false);
+    popup.getContent().add(card);
+    popup.setOnHidden(e -> {
+      if (profilerInfoPopup == popup) {
+        profilerInfoPopup = null;
+      }
+    });
+
+    javafx.geometry.Bounds ownerBounds = owner.localToScreen(owner.getBoundsInLocal());
+    if (ownerBounds == null) {
+      return;
+    }
+
+    profilerInfoPopup = popup;
+    popup.show(owner, ownerBounds.getMinX(), ownerBounds.getMaxY() + 6.0);
+    popup.setX(ownerBounds.getMaxX() - popup.getWidth());
+  }
+
+  private Label profilerInformationLabel(String text) {
+    Label label = new Label(text);
+    label.getStyleClass().add("profiler-info-text");
+    label.setWrapText(true);
+    label.setMaxWidth(340);
+    return label;
+  }
+
+  private void switchProfilerMetric() {
+    showingCpuProfiler = !showingCpuProfiler;
+
+    profilerChart.setVisible(!showingCpuProfiler);
+    profilerChart.setManaged(!showingCpuProfiler);
+    cpuProfilerChart.setVisible(showingCpuProfiler);
+    cpuProfilerChart.setManaged(showingCpuProfiler);
+
+    if (showingCpuProfiler) {
+      profilerMetricButton.setText("Memory");
+      profilerMetricButton.setTooltip(new Tooltip("Show memory usage"));
+    } else {
+      profilerMetricButton.setText("CPU");
+      profilerMetricButton.setTooltip(new Tooltip("Show CPU usage"));
+    }
+  }
+
+  private void updateProfilerLabels(ZPEDebugger.ProfileSample sample) {
+    double heapMegabytes = sample.heapUsed / (1024.0 * 1024.0);
+    double heapCommittedMegabytes = sample.heapCommitted / (1024.0 * 1024.0);
+    double nonHeapMegabytes = sample.nonHeapUsed / (1024.0 * 1024.0);
+
+    profilerMemoryLabel.setText(String.format(
+            Locale.ROOT,
+            "Heap %.1f MB / %.1f MB committed   Non-heap %.1f MB",
+            heapMegabytes,
+            heapCommittedMegabytes,
+            nonHeapMegabytes
+    ));
+
+    if (sample.processCpuLoad < 0.0) {
+      profilerCpuLabel.setText("CPU warming up…");
+    } else {
+      profilerCpuLabel.setText(String.format(
+              Locale.ROOT,
+              "CPU %.1f%%",
+              sample.processCpuLoad * 100.0
+      ));
+    }
+
+    profilerThreadLabel.setText("Threads " + sample.threadCount);
+    profilerTimeLabel.setText(formatProfilerTime(sample.elapsedNanoseconds));
+  }
+
+  private String formatProfilerTime(long elapsedNanoseconds) {
+    double elapsedSeconds = elapsedNanoseconds / 1_000_000_000.0;
+    if (elapsedSeconds < 1.0) {
+      return String.format(
+              Locale.ROOT,
+              "Time %.1f ms",
+              elapsedNanoseconds / 1_000_000.0
+      );
+    }
+    if (elapsedSeconds < 60.0) {
+      return String.format(Locale.ROOT, "Time %.3f s", elapsedSeconds);
+    }
+
+    long minutes = (long) (elapsedSeconds / 60.0);
+    double seconds = elapsedSeconds - (minutes * 60.0);
+    return String.format(Locale.ROOT, "Time %d:%06.3f", minutes, seconds);
   }
 
   private Node buildconsole() {
@@ -1906,19 +2583,25 @@ public class ZIDEEditor extends Application {
 
     // --- Variables view ---
     variablesView = wrapWithHeader("Variable Watch", buildVariablesPane(),
-            panelIconButton("/files/stepover.png", "Step over", this::stepOver),
+            panelIconButton("/files/step-over.png", "Step over", this::stepOver),
             panelIconButton("/files/continue.png", "Continue debugging", this::continueDebug),
             panelIconButton("/files/stop.png", "Stop execution", this::stopExecution)
     );
 
-    profileView = wrapWithHeader("Profiling", buildProfilerPane(), panelIconButton("/files/bin.png", "Clear profiler", this::clearProfiler));
+    profileView = wrapWithHeader(
+            "Profiling",
+            buildProfilerPane(),
+            buildProfilerInfoButton(),
+            buildProfilerMetricButton(),
+            panelIconButton("/files/bin.png", "Clear profiler", this::clearProfiler)
+    );
 
     // --- Content stack ---
-    bottomContentStack = new StackPane(consoleView, problemsView, variablesView, profileView);
+    bottomContentStack = new StackPane(problemsView, consoleView, variablesView, profileView);
     bottomContentStack.getStyleClass().add("bottom-content-stack");
 
-    problemsView.setVisible(false);
-    problemsView.setManaged(false);
+    consoleView.setVisible(false);
+    consoleView.setManaged(false);
 
     variablesView.setVisible(false);
     variablesView.setManaged(false);
@@ -1927,26 +2610,27 @@ public class ZIDEEditor extends Application {
     profileView.setManaged(false);
 
     // --- Vertical tabs ---
-    consoleTab = createBottomSideTab("Console", icon("/files/console.png"));
+
     problemsTab = createBottomSideTab("Problems", icon("/files/warning.png"));
+    consoleTab = createBottomSideTab("Console", icon("/files/console.png"));
     variablesTab = createBottomSideTab("Variable Watch", icon("/files/watch.png"));
     profileTab = createBottomSideTab("Profiling", icon("/files/profiling.png"));
 
     ToggleGroup group = new ToggleGroup();
-    consoleTab.setToggleGroup(group);
     problemsTab.setToggleGroup(group);
+    consoleTab.setToggleGroup(group);
     variablesTab.setToggleGroup(group);
     profileTab.setToggleGroup(group);
 
 
-    consoleTab.setSelected(true);
+    problemsTab.setSelected(true);
 
-    consoleTab.setOnAction(e -> showBottomPanel(consoleView));
     problemsTab.setOnAction(e -> showBottomPanel(problemsView));
+    consoleTab.setOnAction(e -> showBottomPanel(consoleView));
     variablesTab.setOnAction(e -> showBottomPanel(variablesView));
     profileTab.setOnAction(e -> showBottomPanel(profileView));
 
-    VBox tabs = new VBox(consoleTab, problemsTab, variablesTab, profileTab);
+    VBox tabs = new VBox(problemsTab, consoleTab, variablesTab, profileTab);
     tabs.getStyleClass().add("bottom-side-tabs");
     tabs.setFillWidth(true);
 
@@ -1958,12 +2642,13 @@ public class ZIDEEditor extends Application {
     bottom.setMinHeight(180);
 
 
-    consoleOutputTextArea.addProcessFinishedListener(() ->
-            Platform.runLater(() -> {
-              runBtn.getStyleClass().remove("running");
-              debugBtn.getStyleClass().remove("running");
-            })
-    );
+    consoleOutputTextArea.addProcessFinishedListener(() -> {
+      stepping = false;
+      Platform.runLater(() -> {
+        runBtn.getStyleClass().remove("running");
+        debugBtn.getStyleClass().remove("running");
+      });
+    });
 
     return bottom;
   }
@@ -2011,6 +2696,9 @@ public class ZIDEEditor extends Application {
     TableColumn<ProblemRow, String> lineCol = new TableColumn<>("Line");
     lineCol.setCellValueFactory(v -> v.getValue().lineProperty());
 
+    TableColumn<ProblemRow, String> columnCol = new TableColumn<>("Column");
+    columnCol.setCellValueFactory(v -> v.getValue().columnProperty());
+
     TableColumn<ProblemRow, String> msgCol = new TableColumn<>("Message");
     msgCol.setCellValueFactory(v -> v.getValue().messageProperty());
     msgCol.setPrefWidth(400);
@@ -2021,9 +2709,12 @@ public class ZIDEEditor extends Application {
     lineCol.setMinWidth(60);
     lineCol.setMaxWidth(60);
 
+    columnCol.setMinWidth(70);
+    columnCol.setMaxWidth(70);
+
     msgCol.setPrefWidth(1000); // big so it dominates
 
-    problemsTable.getColumns().setAll(typeCol, lineCol, msgCol);
+    problemsTable.getColumns().setAll(typeCol, lineCol, columnCol, msgCol);
 
     problemsTable.setRowFactory(tv -> {
       TableRow<ProblemRow> row = new TableRow<>();
@@ -2064,16 +2755,19 @@ public class ZIDEEditor extends Application {
 
     private final SimpleStringProperty severity;
     private final SimpleStringProperty line;
+    private final SimpleStringProperty column;
     private final SimpleStringProperty message;
 
-    public ProblemRow(String severity, int line, String message) {
+    public ProblemRow(String severity, int line, int column, String message) {
       this.severity = new SimpleStringProperty(severity);
       this.line = new SimpleStringProperty(String.valueOf(line));
+      this.column = new SimpleStringProperty(String.valueOf(column));
       this.message = new SimpleStringProperty(message);
     }
 
     public StringProperty severityProperty() { return severity; }
     public StringProperty lineProperty() { return line; }
+    public StringProperty columnProperty() { return column; }
     public StringProperty messageProperty() { return message; }
     public String getSeverity() {
       return severity.get();
@@ -2115,7 +2809,7 @@ public class ZIDEEditor extends Application {
     return box;
   }
 
-  private void showProblemsPane() {
+  void showProblemsPane() {
     Platform.runLater(() -> {
       problemsTab.setSelected(true);
       showBottomPanel(problemsView);
@@ -2170,7 +2864,7 @@ public class ZIDEEditor extends Application {
     centre.setStyle("-fx-font-size: 13px;");
 
     rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-      ZIDESyntaxEditor c = (ZIDESyntaxEditor) getCurrentTab().getEditor();
+      YASSCodeEditor c = getCurrentTab().getEditor();
       setLanguage("yass", c);
     });
 

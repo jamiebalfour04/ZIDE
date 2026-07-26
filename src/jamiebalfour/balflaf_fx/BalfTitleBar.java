@@ -1,6 +1,6 @@
 package jamiebalfour.balflaf_fx;
 
-import jamiebalfour.HelperFunctions;
+import jamiebalfour.helpers.HelperFunctions;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;

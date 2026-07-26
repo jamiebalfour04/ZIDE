@@ -260,6 +260,152 @@
     -fx-background-color: rgba(0,0,0,0.18);
 }
 
+.profiler-pane {
+    -fx-background-color: -fx-control-inner-background;
+}
+
+.profiler-statistics {
+    -fx-padding: 7 12 3 12;
+}
+
+.profiler-stat {
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+    -fx-opacity: 0.86;
+}
+
+.profiler-chart .default-color0.chart-series-line {
+    -fx-stroke: #ff8a5b;
+    -fx-stroke-width: 2px;
+}
+
+.profiler-chart .default-color1.chart-series-line {
+    -fx-stroke: #3f8fd2;
+    -fx-stroke-width: 2px;
+}
+
+.cpu-profiler-chart .default-color0.chart-series-line {
+    -fx-stroke: #8b5cf6;
+    -fx-stroke-width: 2px;
+}
+
+.profiler-hover-line {
+    -fx-stroke: rgba(70, 80, 95, 0.72);
+    -fx-stroke-width: 1px;
+    -fx-stroke-dash-array: 4 3;
+}
+
+.profiler-hover-details {
+    -fx-padding: 7 9 7 9;
+    -fx-background-color: rgba(255, 255, 255, 0.96);
+    -fx-background-radius: 5;
+    -fx-border-color: rgba(0, 0, 0, 0.18);
+    -fx-border-radius: 5;
+    -fx-font-size: 11px;
+    -fx-text-fill: #26364a;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.18), 8, 0.12, 0, 2);
+}
+
+.app-root:dark .profiler-hover-line {
+    -fx-stroke: rgba(225, 230, 240, 0.72);
+}
+
+.app-root:dark .profiler-hover-details {
+    -fx-background-color: rgba(35, 40, 49, 0.97);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+    -fx-text-fill: #e6e9ee;
+}
+
+.profiler-switch-button {
+    -fx-padding: 2 9 2 9;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.profiler-info-button {
+    -fx-min-width: 18px;
+    -fx-pref-width: 18px;
+    -fx-max-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-height: 18px;
+    -fx-max-height: 18px;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-background-radius: 9px;
+    -fx-border-color: rgba(70, 80, 95, 0.58);
+    -fx-border-radius: 9px;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+
+.profiler-info-button:hover {
+    -fx-background-color: rgba(70, 80, 95, 0.10);
+}
+
+.profiler-info-card {
+    -fx-pref-width: 360px;
+    -fx-max-width: 360px;
+    -fx-padding: 13px 15px 14px 15px;
+    -fx-background-color: rgba(255, 255, 255, 0.98);
+    -fx-background-radius: 7px;
+    -fx-border-color: rgba(0, 0, 0, 0.17);
+    -fx-border-radius: 7px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 14, 0.14, 0, 3);
+}
+
+.profiler-info-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #26364a;
+}
+
+.profiler-info-text {
+    -fx-font-size: 11px;
+    -fx-line-spacing: 2px;
+    -fx-text-fill: #3d4755;
+}
+
+.profiler-info-card.dark {
+    -fx-background-color: rgba(35, 40, 49, 0.98);
+    -fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.profiler-info-card.dark .profiler-info-title {
+    -fx-text-fill: #f0f2f5;
+}
+
+.profiler-info-card.dark .profiler-info-text {
+    -fx-text-fill: #d4d8df;
+}
+
+.app-root:dark .profiler-info-button {
+    -fx-border-color: rgba(225, 230, 240, 0.62);
+    -fx-text-fill: #e6e9ee;
+}
+
+.app-root:dark .profiler-info-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.profiler-inactive-message {
+    -fx-padding: 10 16 10 16;
+    -fx-background-color: rgba(255,255,255,0.88);
+    -fx-background-radius: 6;
+    -fx-border-color: rgba(0,0,0,0.12);
+    -fx-border-radius: 6;
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #26364a;
+}
+
+.app-root:dark .profiler-inactive-message {
+    -fx-background-color: rgba(35,40,49,0.92);
+    -fx-border-color: rgba(255,255,255,0.14);
+    -fx-text-fill: #e6e9ee;
+}
+
 .button.running{
     -fx-background-color: #0a0;
     -fx-border-color: transparent;
@@ -545,17 +691,31 @@
     -fx-background-color: rgba(0,0,0,0.08);
 }
 
-.balf-titlebar {
+.app-root .balf-titlebar {
     -fx-background-color: #517;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
 }
 
-.main-menu-bar{
+.app-root .main-menu-bar{
     -fx-background-color: #517;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
     -fx-text-fill: white;
 }
 
 .main-menu-bar .glass-menu-title {
     -fx-text-fill: white;
+}
+
+.app-root .app-toolbar {
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
 }
 
 .app-root:dark .pane-header {
@@ -688,4 +848,76 @@
 
 .zpe-online-open-button {
     -fx-background-radius: 10px;
+}
+
+.editor-diagnostic-overlay {
+    -fx-padding: 0;
+}
+
+.editor-error-indicator,
+.editor-warning-indicator {
+    -fx-padding: 4px 9px;
+    -fx-background-radius: 13px;
+    -fx-border-radius: 13px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.20), 6, 0.15, 0, 1);
+    -fx-cursor: hand;
+}
+
+.editor-error-indicator {
+    -fx-background-color: rgba(255, 238, 238, 0.96);
+    -fx-border-color: rgba(211, 47, 47, 0.35);
+}
+
+.editor-error-indicator:hover {
+    -fx-background-color: rgba(255, 220, 220, 0.98);
+}
+
+.editor-warning-indicator {
+    -fx-background-color: rgba(255, 248, 225, 0.96);
+    -fx-border-color: rgba(230, 145, 0, 0.40);
+}
+
+.editor-warning-indicator:hover {
+    -fx-background-color: rgba(255, 238, 190, 0.98);
+}
+
+.editor-error-icon,
+.editor-error-count {
+    -fx-text-fill: #d32f2f;
+    -fx-font-weight: bold;
+}
+
+.editor-warning-icon,
+.editor-warning-count {
+    -fx-text-fill: #c77800;
+    -fx-font-weight: bold;
+}
+
+.app-root:dark .editor-error-indicator {
+    -fx-background-color: rgba(82, 25, 30, 0.96);
+    -fx-border-color: rgba(255, 82, 82, 0.48);
+}
+
+.app-root:dark .editor-error-indicator:hover {
+    -fx-background-color: rgba(110, 30, 36, 0.98);
+}
+
+.app-root:dark .editor-error-icon,
+.app-root:dark .editor-error-count {
+    -fx-text-fill: #ff5252;
+}
+
+.app-root:dark .editor-warning-indicator {
+    -fx-background-color: rgba(78, 57, 18, 0.96);
+    -fx-border-color: rgba(255, 183, 77, 0.48);
+}
+
+.app-root:dark .editor-warning-indicator:hover {
+    -fx-background-color: rgba(103, 73, 20, 0.98);
+}
+
+.app-root:dark .editor-warning-icon,
+.app-root:dark .editor-warning-count {
+    -fx-text-fill: #ffb74d;
 }

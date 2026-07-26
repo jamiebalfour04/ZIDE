@@ -17,7 +17,6 @@
       <element id="directory" name="META-INF">
         <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />
       </element>
-      <element id="extracted-dir" path="$JARs$/CodeEditorView.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/ZPE/zpe.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/jfx/javafx-swt.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/jfx/javafx.base.jar" path-in-jar="/" />

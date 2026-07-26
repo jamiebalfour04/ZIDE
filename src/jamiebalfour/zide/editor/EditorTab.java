@@ -3,41 +3,122 @@ package jamiebalfour.zide.editor;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfScrollbarPane;
+import jamiebalfour.zpe.core.YASSDiagnostic;
+import jamiebalfour.zpe.core.ZPEKit;
+import jamiebalfour.zpe.gui.YASSCodeEditor;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class EditorTab extends Tab {
+  private static final int ANALYSIS_DELAY_MS = 400;
+  private static final ExecutorService ANALYSER = Executors.newSingleThreadExecutor(r -> {
+    Thread thread = new Thread(r, "zide-syntax-analyser");
+    thread.setDaemon(true);
+    return thread;
+  });
+
+  private final ZIDEEditor owner;
   private final String path;
-  private final ZIDESyntaxEditor editor;
+  private final YASSCodeEditor editor;
   private final BalfScrollbarPane pane;
+  private final Timer analysisTimer;
+  private final AtomicInteger analysisVersion = new AtomicInteger();
+  private final HBox errorIndicator = new HBox(4);
+  private final Label errorCountLabel = new Label();
+  private final HBox warningIndicator = new HBox(4);
+  private final Label warningCountLabel = new Label();
+  private final HBox diagnosticOverlay = new HBox(7);
   private boolean changes = false;
 
-  public EditorTab(String title, String path, ZIDESyntaxEditor editor, BalfScrollbarPane pane, javafx.scene.Node content) {
+  public EditorTab(ZIDEEditor owner, String title, String path, YASSCodeEditor editor, BalfScrollbarPane pane, Node content) {
     super(title, content);
+    this.owner = owner;
     this.path = path;
     this.editor = editor;
     this.pane = pane;
     pane.setLightColour(Color.white);
+
+    Label errorIcon = new Label("❗");
+    errorIcon.getStyleClass().add("editor-error-icon");
+    errorCountLabel.getStyleClass().add("editor-error-count");
+    errorIndicator.getStyleClass().add("editor-error-indicator");
+    errorIndicator.setAlignment(Pos.CENTER);
+    errorIndicator.getChildren().addAll(errorIcon, errorCountLabel);
+    errorIndicator.setVisible(false);
+    errorIndicator.setManaged(false);
+    errorIndicator.setOnMouseClicked(e -> owner.showProblemsPane());
+
+    Label warningIcon = new Label("⚠");
+    warningIcon.getStyleClass().add("editor-warning-icon");
+    warningCountLabel.getStyleClass().add("editor-warning-count");
+    warningIndicator.getStyleClass().add("editor-warning-indicator");
+    warningIndicator.setAlignment(Pos.CENTER);
+    warningIndicator.getChildren().addAll(warningIcon, warningCountLabel);
+    warningIndicator.setVisible(false);
+    warningIndicator.setManaged(false);
+    warningIndicator.setOnMouseClicked(e -> owner.showProblemsPane());
+
+    diagnosticOverlay.getChildren().addAll(errorIndicator, warningIndicator);
+    diagnosticOverlay.getStyleClass().add("editor-diagnostic-overlay");
+    diagnosticOverlay.setAlignment(Pos.CENTER_RIGHT);
+    diagnosticOverlay.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+
+    StackPane editorContainer = new StackPane(content, diagnosticOverlay);
+    StackPane.setAlignment(diagnosticOverlay, Pos.TOP_RIGHT);
+    setContent(editorContainer);
+    updateDiagnosticOverlayPosition();
+
+    editor.getMinimapComponent().addComponentListener(new ComponentAdapter() {
+      @Override
+      public void componentShown(ComponentEvent e) {
+        Platform.runLater(() -> updateDiagnosticOverlayPosition());
+      }
+
+      @Override
+      public void componentHidden(ComponentEvent e) {
+        Platform.runLater(() -> updateDiagnosticOverlayPosition());
+      }
+    });
+
+    analysisTimer = new Timer(ANALYSIS_DELAY_MS, e -> analyseCurrentSource());
+    analysisTimer.setRepeats(false);
 
     editor.getDocument().addDocumentListener(new DocumentListener() {
 
       @Override
       public void insertUpdate(DocumentEvent e) {
         changes = true;
+        scheduleAnalysis();
       }
 
       @Override
       public void removeUpdate(DocumentEvent e) {
         changes = true;
+        scheduleAnalysis();
       }
 
       @Override
       public void changedUpdate(DocumentEvent e) {
         changes = true;
+        scheduleAnalysis();
       }
     });
 
@@ -57,6 +138,67 @@ public class EditorTab extends Tab {
         editor.setText(editor.getText());
       }
     });
+
+    scheduleAnalysis();
+  }
+
+  void scheduleAnalysis() {
+    if (path != null && !path.toLowerCase().endsWith(".yas")) {
+      return;
+    }
+
+    analysisVersion.incrementAndGet();
+    analysisTimer.restart();
+  }
+
+  private void analyseCurrentSource() {
+    final int version = analysisVersion.get();
+    final String source = editor.getText();
+
+    ANALYSER.submit(() -> {
+      List<YASSDiagnostic> diagnostics = ZPEKit.analyseCode(source, 0, source.length());
+      if (version != analysisVersion.get()) {
+        return;
+      }
+
+      SwingUtilities.invokeLater(() -> {
+        if (version != analysisVersion.get() || !source.equals(editor.getText())) {
+          return;
+        }
+
+        Platform.runLater(() -> {
+          if (version == analysisVersion.get()) {
+            owner.updateProblems(this, diagnostics);
+          }
+        });
+      });
+    });
+  }
+
+  void dispose() {
+    analysisVersion.incrementAndGet();
+    analysisTimer.stop();
+  }
+
+  void setDiagnosticCounts(int errorCount, int warningCount) {
+    errorCountLabel.setText(String.valueOf(errorCount));
+    boolean hasErrors = errorCount > 0;
+    errorIndicator.setVisible(hasErrors);
+    errorIndicator.setManaged(hasErrors);
+
+    warningCountLabel.setText(String.valueOf(warningCount));
+    boolean hasWarnings = warningCount > 0;
+    warningIndicator.setVisible(hasWarnings);
+    warningIndicator.setManaged(hasWarnings);
+    updateDiagnosticOverlayPosition();
+  }
+
+  private void updateDiagnosticOverlayPosition() {
+    double rightInset = 18;
+    if (editor.isMinimapEnabled() && editor.getMinimapComponent().isVisible()) {
+      rightInset += editor.getMinimapComponent().getPreferredSize().getWidth();
+    }
+    StackPane.setMargin(diagnosticOverlay, new Insets(10, rightInset, 0, 0));
   }
   
 
@@ -64,7 +206,7 @@ public class EditorTab extends Tab {
     return path;
   }
 
-  public ZIDESyntaxEditor getEditor() { return editor; }
+  public YASSCodeEditor getEditor() { return editor; }
   public BalfScrollbarPane getScrollPane() { return pane; }
 
   void switchOnDarkMode() {

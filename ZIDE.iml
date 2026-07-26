@@ -8,8 +8,8 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="zpe" level="project" />
-    <orderEntry type="library" name="CodeEditorView" level="project" />
     <orderEntry type="library" name="org.eclipse.jgit-6.10.0.202406032230-r" level="project" />
     <orderEntry type="library" name="javafx-swt" level="project" />
+    <orderEntry type="library" name="BalfClassLibrary" level="project" />
   </component>
 </module>

@@ -1,7 +1,7 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.balflaf_fx.BalfTitleBar;
-import jamiebalfour.zpe.core.ZPECore;
+import jamiebalfour.zpe.core.ZPE;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -55,7 +55,7 @@ public final class ZIDEAboutWindow {
     Label version = new Label("ZIDE Version " + getVersion());
     version.getStyleClass().add("about-version");
 
-    Label zpe_version = new Label("ZPE Version " + ZPECore.getVersionNumber() + " [" + ZPECore.getVersionName() + "]");
+    Label zpe_version = new Label("ZPE Version " + ZPE.getVersionNumber() + " [" + ZPE.getVersionName() + "]");
     zpe_version.getStyleClass().add("about-version");
 
 
