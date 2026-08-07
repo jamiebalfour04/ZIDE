@@ -2,9 +2,9 @@ package jamiebalfour.zide.core;
 
 class ZIDEBuildInformation {
 
-  static String date = "26-07-2026";
-  static String time = "12:41:47";
-  static String build = "1601";
+  static String date = "07-08-2026";
+  static String time = "17:37:48";
+  static String build = "1627";
 
 }
 

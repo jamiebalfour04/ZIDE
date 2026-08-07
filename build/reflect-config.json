@@ -1,0 +1,12 @@
+[
+  {
+    "name": "jamiebalfour.zide.editor.ZIDEEditor",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.javafx.tk.quantum.QuantumToolkit",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  }
+]

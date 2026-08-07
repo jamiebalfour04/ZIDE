@@ -17,7 +17,7 @@ import jamiebalfour.zpe.core.exceptions.CompileException;
 import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.YASSCodeEditor;
-import jamiebalfour.zpe.gui.ZPEMacroInterface;
+import jamiebalfour.zpe.gui.ZPEMacroEditor;
 import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -70,12 +70,11 @@ import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.io.*;
 import java.net.URLDecoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -88,6 +87,7 @@ public class ZIDEEditor extends Application {
   Label rightFooterLabel;
   ConsoleOutputTextArea consoleOutputTextArea;
   BalfScrollbarPane consoleScrollbar;
+  private ZIDESystemTerminal systemTerminal;
   Button runBtn;
   Button buildBtn;
   Button debugBtn;
@@ -115,6 +115,11 @@ public class ZIDEEditor extends Application {
   String username = null;
   String password = null;
   boolean loggedIn = false;
+  private WatchService projectWatchService;
+  private Thread projectWatchThread;
+  private volatile boolean watchingProjectDirectory;
+  private final AtomicBoolean projectTreeRefreshQueued = new AtomicBoolean(false);
+  private String cloudFileName = "";
 
 
 
@@ -231,6 +236,7 @@ public class ZIDEEditor extends Application {
     // Left: project tree
     Node projectTree = buildProjectTree(projectDir);
     currentProjectRoot = projectDir;
+    startProjectDirectoryWatcher(projectDir);
     Node leftPane = wrapTitled("Project", projectTree);
     //leftPane.setMinWidth(260);
 
@@ -313,6 +319,7 @@ public class ZIDEEditor extends Application {
     stage.setTitle("ZIDE");
     stage.setScene(scene);
     registerKeyboardShortcuts(scene);
+    stage.setOnCloseRequest(event -> stopProjectDirectoryWatcher());
     stage.show();
 
     boolean isMac = System.getProperty("os.name").toLowerCase().contains("mac");
@@ -320,6 +327,11 @@ public class ZIDEEditor extends Application {
     if (isMac) {
       root.getStyleClass().add("mac-window");
     }
+  }
+
+  @Override
+  public void stop() {
+    stopProjectDirectoryWatcher();
   }
 
   private void setLeftSplitWidth(SplitPane splitPane, double pixels) {
@@ -560,8 +572,8 @@ public class ZIDEEditor extends Application {
     script.separator();
     script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
     script.separator();
-    script.createItem("Compile to ZEX", "", this::compileProject);
-    script.createItem("Compile Native", "", this::compileNative);
+    script.createItem("Compile project to ZEX", "", this::compileProject);
+    script.createItem("Compile project Native", "", this::compileNative);
     script.separator();
     List<String> transpilers = ZPEKit.listTranspilerNames();
     if (!transpilers.isEmpty()) {
@@ -585,8 +597,11 @@ public class ZIDEEditor extends Application {
 
     git.createItem("Clone", "", this::cloneRepo);
     git.separator();
-    git.createItem("Commit", "", null);
-    git.createItem("Push", "", null);
+    git.createItem("Repository Status", "", this::showGitStatus);
+    git.createItem("Commit All Changes", "", this::commitGitChanges);
+    git.separator();
+    git.createItem("Pull", "", this::pullGitChanges);
+    git.createItem("Push", "", this::pushGitChanges);
 
 
     var zpeOnline = bar.menu("ZPE Online");
@@ -596,7 +611,7 @@ public class ZIDEEditor extends Application {
     loadFromOnline = zpeOnline.createItem("Load from ZPE Online", "", () -> {});
 
     loadFromOnline.setOnMouseClicked(e -> loadFromUsersCloudFX());
-    saveToOnline = zpeOnline.createItem("Save to ZPE Online", "", () -> {});
+    saveToOnline = zpeOnline.createItem("Save to ZPE Online", "", this::saveToZPEOnline);
 
 
     loadFromOnline.setDisable(true);
@@ -620,8 +635,13 @@ public class ZIDEEditor extends Application {
 
     File chosen = chooser.showDialog(_stage);
     if (chosen != null) {
-      buildProjectTree(chosen);
       currentProjectRoot = chosen;
+      projectDir = chosen;
+      buildProjectTree(chosen);
+      startProjectDirectoryWatcher(chosen);
+      if (systemTerminal != null) {
+        systemTerminal.setWorkingDirectory(chosen.toPath());
+      }
     }
   }
 
@@ -656,18 +676,6 @@ public class ZIDEEditor extends Application {
     return result.orElse(null);
   }
 
-  private String getFolderName(String repoUrl) {
-    // remove trailing slash if present
-    repoUrl = repoUrl.endsWith("/") ? repoUrl.substring(0, repoUrl.length() - 1) : repoUrl;
-
-    String[] parts = repoUrl.split("/");
-
-    if (parts.length < 2) return "repo";
-
-    // second last part = owner/org
-    return parts[parts.length - 2];
-  }
-
   void loadFromUsersCloudFX() {
     HashMap<String, String> arguments = new HashMap<>();
     arguments.put("username", username);
@@ -682,54 +690,133 @@ public class ZIDEEditor extends Application {
   }
 
   private void cloneRepo() {
-    try {
-      // Ask for repo URL
-      String repoUrl = askForRepoUrl();
+    String repoUrl = askForRepoUrl();
+    if (repoUrl == null || repoUrl.trim().isEmpty()) return;
 
-      if (repoUrl == null || repoUrl.trim().isEmpty()) {
-        return;
-      }
+    String repositoryName = repositoryNameFromUrl(repoUrl.trim());
+    DirectoryChooser chooser = new DirectoryChooser();
+    chooser.setTitle("Choose where to clone " + repositoryName);
+    chooser.setInitialDirectory(currentProjectRoot != null && currentProjectRoot.isDirectory()
+            ? currentProjectRoot : new File(System.getProperty("user.home"), "Documents"));
+    File parentDirectory = chooser.showDialog(_stage);
+    if (parentDirectory == null) return;
 
-      repoUrl = repoUrl.trim();
-
-      // Extract repo name
-      String repoName = repoUrl.substring(repoUrl.lastIndexOf("/") + 1)
-              .replace(".git", "");
-
-      // Build destination path
-      File baseDir = new File(System.getProperty("user.home"),
-              "Documents/YASS Projects");
-
-      if (!baseDir.exists()) {
-        baseDir.mkdirs();
-      }
-
-      String folderName = getFolderName(repoUrl);
-      File destination = new File(baseDir, folderName);
-
-      if(!new File(destination.getAbsolutePath()).exists()) {
-        //new File(destination.getAbsolutePath()).mkdirs();
-      }
-
-      // Clone
-      Git.cloneRepository()
-              .setURI(repoUrl)
-              .setDirectory(destination)
-              .setCredentialsProvider(new UsernamePasswordCredentialsProvider("", ""))
-              .call()
-              .close();
-
-
-      // Optional: open in your IDE
-      buildProjectTree(currentProjectRoot);
-
-    } catch (Exception e) {
-      e.printStackTrace();
-      JOptionPane.showMessageDialog(null,
-              "Clone failed:\n" + e.getMessage(),
-              "Error",
-              JOptionPane.ERROR_MESSAGE);
+    File destination = new File(parentDirectory, repositoryName);
+    if (destination.exists()) {
+      showError("Clone Repository", "The destination folder already exists:\n" + destination);
+      return;
     }
+
+    runGitTask("Cloning " + repositoryName, () -> {
+      try (Git ignored = Git.cloneRepository().setURI(repoUrl.trim()).setDirectory(destination).call()) {
+        Platform.runLater(() -> openGitProject(destination));
+        return "Cloned " + repositoryName + ".";
+      }
+    });
+  }
+
+  private String repositoryNameFromUrl(String repositoryUrl) {
+    String trimmed = repositoryUrl.endsWith("/")
+            ? repositoryUrl.substring(0, repositoryUrl.length() - 1) : repositoryUrl;
+    int separator = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf(':'));
+    String name = separator >= 0 ? trimmed.substring(separator + 1) : trimmed;
+    return name.endsWith(".git") ? name.substring(0, name.length() - 4) : name;
+  }
+
+  private void openGitProject(File directory) {
+    currentProjectRoot = directory;
+    projectDir = directory;
+    buildProjectTree(directory);
+    startProjectDirectoryWatcher(directory);
+    if (systemTerminal != null) systemTerminal.setWorkingDirectory(directory.toPath());
+  }
+
+  private Git openCurrentGitProject() throws Exception {
+    if (currentProjectRoot == null) throw new IOException("Open a project folder first.");
+    return Git.open(currentProjectRoot);
+  }
+
+  private void showGitStatus() {
+    runGitTask("Checking Git status", () -> {
+      try (Git git = openCurrentGitProject()) {
+        org.eclipse.jgit.api.Status status = git.status().call();
+        StringBuilder summary = new StringBuilder();
+        appendGitStatus(summary, "Modified", status.getModified());
+        appendGitStatus(summary, "Added", status.getAdded());
+        appendGitStatus(summary, "Changed", status.getChanged());
+        appendGitStatus(summary, "Removed", status.getRemoved());
+        appendGitStatus(summary, "Missing", status.getMissing());
+        appendGitStatus(summary, "Untracked", status.getUntracked());
+        return summary.length() == 0 ? "Working tree is clean." : summary.toString();
+      }
+    });
+  }
+
+  private void appendGitStatus(StringBuilder summary, String label, Set<String> paths) {
+    if (paths.isEmpty()) return;
+    if (summary.length() > 0) summary.append("\n\n");
+    summary.append(label).append(":\n").append(String.join("\n", paths));
+  }
+
+  private void commitGitChanges() {
+    TextInputDialog dialog = new TextInputDialog();
+    dialog.initOwner(_stage);
+    dialog.setTitle("Commit Changes");
+    dialog.setHeaderText("Commit all project changes");
+    dialog.setContentText("Commit message:");
+    Optional<String> message = dialog.showAndWait();
+    if (message.isEmpty() || message.get().trim().isEmpty()) return;
+    if (getCurrentTab() != null && getCurrentTab().getPath() != null) saveCurrentFile();
+    runGitTask("Creating commit", () -> {
+      try (Git git = openCurrentGitProject()) {
+        git.add().addFilepattern(".").call();
+        git.add().setUpdate(true).addFilepattern(".").call();
+        return "Created commit " + git.commit().setMessage(message.get().trim()).call().getName().substring(0, 8) + ".";
+      }
+    });
+  }
+
+  private void pullGitChanges() {
+    runGitTask("Pulling changes", () -> {
+      try (Git git = openCurrentGitProject()) {
+        var result = git.pull().call();
+        return result.isSuccessful() ? "Pull completed." : "Pull completed with conflicts; resolve them before committing.";
+      }
+    });
+  }
+
+  private void pushGitChanges() {
+    runGitTask("Pushing changes", () -> {
+      try (Git git = openCurrentGitProject()) {
+        git.push().call();
+        return "Push completed.";
+      }
+    });
+  }
+
+  /** Executes Git work away from the JavaFX application thread and reports the final outcome on it. */
+  private void runGitTask(String activity, Callable<String> action) {
+    statusLabel.setText(activity + "…");
+    Thread worker = new Thread(() -> {
+      try {
+        String result = action.call();
+        Platform.runLater(() -> {
+          statusLabel.setText("Ready");
+          Alert alert = new Alert(Alert.AlertType.INFORMATION, result);
+          alert.initOwner(_stage);
+          alert.setTitle("Git");
+          alert.setHeaderText(activity);
+          alert.showAndWait();
+        });
+      } catch (Exception exception) {
+        Platform.runLater(() -> {
+          statusLabel.setText("Ready");
+          showError("Git operation failed", exception.getMessage());
+        });
+      }
+    }, "zide-git-operation");
+    worker.setDaemon(true);
+    worker.start();
   }
 
   private ZPEList getUsersCloudFileList() {
@@ -831,6 +918,8 @@ public class ZIDEEditor extends Application {
       openTab(arguments.get("name"));
       getCurrentTab().getEditor().clearUndoRedoManagers();
       getCurrentTab().getEditor().setText(code);
+
+      cloudFileName = arguments.getOrDefault("name", "");
 
       //lastCloudFileOpened = file;
       //lastFileOpened = "";
@@ -964,31 +1053,63 @@ public class ZIDEEditor extends Application {
     });
   }
 
+  /**
+   * Builds the explicitly selected project folder, or the current tab's parent
+   * folder when no project folder is selected in the project tree.
+   */
   private void compileProject() {
-    if (getCurrentTab() == null) {
-      showError("Error compiling project", "No project open");
+    EditorTab currentTab = getCurrentTab();
+    if (currentTab == null || currentTab.getPath() == null || currentTab.getPath().isBlank()) {
+      showError("Error compiling project", "Save the current file before compiling its project.");
+      return;
+    }
+
+    File currentFile = new File(currentTab.getPath()).getAbsoluteFile();
+    if (!currentFile.isFile()) {
+      showError("Error compiling project", "The current file must exist before its project can be compiled.");
+      return;
+    }
+
+    // Directory compilation reads files from disk, so include unsaved work.
+    if (currentTab.hasChanges()) {
+      saveCurrentFile();
+      if (currentTab.hasChanges()) return;
+    }
+
+    File projectDirectory = getCompileProjectDirectory(currentFile);
+    if (projectDirectory == null || !projectDirectory.isDirectory()) {
+      showError("Error compiling project", "Select or open a project folder before compiling.");
       return;
     }
 
     File outputLocation = chooseOutputFile(
             _stage,
-            null,
+            currentFile,
             new FileChooser.ExtensionFilter("YASS Executable", "*.yex")
     );
-
     if (outputLocation == null) return;
 
-    try {
-      ZPEKit.compile(
-              getCurrentTab().getEditor().getText(),
-              outputLocation.getAbsolutePath(),
-              "",
-              "",
-              true
-      );
-    } catch (IOException | CompileException ex) {
-      showError("Error compiling project", ex.getMessage());
+    boolean compiled = ZPEKit.compileDirectory(
+            projectDirectory.getAbsolutePath(), outputLocation.getAbsolutePath(), "", ""
+    );
+    if (compiled) {
+      Alert alert = new Alert(Alert.AlertType.INFORMATION, "Successfully compiled " + projectDirectory.getName() + ".");
+      alert.setHeaderText(null);
+      alert.showAndWait();
+    } else {
+      showError("Error compiling project", "The selected folder could not be compiled. Check that it contains valid YASS source files.");
     }
+  }
+
+  /** Uses an explicit folder selection; otherwise the current tab defines the project folder. */
+  private File getCompileProjectDirectory(File currentFile) {
+    if (projectTree != null) {
+      TreeItem<File> selected = projectTree.getSelectionModel().getSelectedItem();
+      if (selected != null && selected.getValue() != null && selected.getValue().isDirectory()) {
+        return selected.getValue();
+      }
+    }
+    return currentFile.getParentFile();
   }
 
   private void compileNative() {
@@ -1084,17 +1205,94 @@ public class ZIDEEditor extends Application {
     try {
       ZPEMap res = ZPEOnline.loginToZPEOnline(username, password);
 
-      if (Integer.parseInt(res.get("result").toString()) == -1) {
-        showError("Error logging in to ZPE Online", res.get("message").toString());
+      if (res == null || !res.containsKey(new ZPEString("result"))) {
+        showError("Error logging in to ZPE Online", "The server returned an invalid response.");
+        return;
+      }
+      if (Integer.parseInt(res.get(new ZPEString("result")).toString()) != 1) {
+        Object message = res.get(new ZPEString("message"));
+        showError("Error logging in to ZPE Online", message == null ? "Login was not accepted." : message.toString());
         return;
       }
       loadFromOnline.setDisable(false);
+      saveToOnline.setDisable(false);
       loggedIn = true;
 
       new Alert(Alert.AlertType.INFORMATION, "Successfully logged in to ZPE Online").showAndWait();
 
     } catch (Exception ex) {
       showError("Error logging in to ZPE Online", ex.getMessage());
+    }
+  }
+
+  /** Saves the active editor to the user's ZPE Online account using the established v10 API. */
+  private void saveToZPEOnline() {
+    if (!loggedIn || username == null || password == null) {
+      loginToZPEOnline();
+      if (!loggedIn) return;
+    }
+    if (getCurrentTab() == null) {
+      showError("Save to ZPE Online", "Open a YASS file before saving it online.");
+      return;
+    }
+
+    String code = getCurrentTab().getEditor().getText();
+    try {
+      if (!ZPEKit.validateCode(code)) {
+        showError("Save to ZPE Online", "Validate and fix the code before uploading it.");
+        return;
+      }
+    } catch (CompileException exception) {
+      showError("Save to ZPE Online", "The code could not be validated: " + exception.getMessage());
+      return;
+    }
+
+    TextInputDialog nameDialog = new TextInputDialog(cloudFileName);
+    nameDialog.initOwner(_stage);
+    nameDialog.setTitle("Save to ZPE Online");
+    nameDialog.setHeaderText("Save the current script to your account");
+    nameDialog.setContentText("File name:");
+    Optional<String> selectedName = nameDialog.showAndWait();
+    if (selectedName.isEmpty() || selectedName.get().trim().isEmpty()) return;
+
+    Alert publicPrompt = new Alert(Alert.AlertType.CONFIRMATION);
+    publicPrompt.initOwner(_stage);
+    publicPrompt.setTitle("ZPE Online visibility");
+    publicPrompt.setHeaderText("Make this script public?");
+    publicPrompt.setContentText("Choose OK to publish it, or Cancel to keep it private.");
+    boolean isPublic = publicPrompt.showAndWait().filter(ButtonType.OK::equals).isPresent();
+
+    Map<String, String> arguments = new HashMap<>();
+    arguments.put("username", username);
+    arguments.put("password", password);
+    arguments.put("content", code);
+    arguments.put("content_name", selectedName.get().trim());
+    arguments.put("public", isPublic ? "1" : "0");
+
+    try {
+      String response = HelperFunctions.makePOSTRequest(
+              ZPEInstance.getOnlinePathProperty() + "/save.php?version=10", arguments);
+      if (response == null || response.isEmpty()) {
+        showError("Save to ZPE Online", "The server did not accept the file.");
+        return;
+      }
+      ZPEMap result = (ZPEMap) new ZenithJSONParser().jsonDecode(response, false);
+      String status = String.valueOf(result.get(new ZPEString("result")));
+      if ("1".equals(status)) {
+        cloudFileName = selectedName.get().trim();
+        Alert success = new Alert(Alert.AlertType.INFORMATION, "Saved " + cloudFileName + " to ZPE Online.");
+        success.initOwner(_stage);
+        success.setHeaderText("Cloud save complete");
+        success.showAndWait();
+      } else if ("-2".equals(status)) {
+        showError("Save to ZPE Online", "The script is too large to upload.");
+      } else if ("-3".equals(status)) {
+        showError("Save to ZPE Online", "The script contains characters that ZPE Online cannot accept.");
+      } else {
+        showError("Save to ZPE Online", "The server could not save this file.");
+      }
+    } catch (Exception exception) {
+      showError("Save to ZPE Online", exception.getMessage());
     }
   }
 
@@ -1136,6 +1334,20 @@ public class ZIDEEditor extends Application {
 
   private EditorTab getCurrentTab(){
     return (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+  }
+
+  /**
+   * Returns the actual folder of an opened tab. Runs use a temporary copy of
+   * the source, but resource lookups must remain rooted in this folder.
+   */
+  private Path resourceDirectoryFor(EditorTab tab) {
+    if (tab == null || tab.getPath() == null || tab.getPath().isBlank()) return null;
+    try {
+      Path directory = Path.of(tab.getPath()).toAbsolutePath().normalize().getParent();
+      return directory != null && Files.isDirectory(directory) ? directory : null;
+    } catch (Exception ignored) {
+      return null;
+    }
   }
 
   private ObservableList<ProblemRow> problemsRows = FXCollections.observableArrayList();
@@ -1223,7 +1435,7 @@ public class ZIDEEditor extends Application {
         });
       });
       statusLabel.setText("Executing code");
-      consoleOutputTextArea.runAsProcess(tempPath, false, true, "");
+      consoleOutputTextArea.runAsProcess(tempPath, resourceDirectoryFor(tab), false, true, "");
 
       //stopExecution.setDisable(false);
 
@@ -1232,7 +1444,7 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  ZPEMacroInterface macroInterface = null;
+  ZPEMacroEditor.Handle macroInterface = null;
   private void openMSI() {
     if(getCurrentTab() == null) {
       Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -1243,13 +1455,12 @@ public class ZIDEEditor extends Application {
       return;
     }
     ZPERuntimeEnvironment z = new ZPERuntimeEnvironment();
-    if(macroInterface == null) {
-      macroInterface = new ZPEMacroInterface(z, new ZPEObject[]{new YASSCodeEditor.EditorObject(z, ZPEKit.getGlobalFunction(z), (getCurrentTab().getEditor()))}, null);
-    } else{
-      macroInterface.setAlwaysOnTop(true);
-      macroInterface.setAlwaysOnTop(false);
+    if(macroInterface == null || !macroInterface.isDisplayable()) {
+      macroInterface = ZPEMacroEditor.createJavaFX(z,
+              new ZPEObject[]{new YASSCodeEditor.EditorObject(z,
+                      ZPEKit.getGlobalFunction(z), getCurrentTab().getEditor())}, null);
     }
-    macroInterface.setVisible(true);
+    macroInterface.open(null, null, null);
   }
 
   private boolean getZPE() {
@@ -1322,7 +1533,7 @@ public class ZIDEEditor extends Application {
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab.getEditor(), tab.getEditor().getText()), false);
       beginProfilerSession();
-      consoleOutputTextArea.runAsProcess(tempPath, true, true, "");
+      consoleOutputTextArea.runAsProcess(tempPath, resourceDirectoryFor(tab), true, true, "");
       consoleOutputTextArea.addProcessFinishedListener(() -> {
         invertImageView(getToolbarButtonIcon(debugBtn));
         endProfilerSession();
@@ -1608,7 +1819,108 @@ public class ZIDEEditor extends Application {
   }
 
   private void refreshTree() {
-    buildProjectTree(projectDir);
+    if (currentProjectRoot != null) {
+      buildProjectTree(currentProjectRoot);
+    }
+  }
+
+  /** Starts a recursive, daemon watcher for the project currently shown in the tree. */
+  private void startProjectDirectoryWatcher(File root) {
+    stopProjectDirectoryWatcher();
+    if (root == null || !root.isDirectory()) return;
+
+    try {
+      projectWatchService = FileSystems.getDefault().newWatchService();
+      registerProjectDirectories(root.toPath());
+      watchingProjectDirectory = true;
+      projectWatchThread = new Thread(this::watchProjectDirectoryEvents, "zide-project-watcher");
+      projectWatchThread.setDaemon(true);
+      projectWatchThread.start();
+    } catch (IOException exception) {
+      ZPE.log("Unable to watch project directory: " + exception.getMessage());
+      stopProjectDirectoryWatcher();
+    }
+  }
+
+  /** Registers every existing directory so edits in nested project folders are observed as well. */
+  private void registerProjectDirectories(Path root) throws IOException {
+    try (var paths = Files.walk(root)) {
+      paths.filter(Files::isDirectory).forEach(directory -> {
+        try {
+          directory.register(projectWatchService,
+                  StandardWatchEventKinds.ENTRY_CREATE,
+                  StandardWatchEventKinds.ENTRY_DELETE,
+                  StandardWatchEventKinds.ENTRY_MODIFY);
+        } catch (IOException ignored) {
+          // A directory can disappear while the project is being scanned.
+        }
+      });
+    }
+  }
+
+  /** Waits off the JavaFX thread, adds newly-created folders to the watch set, then coalesces UI refreshes. */
+  private void watchProjectDirectoryEvents() {
+    while (watchingProjectDirectory && projectWatchService != null) {
+      WatchKey key;
+      try {
+        key = projectWatchService.take();
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return;
+      } catch (ClosedWatchServiceException exception) {
+        return;
+      }
+
+      Path directory = (Path) key.watchable();
+      boolean changed = false;
+      for (WatchEvent<?> event : key.pollEvents()) {
+        if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
+          changed = true;
+          continue;
+        }
+        changed = true;
+        if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+          Path created = directory.resolve((Path) event.context());
+          if (Files.isDirectory(created)) {
+            try {
+              registerProjectDirectories(created);
+            } catch (IOException ignored) {
+              // The directory may have been removed immediately after it was created.
+            }
+          }
+        }
+      }
+      if (!key.reset()) changed = true;
+      if (changed) queueProjectTreeRefresh();
+    }
+  }
+
+  /** Ensures a burst of editor or Git events creates one tree rebuild rather than many. */
+  private void queueProjectTreeRefresh() {
+    if (!projectTreeRefreshQueued.compareAndSet(false, true)) return;
+    Platform.runLater(() -> {
+      try {
+        refreshTree();
+      } finally {
+        projectTreeRefreshQueued.set(false);
+      }
+    });
+  }
+
+  /** Stops the previous watcher before another project is opened or ZIDE exits. */
+  private void stopProjectDirectoryWatcher() {
+    watchingProjectDirectory = false;
+    if (projectWatchThread != null) projectWatchThread.interrupt();
+    if (projectWatchService != null) {
+      try {
+        projectWatchService.close();
+      } catch (IOException ignored) {
+        // The service may already have been closed during application shutdown.
+      }
+    }
+    projectWatchThread = null;
+    projectWatchService = null;
+    projectTreeRefreshQueued.set(false);
   }
 
   private TabPane editorTabs;
@@ -1661,6 +1973,8 @@ public class ZIDEEditor extends Application {
       if(rightFooterLabel != null){
         if(ext.equals("yas")) {
           rightFooterLabel.setText("YASS");
+        } else if (ext.equals("ywp")) {
+          rightFooterLabel.setText("YWP");
         } else{
           rightFooterLabel.setText("Text");
         }
@@ -1787,7 +2101,6 @@ public class ZIDEEditor extends Application {
         wrapper.setOpaque(true);
         wrapper.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
         wrapper.setBackground(Color.white);
-        wrapper.setLightColour(Color.white);
 
 
         BalfScrollbarPane scrollPane = new BalfScrollbarPane();
@@ -1951,12 +2264,14 @@ public class ZIDEEditor extends Application {
   private ToggleButton problemsTab;
   private ToggleButton variablesTab;
   private ToggleButton profileTab;
+  private ToggleButton terminalTab;
 
   private StackPane bottomContentStack;
   private Node consoleView;
   private Node problemsView;
   private Node variablesView;
   private Node profileView;
+  private Node terminalView;
 
   private Node wrapWithHeader(String titleText, Node content, Node... actions) {
     Label title = new Label(titleText);
@@ -2566,10 +2881,13 @@ public class ZIDEEditor extends Application {
 
 
     consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
-    consoleScrollbar.setLightColour(Color.WHITE);
+    // The console is intentionally black in every application theme.  Keep
+    // the scroll pane track black too, and remove BalfLaf's two-pixel focus
+    // border/inset so no light rim is visible around the embedded Swing view.
+    consoleScrollbar.setLightColour(Color.BLACK);
     consoleScrollbar.setDarkColour(Color.BLACK);
-    consoleScrollbar.setBorder(BorderFactory.createEmptyBorder());
-    consoleScrollbar.getVerticalScrollBar().setUnitIncrement(16);
+    consoleScrollbar.setFocusBorderEnabled(false);
+    consoleScrollbar.getVerticalScrollBar().setUnitIncrement(4);
 
     consoleNode.setContent(consoleScrollbar);
 
@@ -2577,6 +2895,13 @@ public class ZIDEEditor extends Application {
     VBox.setVgrow(consoleNode, Priority.ALWAYS);
 
     consoleView =  wrapWithHeader("Console", consoleContainer);
+
+    // Console remains program output. Terminal is a separate JavaFX wrapper
+    // around the user's system shell.
+    systemTerminal = new ZIDESystemTerminal(currentProjectRoot == null
+            ? Path.of(System.getProperty("user.home"))
+            : currentProjectRoot.toPath());
+    terminalView = wrapWithHeader("Terminal", systemTerminal);
 
     // --- Problems view ---
     problemsView = wrapWithHeader("Problems", buildProblemsPane());
@@ -2597,11 +2922,14 @@ public class ZIDEEditor extends Application {
     );
 
     // --- Content stack ---
-    bottomContentStack = new StackPane(problemsView, consoleView, variablesView, profileView);
+    bottomContentStack = new StackPane(problemsView, consoleView, terminalView, variablesView, profileView);
     bottomContentStack.getStyleClass().add("bottom-content-stack");
 
     consoleView.setVisible(false);
     consoleView.setManaged(false);
+
+    terminalView.setVisible(false);
+    terminalView.setManaged(false);
 
     variablesView.setVisible(false);
     variablesView.setManaged(false);
@@ -2612,13 +2940,15 @@ public class ZIDEEditor extends Application {
     // --- Vertical tabs ---
 
     problemsTab = createBottomSideTab("Problems", icon("/files/warning.png"));
-    consoleTab = createBottomSideTab("Console", icon("/files/console.png"));
+    consoleTab = createBottomSideTab("Console", icon("/files/controller-play.png"));
+    terminalTab = createBottomSideTab("Terminal", icon("/files/console.png"));
     variablesTab = createBottomSideTab("Variable Watch", icon("/files/watch.png"));
     profileTab = createBottomSideTab("Profiling", icon("/files/profiling.png"));
 
     ToggleGroup group = new ToggleGroup();
     problemsTab.setToggleGroup(group);
     consoleTab.setToggleGroup(group);
+    terminalTab.setToggleGroup(group);
     variablesTab.setToggleGroup(group);
     profileTab.setToggleGroup(group);
 
@@ -2627,10 +2957,14 @@ public class ZIDEEditor extends Application {
 
     problemsTab.setOnAction(e -> showBottomPanel(problemsView));
     consoleTab.setOnAction(e -> showBottomPanel(consoleView));
+    terminalTab.setOnAction(e -> {
+      showBottomPanel(terminalView);
+      systemTerminal.focusCommandInput();
+    });
     variablesTab.setOnAction(e -> showBottomPanel(variablesView));
     profileTab.setOnAction(e -> showBottomPanel(profileView));
 
-    VBox tabs = new VBox(problemsTab, consoleTab, variablesTab, profileTab);
+    VBox tabs = new VBox(problemsTab, consoleTab, terminalTab, variablesTab, profileTab);
     tabs.getStyleClass().add("bottom-side-tabs");
     tabs.setFillWidth(true);
 
@@ -3173,6 +3507,7 @@ public class ZIDEEditor extends Application {
     invertImageView(getToggleButtonIcon(variablesTab));
     invertImageView(getToggleButtonIcon(problemsTab));
     invertImageView(getToggleButtonIcon(profileTab));
+    invertImageView(getToggleButtonIcon(terminalTab));
   }
 
   private void invertImageView(ImageView imageView) {

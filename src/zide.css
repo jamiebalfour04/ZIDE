@@ -122,62 +122,75 @@
     -fx-text-fill: #e6e9ee;
 }
 
-.editor-tabs .tab-header-area {
-    -fx-padding: 0 0 0 0;
-}
-.editor-tabs .tab {
-    -fx-background-radius: 0 0 0 0;
-    -fx-border-radius: 0 0 0 0;
-    -fx-padding: 4 20;
-    /*-fx-pref-width: 140px;
-    -fx-max-width: 240px;*/
-    -fx-border-color: transparent;
-}
-
-.editor-tabs .tab:selected {
-    -fx-background-color: white;
+/*
+ * Flat document tabs.  The strip has no individual tab boxes: selection is
+ * communicated by the same purple used by ZIDE's title bar (#517), keeping
+ * the editor compact now and making it suitable for either Swing or JavaFX
+ * code-editor content in future.
+ */
+.editor-tabs {
+    -fx-tab-min-height: 34px;
+    -fx-tab-max-height: 34px;
+    -fx-background-color: transparent;
 }
 
-/* Header strip (behind tabs) */
-.editor-tabs .tab-header-area {
-    -fx-background-color: #e6e6e6;
+.editor-tabs .tab-header-area,
+.editor-tabs .tab-header-background {
+    -fx-padding: 0;
+    -fx-background-color: #f3f4f6;
 }
 
-/* Container for tabs */
 .editor-tabs .headers-region {
     -fx-background-color: transparent;
 }
 
-/* Inactive tabs */
 .editor-tabs .tab {
-    -fx-background-color: #e2e2e2;
-    -fx-border-color: #cfcfcf;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-color: transparent transparent transparent transparent;
+    -fx-border-width: 0 0 3 0;
+    -fx-border-insets: 0;
+    -fx-padding: 7 13 6 13;
 }
 
-.app-root:dark .editor-tabs .tab{
-    -fx-background-color: #282D37;
-    -fx-border-color: #000000;
+.editor-tabs .tab:hover {
+    -fx-background-color: rgba(0, 0, 0, 0.045);
 }
 
-/* Active tab: pure white, merges into editor */
 .editor-tabs .tab:selected {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #517 transparent;
+}
+
+.editor-tabs .tab .focus-indicator,
+.editor-tabs .tab:selected .tab-container {
+    -fx-border-width: 0;
+    -fx-border-color: transparent;
+}
+
+.editor-tabs .tab-content-area {
     -fx-background-color: white;
-    -fx-border-color: #cfcfcf #cfcfcf white #cfcfcf;
+    -fx-border-width: 0;
+}
+
+.app-root:dark .editor-tabs .tab-header-area,
+.app-root:dark .editor-tabs .tab-header-background {
+    -fx-background-color: #1b1f26;
+}
+
+.app-root:dark .editor-tabs .tab:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
 }
 
 .app-root:dark .editor-tabs .tab:selected {
-    -fx-background-color: #282D37;
-    -fx-border-color: #000000 #000000 #282D37 #000000;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #517 transparent;
 }
 
-/* Editor area */
-.editor-tabs .tab-content-area {
-    -fx-background-color: white;
-}
-
-/* IMPORTANT: hide the grey line under active tab */
-.editor-tabs .tab:selected .tab-container {
-    -fx-border-width: 1 1 0 1;
+.app-root:dark .editor-tabs .tab-content-area {
+    -fx-background-color: #1b1f26;
 }
 
 .code-area, .console-output {
@@ -189,6 +202,57 @@
 }
 .app-root:dark .code-area, .app-root:dark .console-output {
     -fx-text-fill: #e6e9ee;
+}
+
+/* JavaFX system terminal: separate from the Swing program-output console. */
+.terminal-pane {
+    -fx-background-color: #111318;
+}
+
+.terminal-output {
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: #e4e8f0;
+    -fx-control-inner-background: #111318;
+    -fx-background-color: #111318;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+    -fx-highlight-fill: #355c91;
+    -fx-highlight-text-fill: white;
+}
+
+.terminal-output .content {
+    -fx-background-color: #111318;
+}
+
+.terminal-input-bar {
+    -fx-background-color: #191d24;
+    -fx-border-color: rgba(255,255,255,0.10);
+    -fx-border-width: 1 0 0 0;
+}
+
+.terminal-prompt {
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-font-weight: 700;
+    -fx-text-fill: #89d185;
+}
+
+.terminal-command-input {
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-text-fill: #e4e8f0;
+    -fx-prompt-text-fill: #77808d;
+    -fx-background-color: #222832;
+    -fx-border-color: rgba(255,255,255,0.12);
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+}
+
+.terminal-stop-button {
+    -fx-font-size: 11px;
+    -fx-padding: 4 9 4 9;
+    -fx-text-fill: #ffd2d2;
+    -fx-background-color: #4b282d;
+    -fx-border-color: #75414a;
 }
 
 .status-bar {
@@ -638,6 +702,61 @@
     -fx-border-width: 1;
     -fx-background-insets: 0;
     -fx-padding: 0;
+}
+
+/* Tables must explicitly follow the JavaFX root's dark pseudo-class. */
+.app-root:dark .table-view,
+.app-root:dark .table-view:focused {
+    -fx-background-color: #1b2028;
+    -fx-border-color: #343c48;
+}
+
+.app-root:dark .table-view .column-header-background,
+.app-root:dark .table-view .column-header,
+.app-root:dark .table-view .filler {
+    -fx-background-color: #242b35;
+    -fx-border-color: transparent #343c48 #343c48 transparent;
+}
+
+.app-root:dark .table-view .column-header .label {
+    -fx-text-fill: #e6e9ee;
+}
+
+.app-root:dark .table-row-cell {
+    -fx-background-color: #1b2028;
+    -fx-border-color: transparent transparent #2d3540 transparent;
+}
+
+.app-root:dark .table-row-cell:odd {
+    -fx-background-color: #202631;
+}
+
+.app-root:dark .table-row-cell:selected,
+.app-root:dark .table-row-cell:focused:selected,
+.app-root:dark .table-view:focused .table-row-cell:selected {
+    -fx-background-color: #354252;
+}
+
+.app-root:dark .table-cell,
+.app-root:dark .table-row-cell:selected .table-cell {
+    -fx-text-fill: #e6e9ee;
+    -fx-border-color: transparent #2d3540 transparent transparent;
+}
+
+.app-root:dark .table-view .placeholder,
+.app-root:dark .bottom-panel,
+.app-root:dark .bottom-content-stack {
+    -fx-background-color: #1b2028;
+}
+
+.app-root:dark .table-view .placeholder .label {
+    -fx-text-fill: #aeb8c5;
+}
+
+.app-root:dark .table-view .scroll-bar:vertical,
+.app-root:dark .table-view .scroll-bar:horizontal,
+.app-root:dark .table-view .scroll-bar .track {
+    -fx-background-color: #1b2028;
 }
 
 .glass-menu-popup {
