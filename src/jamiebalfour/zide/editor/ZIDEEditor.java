@@ -5,6 +5,8 @@ import jamiebalfour.helpers.HelperFunctions;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
+import jamiebalfour.codeeditor.CodeEditorViewFX;
+import jamiebalfour.codeeditor.CodeSyntaxModel;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
@@ -18,7 +20,7 @@ import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.YASSCodeEditor;
 import jamiebalfour.zpe.gui.ZPEMacroEditor;
-import jamiebalfour.zpe.gui.editor.ConsoleOutputTextArea;
+import jamiebalfour.zpe.gui.editor.ConsoleOutputTextAreaFX;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
 import javafx.animation.*;
@@ -28,7 +30,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.embed.swing.SwingNode;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -85,8 +86,7 @@ public class ZIDEEditor extends Application {
   Stage _stage;
   ZPERuntimeEnvironment runtime;
   Label rightFooterLabel;
-  ConsoleOutputTextArea consoleOutputTextArea;
-  BalfScrollbarPane consoleScrollbar;
+  ConsoleOutputTextAreaFX consoleOutputTextArea;
   private ZIDESystemTerminal systemTerminal;
   Button runBtn;
   Button buildBtn;
@@ -529,28 +529,27 @@ public class ZIDEEditor extends Application {
             false,
             selected -> {
               BalfLafManager.getInstance().toggleDarkMode(selected);
+              // BalfLafManager is the authority here: it may reject dark mode
+              // for a system-UI window.  Keep the JavaFX surface and its code
+              // editors in exactly the same state as the BalfLaf components.
+              boolean darkModeActive = BalfLafManager.getInstance().isDarkModeEnabled();
               invertImages();
 
               var scene = _stage.getScene();
               scene.getRoot().pseudoClassStateChanged(
                       javafx.css.PseudoClass.getPseudoClass("dark"),
-                      selected
+                      darkModeActive
               );
 
               for (Tab t : editorTabs.getTabs()) {
                 EditorTab tab = (EditorTab) t;
 
-                if (selected) {
+                if (darkModeActive) {
                   tab.switchOnDarkMode();
                 } else {
                   tab.switchOffDarkMode();
                 }
 
-                int scrollPosition = tab.getScrollPane().getVerticalScrollBar().getValue();
-
-                SwingUtilities.invokeLater(() ->
-                        tab.getScrollPane().getVerticalScrollBar().setValue(scrollPosition)
-                );
               }
             });
 
@@ -916,8 +915,8 @@ public class ZIDEEditor extends Application {
 
       code = code.replace("\\n", System.lineSeparator());
       openTab(arguments.get("name"));
-      getCurrentTab().getEditor().clearUndoRedoManagers();
       getCurrentTab().getEditor().setText(code);
+      getCurrentTab().setHasChanges(false);
 
       cloudFileName = arguments.getOrDefault("name", "");
 
@@ -1398,14 +1397,12 @@ public class ZIDEEditor extends Application {
   public void beautifyCurrentDocument() {
 
       if(getCurrentTab() == null) return;
-      YASSCodeEditor doc = getCurrentTab().getEditor();
+      CodeEditorViewFX doc = getCurrentTab().getEditor();
       String code = doc.getText();
 
       String formatted = ZPEKit.beautifyCode(code);
 
       doc.setText(formatted);
-      doc.rehighlightAll();
-
       doc.setCaretPosition(0);
 
 
@@ -1458,7 +1455,7 @@ public class ZIDEEditor extends Application {
     if(macroInterface == null || !macroInterface.isDisplayable()) {
       macroInterface = ZPEMacroEditor.createJavaFX(z,
               new ZPEObject[]{new YASSCodeEditor.EditorObject(z,
-                      ZPEKit.getGlobalFunction(z), getCurrentTab().getEditor())}, null);
+                      ZPEKit.getGlobalFunction(z), createMacroEditorBridge())}, null);
     }
     macroInterface.open(null, null, null);
   }
@@ -1488,7 +1485,16 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  private String prepareDebugSourceWithBreakpoints(CodeEditorView mainSyntax, String source) {
+  private YASSCodeEditor createMacroEditorBridge() {
+    // Compatibility bridge only: it is never attached to the ZIDE scene.
+    // ZPE's current Macro Editor object still accepts CodeEditorView; keeping
+    // this isolated lets the visible editor remain fully JavaFX-native.
+    YASSCodeEditor bridge = new YASSCodeEditor(false);
+    bridge.setText(getCurrentTab().getEditor().getText());
+    return bridge;
+  }
+
+  private String prepareDebugSourceWithBreakpoints(EditorTab tab, String source) {
     String[] lines = source.split("\\R", -1);
     StringBuilder out = new StringBuilder();
 
@@ -1496,7 +1502,7 @@ public class ZIDEEditor extends Application {
     for (int line = 1; line <= lines.length; line++) {
       String currentLine = lines[line - 1];
 
-      if (mainSyntax.hasSpecialLine(line)) {
+      if (tab.hasSpecialLine(line)) {
         out.append("#breakpoint# ");
       }
 
@@ -1531,7 +1537,7 @@ public class ZIDEEditor extends Application {
       debugSeparator.setVisible(true);
 
 
-      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab.getEditor(), tab.getEditor().getText()), false);
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab, tab.getEditor().getText()), false);
       beginProfilerSession();
       consoleOutputTextArea.runAsProcess(tempPath, resourceDirectoryFor(tab), true, true, "");
       consoleOutputTextArea.addProcessFinishedListener(() -> {
@@ -2025,173 +2031,109 @@ public class ZIDEEditor extends Application {
       }
     }
 
-    SwingNode swingNode = new SwingNode();
-    swingNode.getStyleClass().add("swing-editor-host");
+    CodeEditorViewFX editor = new CodeEditorViewFX();
+    editor.setFontSize(14);
+    editor.setWordWrap(USE_WORD_WRAP);
+    editor.setDarkMode(BalfLafManager.getInstance().isDarkModeEnabled());
 
-    // Holders that are safe to access from JavaFX side
-    AtomicReference<CodeEditorView> editorRef = new AtomicReference<>();
-    AtomicBoolean hasNonBlankContent = new AtomicBoolean(false);
-
-    // Build Swing UI on EDT
-
-
-
-
+    String lang = languageForFile(file);
+    setLanguage(lang, editor);
+    if (file != null) {
       try {
-
-        YASSCodeEditor mainSyntax = new YASSCodeEditor(true);
-
-        mainSyntax.setFontSize(14);
-
-        mainSyntax.addLineNumberClickListener(lineNumber -> {
-          if(mainSyntax.hasSpecialLine(lineNumber)){
-            mainSyntax.removeSpecialLine(lineNumber);
-          } else{
-            mainSyntax.addSpecialLine(lineNumber);
-          }
-
-        });
-
-        Font jbMono = loadAndRegister("/files/JetBrainsMono-Regular.ttf");
-        Font editorFont = jbMono.deriveFont(Font.PLAIN, 14);
-        mainSyntax.setFont(editorFont);
-
-        String lang = "txt";
-
-        if(file != null && file.endsWith(".yas")) {
-          lang = "yass";
-        }
-
-        setLanguage(lang, mainSyntax);
-
-
-
-
-
-        Color normal   = new Color(35, 35, 38);      // #232326
-        Color comment  = new Color(72, 145, 85);     // #489155
-        Color quote    = new Color(220, 95, 60);     // #DC5F3C
-        Color keyword  = new Color(138, 43, 226);    // #8A2BE2
-        Color function = new Color(0, 122, 255);     // #007AFF
-        Color heredoc  = new Color(235, 120, 55);    // #EB7837
-        Color bool     = new Color(200, 55, 135);    // #C83787
-        Color var      = new Color(210, 60, 110);    // #D23C6E
-        Color doc      = new Color(34, 150, 120);    // #229678
-        Color type     = new Color(0, 150, 170);     // #0096AA
-        Color special  = new Color(180, 90, 20);     // #B45A14
-
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Normal, normal);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Comment, comment);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Quote, quote);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Keyword, keyword);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Function, function);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Heredoc, heredoc);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Bool, bool);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Var, var);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Doc, doc);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Type, type);
-        mainSyntax.setAttributeColor(CodeEditorView.ATTR_TYPE.Special, special);
-
-        mainSyntax.setAttributeFontStyle(CodeEditorView.ATTR_TYPE.Keyword, Font.PLAIN);
-
-
-        Color dark = Color.decode("#282D37");
-        // Wrapper + padding
-        BalfPanel wrapper = new BalfPanel(new BorderLayout());
-        wrapper.setOpaque(true);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
-        wrapper.setBackground(Color.white);
-
-
-        BalfScrollbarPane scrollPane = new BalfScrollbarPane();
-        scrollPane.setLightColour(Color.white);
-        scrollPane.setDarkColour(dark);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-        if(!USE_WORD_WRAP){
-          scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        } else{
-          scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        }
-
-
-        mainSyntax.repaint();
-        mainSyntax.requestFocus();
-
-
-        scrollPane.getVerticalScrollBar().addAdjustmentListener(e -> mainSyntax.hideTooltip());
-
-        mainSyntax.setWrapper(scrollPane);
-        mainSyntax.setMinimapEnabled(true);
-
-        JPanel editorWithMinimapPanel = new JPanel(new BorderLayout());
-        editorWithMinimapPanel.setOpaque(false);
-        editorWithMinimapPanel.add(scrollPane, BorderLayout.CENTER);
-        editorWithMinimapPanel.add(mainSyntax.getMinimapComponent(), BorderLayout.EAST);
-
-        wrapper.add(editorWithMinimapPanel, BorderLayout.CENTER);
-
-
-        // Load file (still on EDT)
-        if (file != null) {
-          mainSyntax.setText(FileHelperFunctions.readFileAsString(file));
-        }
-
-        mainSyntax.loadAllCitizens();
-
-        mainSyntax.setCaretPosition(0);
-
-        // Track “has content” safely
-        hasNonBlankContent.set(mainSyntax.getText() != null && !mainSyntax.getText().isBlank());
-
-        mainSyntax.getDocument().addDocumentListener(new DocumentListener() {
-          private void update() {
-            // always EDT already, but keep it simple
-            hasNonBlankContent.set(!mainSyntax.getText().isBlank());
-            mainSyntax.loadAllCitizens();
-          }
-
-          @Override public void insertUpdate(DocumentEvent e) { update(); }
-          @Override public void removeUpdate(DocumentEvent e) { update(); }
-          @Override public void changedUpdate(DocumentEvent e) { update(); }
-        });
-
-        editorRef.set(mainSyntax);
-        swingNode.setContent(wrapper);
-        swingNode.getStyleClass().add("swing-editor-host");
-
-        mainSyntax.setFont(new Font(mainSyntax.getFont().getFontName(), mainSyntax.getFont().getStyle(), mainSyntax.getFont().getSize()));
-        mainSyntax.repaint();
-
-
-        // Create the tab using the boolean (no cross-thread Swing calls)
-        Tab tab = createEditorTab(name, mainSyntax, scrollPane, file, swingNode, hasNonBlankContent::get);
-        if(file != null){
-          tab.setId(file);
-        }
-
-
-        editorTabs.getTabs().add(tab);
-        editorTabs.getSelectionModel().select(tab);
-
-        // Helps focus when you click into the editor region
-        swingNode.setOnMousePressed(e -> swingNode.requestFocus());
-
-      } catch (IOException ex) {
-        throw new RuntimeException(ex);
+        editor.setText(FileHelperFunctions.readFileAsString(file));
+      } catch (IOException exception) {
+        showError("Unable to open file", exception.getMessage());
+        return;
       }
+    }
+    editor.setCaretPosition(0);
+
+    Tab tab = createEditorTab(name, editor, file, editor.getView());
+    if (file != null) tab.setId(file);
+    editorTabs.getTabs().add(tab);
+    editorTabs.getSelectionModel().select(tab);
+    Platform.runLater(editor::requestFocus);
 
 
   }
 
-  private void setLanguage(String lang, YASSCodeEditor mainSyntax) {
+  /** Determines the small language profile needed by the JavaFX editor. */
+  private String languageForFile(String file) {
+    if (file == null) return "txt";
+    String lowerCaseName = file.toLowerCase(Locale.ROOT);
+    if (lowerCaseName.endsWith(".yas")) return "yass";
+    if (lowerCaseName.endsWith(".py")) return "python";
+    return "txt";
+  }
+
+  /** Configures the JavaFX editor from ZPE's shared language catalogues. */
+  private void setLanguage(String lang, CodeEditorViewFX editor) {
     if(lang.equals("yass")) {
-
-      for (String s : ZPEKit.getAllFunctions()) {
-        BalfSearchBox.SearchSuggestion suggestion = new BalfSearchBox.SearchSuggestion(s + " " + ZPEKit.getFunctionManualEntry(s), s);
+      editor.setLineCommentMarkers("\\");
+      editor.setBlockCommentMarkers("/*", "*/");
+      editor.setQuoteDelimiters("\"'`");
+      editor.setVariableDelimiters("$");
+      editor.clearKeywords();
+      editor.clearAutoCompleteItems();
+      for (String keyword : ZPEKit.getKeywords()) {
+        editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
+        editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
       }
-
+      for (String type : ZPEKit.getTypeKeywords()) {
+        editor.addKeyword(type, CodeSyntaxModel.Style.TYPE);
+        editor.addAutoCompleteItem(type, CodeEditorViewFX.AutoCompleteItemType.Type);
+      }
+      for (String function : ZPEKit.getBuiltInFunctions()) {
+        editor.addKeyword(function, CodeSyntaxModel.Style.FUNCTION);
+        editor.addAutoCompleteItem(function, CodeEditorViewFX.AutoCompleteItemType.Function);
+      }
+      for (String structure : ZPEInstance.getBuiltInStructuresNames()) {
+        editor.addKeyword(structure, CodeSyntaxModel.Style.TYPE);
+        editor.addAutoCompleteItem(structure, CodeEditorViewFX.AutoCompleteItemType.Type);
+      }
       rightFooterLabel.setText("YAS");
+    } else if (lang.equals("python")) {
+      // Python files were previously treated as plain text, which made a
+      // dark editor look washed out and left the source almost uncoloured.
+      editor.setLineCommentMarkers("#");
+      editor.setBlockCommentMarkers("", "");
+      editor.setQuoteDelimiters("\"'");
+      editor.setVariableDelimiters("");
+      editor.clearKeywords();
+      editor.clearAutoCompleteItems();
+
+      String[] pythonKeywords = {
+              "and", "as", "assert", "async", "await", "break", "class", "continue", "def",
+              "del", "elif", "else", "except", "finally", "for", "from", "global", "if",
+              "import", "in", "is", "lambda", "nonlocal", "not", "or", "pass", "raise",
+              "return", "try", "while", "with", "yield"
+      };
+      String[] pythonTypes = {"int", "float", "str", "bool", "list", "dict", "set", "tuple", "object", "type"};
+      String[] pythonFunctions = {"print", "len", "range", "enumerate", "zip", "map", "filter", "sorted", "sum", "min", "max"};
+      for (String keyword : pythonKeywords) {
+        editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
+        editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
+      }
+      for (String type : pythonTypes) {
+        editor.addKeyword(type, CodeSyntaxModel.Style.TYPE);
+        editor.addAutoCompleteItem(type, CodeEditorViewFX.AutoCompleteItemType.Type);
+      }
+      for (String function : pythonFunctions) {
+        editor.addKeyword(function, CodeSyntaxModel.Style.FUNCTION);
+        editor.addAutoCompleteItem(function, CodeEditorViewFX.AutoCompleteItemType.Function);
+      }
+      editor.addKeyword("True", CodeSyntaxModel.Style.BOOLEAN);
+      editor.addKeyword("False", CodeSyntaxModel.Style.BOOLEAN);
+      editor.addKeyword("None", CodeSyntaxModel.Style.BOOLEAN);
+      rightFooterLabel.setText("Python");
+    } else {
+      editor.setLineCommentMarkers("//");
+      editor.setBlockCommentMarkers("/*", "*/");
+      editor.setQuoteDelimiters("\"'");
+      editor.setVariableDelimiters("$");
+      editor.clearKeywords();
+      editor.clearAutoCompleteItems();
+      rightFooterLabel.setText("Text");
     }
   }
 
@@ -2210,8 +2152,8 @@ public class ZIDEEditor extends Application {
     return alert.showAndWait().orElse(cancel) == close;
   }
 
-  private Tab createEditorTab(String title, YASSCodeEditor syntax, BalfScrollbarPane scrollPane, String path, Node content, Supplier<Boolean> hasContent) {
-    EditorTab tab = new EditorTab(this, title, path, syntax, scrollPane, content);
+  private Tab createEditorTab(String title, CodeEditorViewFX editor, String path, Node content) {
+    EditorTab tab = new EditorTab(this, title, path, editor, content);
 
     // Disable JavaFX built-in close button
     tab.setClosable(false);
@@ -2236,7 +2178,7 @@ public class ZIDEEditor extends Application {
 
     closeBtn.setOnAction(e -> {
       if(tab.hasChanges()){
-        if (hasContent.get() && !confirmClose(title)) {
+      if (!tab.getEditor().getText().isBlank() && !confirmClose(title)) {
           return;
         }
       }
@@ -2873,26 +2815,11 @@ public class ZIDEEditor extends Application {
   }
 
   private Node buildconsole() {
-
-    // --- console view ---
-    SwingNode consoleNode = new SwingNode();
-
-    consoleOutputTextArea = new ConsoleOutputTextArea("", Color.WHITE);
-
-
-    consoleScrollbar = new BalfScrollbarPane(consoleOutputTextArea);
-    // The console is intentionally black in every application theme.  Keep
-    // the scroll pane track black too, and remove BalfLaf's two-pixel focus
-    // border/inset so no light rim is visible around the embedded Swing view.
-    consoleScrollbar.setLightColour(Color.BLACK);
-    consoleScrollbar.setDarkColour(Color.BLACK);
-    consoleScrollbar.setFocusBorderEnabled(false);
-    consoleScrollbar.getVerticalScrollBar().setUnitIncrement(4);
-
-    consoleNode.setContent(consoleScrollbar);
-
-    VBox consoleContainer = new VBox(consoleNode);
-    VBox.setVgrow(consoleNode, Priority.ALWAYS);
+    // JavaFX-native console: output history is immutable and the command
+    // field stays separate, so neither output nor process input needs Swing.
+    consoleOutputTextArea = new ConsoleOutputTextAreaFX();
+    VBox consoleContainer = new VBox(consoleOutputTextArea);
+    VBox.setVgrow(consoleOutputTextArea, Priority.ALWAYS);
 
     consoleView =  wrapWithHeader("Console", consoleContainer);
 
@@ -3198,8 +3125,7 @@ public class ZIDEEditor extends Application {
     centre.setStyle("-fx-font-size: 13px;");
 
     rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-      YASSCodeEditor c = getCurrentTab().getEditor();
-      setLanguage("yass", c);
+      if (getCurrentTab() != null) setLanguage("yass", getCurrentTab().getEditor());
     });
 
     var bar = new HBox(statusLabel, new Region(), centre, new Region(), rightFooterLabel);

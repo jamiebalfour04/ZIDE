@@ -11,5 +11,14 @@
     <orderEntry type="library" name="org.eclipse.jgit-6.10.0.202406032230-r" level="project" />
     <orderEntry type="library" name="javafx-swt" level="project" />
     <orderEntry type="library" name="BalfClassLibrary" level="project" />
+    <orderEntry type="module-library">
+      <library name="RichTextFX JavaFX editor">
+        <CLASSES>
+          <root url="jar://$JARs$/richtextfx-fat-0.10.5.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
