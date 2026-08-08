@@ -1,4 +1,4 @@
-<img src="zide_logo.png" alt="ZIDE Logo" style="max-width:200px;margin:auto;display:block;">
+<img src="zide.png" alt="ZIDE Logo" style="max-width:200px;margin:auto;display:block;">
 <h1>ZIDE - ZPE Integrated Development Environment</h1>
 <p>ZIDE, the official ZPE IDE, is the successor to ZPE's built-in text editor. ZIDE is designed to offer greater development support and a stunning JavaFX-powered UI, making it more flexible. </p>
 
