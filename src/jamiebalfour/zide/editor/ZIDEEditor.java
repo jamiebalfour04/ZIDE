@@ -7,6 +7,7 @@ import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
+import jamiebalfour.console.InteractiveConsoleFX;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.ui.BalfLafManager;
 import jamiebalfour.ui.components.BalfPanel;
@@ -20,7 +21,6 @@ import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEString;
 import jamiebalfour.zpe.gui.YASSCodeEditor;
 import jamiebalfour.zpe.gui.ZPEMacroEditor;
-import jamiebalfour.zpe.gui.editor.ConsoleOutputTextAreaFX;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
 import jamiebalfour.zpe.core.types.ZPEMap;
 import javafx.animation.*;
@@ -50,6 +50,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.image.*;
 import javafx.scene.image.Image;
 import javafx.scene.input.Dragboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
@@ -65,9 +66,6 @@ import javafx.util.Duration;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
-import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.io.*;
 import java.net.URLDecoder;
@@ -86,7 +84,7 @@ public class ZIDEEditor extends Application {
   Stage _stage;
   ZPERuntimeEnvironment runtime;
   Label rightFooterLabel;
-  ConsoleOutputTextAreaFX consoleOutputTextArea;
+  InteractiveConsoleFX consoleOutputTextArea;
   private ZIDESystemTerminal systemTerminal;
   Button runBtn;
   Button buildBtn;
@@ -115,6 +113,8 @@ public class ZIDEEditor extends Application {
   String username = null;
   String password = null;
   boolean loggedIn = false;
+  /** True only while a debug launch owns the debugger controls and profiler session. */
+  private volatile boolean debuggingSession;
   private WatchService projectWatchService;
   private Thread projectWatchThread;
   private volatile boolean watchingProjectDirectory;
@@ -1432,12 +1432,27 @@ public class ZIDEEditor extends Application {
         });
       });
       statusLabel.setText("Executing code");
-      consoleOutputTextArea.runAsProcess(tempPath, resourceDirectoryFor(tab), false, true, "");
+      runZPEProcess(tempPath, resourceDirectoryFor(tab), false, true, "");
 
       //stopExecution.setDisable(false);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /** Runs ZPE through the shared core launcher so debug protocol setup is UI-independent. */
+  private boolean runZPEProcess(Path source, Path resourceRoot, boolean debug, boolean preferNative, String extras) {
+    consoleOutputTextArea.clear();
+    consoleOutputTextArea.append("Using temporary file " + source.toAbsolutePath() + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
+    try {
+      ZPEProcessLauncher.Launch launch = ZPEProcessLauncher.prepare(source, resourceRoot, debug, preferNative, extras);
+      consoleOutputTextArea.append(launch.getRuntimeDescription() + "\n\n", InteractiveConsoleFX.OutputKind.KEY);
+      consoleOutputTextArea.runProcess(launch.getProcessBuilder(), launch::processStarted);
+      return true;
+    } catch (IOException exception) {
+      consoleOutputTextArea.append("[Error starting process: " + exception.getMessage() + "]\n", InteractiveConsoleFX.OutputKind.ERROR);
+      return false;
     }
   }
 
@@ -1528,8 +1543,8 @@ public class ZIDEEditor extends Application {
         tab = (EditorTab) editorTabs.getTabs().get(0);
       }
 
+      debuggingSession = true;
       debugBtn.getStyleClass().add("running");
-      invertImageView(getToolbarButtonIcon(debugBtn));
 
       stopExecutionBtn.setVisible(true);
       stepOverButton.setVisible(true);
@@ -1539,14 +1554,31 @@ public class ZIDEEditor extends Application {
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab, tab.getEditor().getText()), false);
       beginProfilerSession();
-      consoleOutputTextArea.runAsProcess(tempPath, resourceDirectoryFor(tab), true, true, "");
-      consoleOutputTextArea.addProcessFinishedListener(() -> {
-        invertImageView(getToolbarButtonIcon(debugBtn));
-        endProfilerSession();
-      });
+      if (!runZPEProcess(tempPath, resourceDirectoryFor(tab), true, true, "")) {
+        finishDebugSession();
+      }
     } catch (IOException e) {
+      finishDebugSession();
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Ends a debug session exactly once. The toolbar icon is deliberately not
+   * inverted here: icon inversion belongs solely to theme changes, while this
+   * method restores transient debug state after both normal and failed runs.
+   */
+  private void finishDebugSession() {
+    if (!debuggingSession) return;
+    debuggingSession = false;
+    endProfilerSession();
+    Platform.runLater(() -> {
+      debugBtn.getStyleClass().remove("running");
+      stopExecutionBtn.setVisible(false);
+      stepOverButton.setVisible(false);
+      continueButton.setVisible(false);
+      debugSeparator.setVisible(false);
+    });
   }
 
   public static Button createExpandableToolbarButton(String labelText, String iconPath, Runnable action) {
@@ -1754,6 +1786,43 @@ public class ZIDEEditor extends Application {
           String name = file.getName();
           setText(name.isEmpty() ? file.getPath() : name);
         }
+
+        {
+          setOnContextMenuRequested(event -> {
+            File file = getItem();
+            if (file == null) return;
+            projectTree.getSelectionModel().select(getTreeItem());
+            createProjectFileMenu(file).show(this, event.getScreenX(), event.getScreenY());
+            event.consume();
+          });
+
+          setOnDragDetected(event -> {
+            File source = getItem();
+            if (source == null || isProjectRoot(source)) return;
+            Dragboard board = startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.putFiles(List.of(source));
+            board.setContent(content);
+            event.consume();
+          });
+
+          setOnDragOver(event -> {
+            File target = getItem();
+            if (target != null && event.getDragboard().hasFiles()
+                    && canDropInto(event.getDragboard().getFiles(), target)) {
+              event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
+            }
+            event.consume();
+          });
+
+          setOnDragDropped(event -> {
+            File target = getItem();
+            boolean success = target != null && event.getDragboard().hasFiles()
+                    && moveOrCopyDroppedFiles(event.getDragboard().getFiles(), target);
+            event.setDropCompleted(success);
+            event.consume();
+          });
+        }
       });
 
       projectTree.setOnMouseClicked(e -> {
@@ -1765,40 +1834,6 @@ public class ZIDEEditor extends Application {
         }
       });
 
-      projectTree.setOnDragOver(event -> {
-        if (event.getDragboard().hasFiles()) {
-          event.acceptTransferModes(TransferMode.COPY);
-        }
-        event.consume();
-      });
-
-      projectTree.setOnDragDropped(event -> {
-        Dragboard db = event.getDragboard();
-        boolean success = false;
-
-        if (db.hasFiles()) {
-
-          TreeItem<File> targetItem = projectTree.getSelectionModel().getSelectedItem();
-
-          if (targetItem != null) {
-
-            File target = targetItem.getValue();
-
-            // If it's a file, use its parent folder
-            File targetDir = target.isDirectory() ? target : target.getParentFile();
-
-            for (File file : db.getFiles()) {
-              copyFileToDirectory(file, targetDir);
-            }
-
-            refreshTree();
-            success = true;
-          }
-        }
-
-        event.setDropCompleted(success);
-        event.consume();
-      });
     }
 
 
@@ -1809,25 +1844,234 @@ public class ZIDEEditor extends Application {
     return projectTree;
   }
 
-  private void copyFileToDirectory(File source, File targetDir) {
+  /** Builds the context menu for a project file or folder. */
+  private ContextMenu createProjectFileMenu(File file) {
+    MenuItem rename = new MenuItem("Rename…");
+    rename.setOnAction(event -> renameProjectFile(file));
+
+    MenuItem reveal = new MenuItem("Show in File Explorer");
+    reveal.setOnAction(event -> revealProjectFile(file));
+
+    MenuItem delete = new MenuItem("Delete…");
+    delete.setOnAction(event -> deleteProjectFile(file));
+    delete.setDisable(isProjectRoot(file));
+
+    return new ContextMenu(rename, reveal, new SeparatorMenuItem(), delete);
+  }
+
+  private void renameProjectFile(File file) {
+    if (isProjectRoot(file)) return;
+    TextInputDialog dialog = new TextInputDialog(file.getName());
+    dialog.initOwner(_stage);
+    dialog.setTitle("Rename");
+    dialog.setHeaderText("Rename " + file.getName());
+    dialog.setContentText("New name:");
+    Optional<String> value = dialog.showAndWait();
+    if (value.isEmpty()) return;
+
+    String name = value.get().trim();
+    if (name.isEmpty() || name.contains("/") || name.contains("\\")) {
+      showProjectFileError("Choose a simple file or folder name.");
+      return;
+    }
+    Path source = file.toPath().toAbsolutePath().normalize();
+    Path destination = source.resolveSibling(name);
+    if (source.equals(destination)) return;
+    if (Files.exists(destination)) {
+      showProjectFileError("An item with that name already exists.");
+      return;
+    }
     try {
-      File dest = new File(targetDir, source.getName());
-
-      Files.copy(
-              source.toPath(),
-              dest.toPath(),
-              StandardCopyOption.REPLACE_EXISTING
-      );
-
-    } catch (IOException e) {
-      e.printStackTrace();
+      Files.move(source, destination);
+      updateOpenTabPaths(source, destination);
+      refreshTree();
+    } catch (IOException exception) {
+      showProjectFileError("Could not rename the item: " + exception.getMessage());
     }
   }
 
-  private void refreshTree() {
-    if (currentProjectRoot != null) {
-      buildProjectTree(currentProjectRoot);
+  private void deleteProjectFile(File file) {
+    if (isProjectRoot(file)) return;
+    Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
+    confirmation.initOwner(_stage);
+    confirmation.setTitle("Delete");
+    confirmation.setHeaderText("Delete " + file.getName() + "?");
+    confirmation.setContentText(file.isDirectory()
+            ? "This permanently deletes the folder and everything inside it."
+            : "This permanently deletes the file.");
+    ButtonType delete = new ButtonType("Delete", ButtonBar.ButtonData.OK_DONE);
+    confirmation.getButtonTypes().setAll(delete, ButtonType.CANCEL);
+    if (confirmation.showAndWait().orElse(ButtonType.CANCEL) != delete) return;
+
+    Path path = file.toPath().toAbsolutePath().normalize();
+    try {
+      try (java.util.stream.Stream<Path> paths = Files.walk(path)) {
+        paths.sorted(Comparator.reverseOrder()).forEach(child -> {
+          try { Files.deleteIfExists(child); }
+          catch (IOException exception) { throw new UncheckedIOException(exception); }
+        });
+      }
+      closeTabsUnder(path);
+      refreshTree();
+    } catch (IOException | UncheckedIOException exception) {
+      Throwable cause = exception instanceof UncheckedIOException ? exception.getCause() : exception;
+      showProjectFileError("Could not delete the item: " + cause.getMessage());
     }
+  }
+
+  private void revealProjectFile(File file) {
+    try {
+      String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+      if (os.contains("mac")) {
+        new ProcessBuilder("open", "-R", file.getAbsolutePath()).start();
+      } else if (os.contains("win")) {
+        new ProcessBuilder("explorer.exe", "/select," + file.getAbsolutePath()).start();
+      } else if (Desktop.isDesktopSupported()) {
+        Desktop.getDesktop().open(file.isDirectory() ? file : file.getParentFile());
+      }
+    } catch (IOException exception) {
+      showProjectFileError("Could not open the file explorer: " + exception.getMessage());
+    }
+  }
+
+  /** Handles both tree moves and files dropped in from Finder/Explorer. */
+  private boolean moveOrCopyDroppedFiles(List<File> sources, File target) {
+    if (!canDropInto(sources, target)) return false;
+    Path targetDirectory = (target.isDirectory() ? target : target.getParentFile()).toPath().toAbsolutePath().normalize();
+    try {
+      for (File sourceFile : sources) {
+        Path source = sourceFile.toPath().toAbsolutePath().normalize();
+        Path destination = targetDirectory.resolve(source.getFileName());
+        if (source.equals(destination)) continue;
+        if (isInsideProject(source)) {
+          Files.move(source, destination);
+          updateOpenTabPaths(source, destination);
+        } else {
+          Files.copy(source, destination);
+        }
+      }
+      refreshTree();
+      return true;
+    } catch (IOException exception) {
+      showProjectFileError("Could not move the item: " + exception.getMessage());
+      return false;
+    }
+  }
+
+  private boolean canDropInto(List<File> sources, File target) {
+    if (sources == null || sources.isEmpty() || target == null) return false;
+    Path targetDirectory = (target.isDirectory() ? target : target.getParentFile()).toPath().toAbsolutePath().normalize();
+    for (File sourceFile : sources) {
+      Path source = sourceFile.toPath().toAbsolutePath().normalize();
+      if (source.equals(targetDirectory) || (Files.isDirectory(source) && targetDirectory.startsWith(source))) return false;
+      if (Files.exists(targetDirectory.resolve(source.getFileName()))) return false;
+    }
+    return true;
+  }
+
+  private boolean isProjectRoot(File file) {
+    return currentProjectRoot != null && file.toPath().toAbsolutePath().normalize()
+            .equals(currentProjectRoot.toPath().toAbsolutePath().normalize());
+  }
+
+  private boolean isInsideProject(Path path) {
+    return currentProjectRoot != null && path.startsWith(currentProjectRoot.toPath().toAbsolutePath().normalize());
+  }
+
+  private void updateOpenTabPaths(Path source, Path destination) {
+    for (Tab tab : new ArrayList<>(editorTabs.getTabs())) {
+      if (!(tab instanceof EditorTab editorTab) || editorTab.getPath() == null) continue;
+      Path tabPath = Path.of(editorTab.getPath()).toAbsolutePath().normalize();
+      if (!tabPath.startsWith(source)) continue;
+      Path movedPath = destination.resolve(source.relativize(tabPath));
+      editorTab.setPath(movedPath.toString());
+      editorTab.setText(movedPath.getFileName().toString());
+    }
+  }
+
+  private void closeTabsUnder(Path deletedPath) {
+    for (Tab tab : new ArrayList<>(editorTabs.getTabs())) {
+      if (tab instanceof EditorTab editorTab && editorTab.getPath() != null
+              && Path.of(editorTab.getPath()).toAbsolutePath().normalize().startsWith(deletedPath)) {
+        editorTabs.getTabs().remove(tab);
+      }
+    }
+  }
+
+  private void showProjectFileError(String message) {
+    Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+    alert.initOwner(_stage);
+    alert.setHeaderText(null);
+    alert.showAndWait();
+  }
+
+  /**
+   * Rebuilds the project tree without making the project navigator jump back
+   * to its initial, collapsed state after a filesystem operation.
+   */
+  private void refreshTree() {
+    if (currentProjectRoot == null) return;
+
+    Set<Path> expandedDirectories = new HashSet<>();
+    rememberExpandedDirectories(projectTree == null ? null : projectTree.getRoot(), expandedDirectories);
+
+    TreeItem<File> selectedItem = projectTree == null
+            ? null
+            : projectTree.getSelectionModel().getSelectedItem();
+    Path selectedPath = selectedItem == null ? null : normalisedProjectPath(selectedItem.getValue());
+
+    buildProjectTree(currentProjectRoot);
+    restoreProjectTreeState(projectTree.getRoot(), expandedDirectories);
+
+    TreeItem<File> restoredSelection = findProjectTreeItem(projectTree.getRoot(), selectedPath);
+    if (restoredSelection != null) {
+      projectTree.getSelectionModel().select(restoredSelection);
+    }
+  }
+
+  /** Records expanded folders by their absolute, normalised path. */
+  private void rememberExpandedDirectories(TreeItem<File> item, Set<Path> expandedDirectories) {
+    if (item == null || item.getValue() == null) return;
+
+    File file = item.getValue();
+    if (!file.isDirectory() || !item.isExpanded()) return;
+
+    expandedDirectories.add(normalisedProjectPath(file));
+    for (TreeItem<File> child : item.getChildren()) {
+      rememberExpandedDirectories(child, expandedDirectories);
+    }
+  }
+
+  /**
+   * Expands only folders that were open before the refresh. Children are loaded
+   * lazily, just as they are for a user-initiated expansion.
+   */
+  private void restoreProjectTreeState(TreeItem<File> item, Set<Path> expandedDirectories) {
+    if (item == null || item.getValue() == null || !item.getValue().isDirectory()) return;
+
+    if (!expandedDirectories.contains(normalisedProjectPath(item.getValue()))) return;
+
+    item.setExpanded(true);
+    loadChildrenIfNeeded(item);
+    for (TreeItem<File> child : item.getChildren()) {
+      restoreProjectTreeState(child, expandedDirectories);
+    }
+  }
+
+  /** Finds a visible tree item after the refreshed hierarchy has been restored. */
+  private TreeItem<File> findProjectTreeItem(TreeItem<File> item, Path targetPath) {
+    if (item == null || targetPath == null || item.getValue() == null) return null;
+    if (targetPath.equals(normalisedProjectPath(item.getValue()))) return item;
+
+    for (TreeItem<File> child : item.getChildren()) {
+      TreeItem<File> result = findProjectTreeItem(child, targetPath);
+      if (result != null) return result;
+    }
+    return null;
+  }
+
+  private Path normalisedProjectPath(File file) {
+    return file == null ? null : file.toPath().toAbsolutePath().normalize();
   }
 
   /** Starts a recursive, daemon watcher for the project currently shown in the tree. */
@@ -2817,7 +3061,7 @@ public class ZIDEEditor extends Application {
   private Node buildconsole() {
     // JavaFX-native console: output history is immutable and the command
     // field stays separate, so neither output nor process input needs Swing.
-    consoleOutputTextArea = new ConsoleOutputTextAreaFX();
+    consoleOutputTextArea = new InteractiveConsoleFX();
     VBox consoleContainer = new VBox(consoleOutputTextArea);
     VBox.setVgrow(consoleOutputTextArea, Priority.ALWAYS);
 
@@ -2905,6 +3149,7 @@ public class ZIDEEditor extends Application {
 
     consoleOutputTextArea.addProcessFinishedListener(() -> {
       stepping = false;
+      finishDebugSession();
       Platform.runLater(() -> {
         runBtn.getStyleClass().remove("running");
         debugBtn.getStyleClass().remove("running");

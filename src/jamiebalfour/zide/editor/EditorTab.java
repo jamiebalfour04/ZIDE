@@ -36,7 +36,7 @@ public class EditorTab extends Tab {
   });
 
   private final ZIDEEditor owner;
-  private final String path;
+  private String path;
   private final CodeEditorViewFX editor;
   private final PauseTransition analysisTimer = new PauseTransition(Duration.millis(ANALYSIS_DELAY_MS));
   private final AtomicInteger analysisVersion = new AtomicInteger();
@@ -124,6 +124,8 @@ public class EditorTab extends Tab {
   }
 
   public String getPath() { return path; }
+  /** Updates the backing path after a project-tree rename or move. */
+  void setPath(String path) { this.path = path; }
   public CodeEditorViewFX getEditor() { return editor; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
   public void toggleSpecialLine(int line) { if (!breakpointLines.add(line)) breakpointLines.remove(line); }

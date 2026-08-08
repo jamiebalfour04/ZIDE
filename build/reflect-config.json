@@ -8,5 +8,50 @@
     "name": "com.sun.javafx.tk.quantum.QuantumToolkit",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacGestureSupport",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacAttribute",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacAction",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacRole",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacSubrole",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacNotification",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacOrientation",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.glass.ui.mac.MacAccessible$MacText",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
   }
 ]

@@ -1,0 +1,9 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "^(jamiebalfour/balflaf_fx/.*|files/balflaf_fx/.*|zide\\.css)$"
+      }
+    ]
+  }
+}
