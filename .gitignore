@@ -6,3 +6,7 @@
 /build/.java-version
 /build/.java_version
 /build/run.sh
+/build/zide
+/build/librca
+/build/ni-build
+**/.DS_Store

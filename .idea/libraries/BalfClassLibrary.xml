@@ -4,6 +4,8 @@
       <root url="jar://$JARs$/BalfClassLibrary.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../BalfClassLibrary/src" />
+    </SOURCES>
   </library>
 </component>
