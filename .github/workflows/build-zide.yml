@@ -43,6 +43,7 @@ jobs:
             -march=compatibility \
             -H:+UnlockExperimentalVMOptions \
             -H:ReflectionConfigurationFiles=build/reflect-config.json \
+            -H:JNIConfigurationFiles=build/jni-config-macos.json \
             -H:ResourceConfigurationFiles=build/resource-config.json \
             --enable-native-access=javafx.graphics \
             '--initialize-at-run-time=com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \

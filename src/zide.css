@@ -233,6 +233,14 @@
     -fx-background-radius: 3px;
 }
 
+.code-editor-scroll-pane .scroll-bar:vertical .thumb {
+    -fx-min-height: 24px;
+}
+
+.code-editor-scroll-pane .scroll-bar:horizontal .thumb {
+    -fx-min-width: 24px;
+}
+
 .code-editor-scroll-pane .scroll-bar .thumb:hover {
     -fx-background-color: #969da6;
 }
