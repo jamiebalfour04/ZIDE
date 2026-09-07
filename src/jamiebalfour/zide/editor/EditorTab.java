@@ -128,7 +128,9 @@ public class EditorTab extends Tab {
   void setPath(String path) { this.path = path; }
   public CodeEditorViewFX getEditor() { return editor; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
-  public void toggleSpecialLine(int line) { if (!breakpointLines.add(line)) breakpointLines.remove(line); }
+  public void toggleSpecialLine(int line) {
+    if (!breakpointLines.add(line)) breakpointLines.remove(line);
+  }
   void switchOnDarkMode() { editor.setDarkMode(true); }
   void switchOffDarkMode() { editor.setDarkMode(false); }
   void setHasChanges(boolean hasChanges) { changes = hasChanges; }

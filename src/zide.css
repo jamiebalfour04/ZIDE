@@ -204,6 +204,70 @@
     -fx-text-fill: #e6e9ee;
 }
 
+/* Low-profile editor scrollbars matching the desktop ZPE code editor. */
+.code-editor-scroll-pane .scroll-bar:vertical {
+    -fx-pref-width: 10px;
+    -fx-min-width: 10px;
+    -fx-max-width: 10px;
+    -fx-background-color: #f4f6f8;
+    -fx-padding: 1px;
+}
+
+.code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-background-color: #f4f6f8;
+    -fx-padding: 1px;
+}
+
+.code-editor-scroll-pane .scroll-bar .track,
+.code-editor-scroll-pane .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.code-editor-scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px;
+    -fx-background-radius: 3px;
+}
+
+.code-editor-scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #969da6;
+}
+
+.code-editor-scroll-pane .scroll-bar .increment-button,
+.code-editor-scroll-pane .scroll-bar .decrement-button {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.code-editor-scroll-pane .scroll-bar .increment-arrow,
+.code-editor-scroll-pane .scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+
+.app-root:dark .code-editor-scroll-pane .scroll-bar:vertical,
+.app-root:dark .code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+
+.app-root:dark .code-editor-scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+
+.app-root:dark .code-editor-scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+
 /* JavaFX system terminal: separate from the Swing program-output console. */
 .terminal-pane {
     -fx-background-color: #111318;
@@ -751,6 +815,56 @@
 
 .app-root:dark .table-view .placeholder .label {
     -fx-text-fill: #aeb8c5;
+}
+
+/* ZUI builder previews approximate the platform-native controls used at run time. */
+.layout-builder-resize-handle {
+    -fx-background-color: #26734d;
+    -fx-border-color: white;
+    -fx-border-width: 1px;
+}
+
+.zui-native-preview {
+    -fx-font-family: system;
+    -fx-font-size: 13px;
+}
+
+.zui-native-button,
+.zui-native-toggle {
+    -fx-background-color: #f6f6f6;
+    -fx-border-color: #aeb3b8;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-padding: 3px 12px;
+}
+
+.zui-native-text-field,
+.zui-native-text-area,
+.zui-native-list {
+    -fx-background-color: white;
+    -fx-border-color: #8f959b;
+    -fx-border-radius: 1px;
+    -fx-background-radius: 1px;
+}
+
+.zui-native-tabs .tab-header-background {
+    -fx-background-color: #e8e8e8;
+}
+
+.mac-window .zui-native-button,
+.mac-window .zui-native-toggle {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5c8cb;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+}
+
+.mac-window .zui-native-text-field,
+.mac-window .zui-native-text-area,
+.mac-window .zui-native-list {
+    -fx-border-color: #b8bcc0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
 }
 
 .app-root:dark .table-view .scroll-bar:vertical,

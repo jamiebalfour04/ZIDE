@@ -69,6 +69,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import java.awt.*;
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -117,6 +118,8 @@ public class ZIDEEditor extends Application {
   private volatile boolean debuggingSession;
   private WatchService projectWatchService;
   private Thread projectWatchThread;
+  private StackPane workspaceStack;
+  private Node layoutBuilderOverlay;
   private volatile boolean watchingProjectDirectory;
   private final AtomicBoolean projectTreeRefreshQueued = new AtomicBoolean(false);
   private String cloudFileName = "";
@@ -176,7 +179,7 @@ public class ZIDEEditor extends Application {
   @Override
   public void start(Stage stage) {
 
-    stage.getIcons().add(new Image(getClass().getResourceAsStream("/files/ZIDE mini macos.png")));
+    stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(HelperFunctions.isMac() ? "/files/zide_macos.png" : "/files/zide.png"))));
     stage.initStyle(StageStyle.UNDECORATED);
 
     _stage = stage;
@@ -220,9 +223,11 @@ public class ZIDEEditor extends Application {
 
     EventHandler<ActionEvent> aboutHandler = e -> ZIDEAboutWindow.show(_stage);
 
-    // Top: menu + toolbar
-    var top = new VBox(new BalfTitleBar(stage, "ZIDE", aboutHandler), buildMenuBar(), buildToolBar());
-    root.setTop(top);
+    // Keep the title bar outside the workspace stack so full-workspace tools
+    // can cover the menus and editor without covering the window controls.
+    root.setTop(new BalfTitleBar(stage, "ZIDE", aboutHandler));
+    Node menuBar = buildMenuBar();
+    Node toolBar = buildToolBar();
 
 
     BalfTitleBar.addWindowResizing(stage, root);
@@ -310,7 +315,10 @@ public class ZIDEEditor extends Application {
       }
     });
 
-    root.setCenter(verticalSplit);
+    VBox applicationWorkspace = new VBox(menuBar, toolBar, verticalSplit);
+    VBox.setVgrow(verticalSplit, Priority.ALWAYS);
+    workspaceStack = new StackPane(applicationWorkspace);
+    root.setCenter(workspaceStack);
 
     var scene = new Scene(root, 1280, 800);
     //scene.setFill(Color.TRANSPARENT);
@@ -589,6 +597,7 @@ public class ZIDEEditor extends Application {
     var tools = bar.menu("Tools");
 
     tools.createItem("Open Macro Scripting Interface", "", this::openMSI);
+    tools.createItem("Open ZUI Layout Builder", "", this::openLayoutBuilder);
 
 
 
@@ -1125,7 +1134,8 @@ public class ZIDEEditor extends Application {
 
     if (outputLocation == null) return;
 
-    if(ZPEKit.compileNativeBinary(getCurrentTab().getEditor().getText(),"", outputLocation.getAbsolutePath(),true)){
+    EditorTab tab = getCurrentTab();
+    if(ZPEKit.compileNativeBinary(sourceWithLayout(tab, tab.getEditor().getText()),"", outputLocation.getAbsolutePath(),true)){
       Alert a = new Alert(Alert.AlertType.INFORMATION, "Successfully compiled native binary");
       a.setHeaderText(null);
       a.showAndWait();
@@ -1178,7 +1188,7 @@ public class ZIDEEditor extends Application {
 
     try {
       String transpiledCode = ZPEKit.transpileCode(
-              currentTab.getEditor().getText(),
+              sourceWithLayout(currentTab, currentTab.getEditor().getText()),
               "",
               transpiler
       );
@@ -1425,14 +1435,17 @@ public class ZIDEEditor extends Application {
       EditorTab tab = getCurrentTab();
       runBtn.getStyleClass().add("running");
 
-      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), tab.getEditor().getText(), false);
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), sourceWithLayout(tab, tab.getEditor().getText()), false);
       consoleOutputTextArea.addProcessFinishedListener(() -> {
         Platform.runLater(() -> {
           statusLabel.setText("Ready");
         });
       });
       statusLabel.setText("Executing code");
-      runZPEProcess(tempPath, resourceDirectoryFor(tab), false, true, "");
+      // ZPEX embeds its compiler at native-image build time. Layout companions
+      // must use the current Java runtime until the native UI compiler is
+      // rebuilt with the same feature set.
+      runZPEProcess(tempPath, resourceDirectoryFor(tab), false, !hasCompanionLayout(tab), "");
 
       //stopExecution.setDisable(false);
 
@@ -1457,6 +1470,83 @@ public class ZIDEEditor extends Application {
   }
 
   ZPEMacroEditor.Handle macroInterface = null;
+  private void openLayoutBuilder() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || tab.getPath() == null || !tab.getPath().toLowerCase(Locale.ROOT).endsWith(".yas")) {
+      Alert alert = new Alert(Alert.AlertType.WARNING);
+      alert.setTitle("No YASS file selected");
+      alert.setHeaderText("Open or save a YASS file first.");
+      alert.setContentText("The layout builder creates a companion .ui.yas file beside it.");
+      alert.showAndWait();
+      return;
+    }
+    Path script = Path.of(tab.getPath()).toAbsolutePath().normalize();
+    String fileName = script.getFileName().toString();
+    String stem = fileName.substring(0, fileName.length() - 4);
+    Path layoutFile = script.resolveSibling(stem + ".ui.yas");
+    String currentSource = tab.getEditor().getText();
+    String cleanedSource = removeCompanionInclude(script, currentSource);
+    if (!cleanedSource.equals(currentSource)) {
+      tab.getEditor().setText(cleanedSource);
+      tab.setHasChanges(true);
+      saveCurrentFile();
+    }
+    openLayoutBuilderFile(layoutFile);
+  }
+
+  private String sourceWithLayout(EditorTab tab, String source) {
+    if (tab == null || tab.getPath() == null || tab.getPath().toLowerCase(Locale.ROOT).endsWith(".ui.yas")) return source;
+    Path script = Path.of(tab.getPath()).toAbsolutePath().normalize();
+    String fileName = script.getFileName().toString();
+    if (!fileName.toLowerCase(Locale.ROOT).endsWith(".yas")) return source;
+    Path layoutFile = script.resolveSibling(fileName.substring(0, fileName.length() - 4) + ".ui.yas");
+    if (!Files.isRegularFile(layoutFile)) return source;
+    String includePath = layoutFile.toString().replace('\\', '/').replace("\"", "\\\"");
+    String separator = source.isEmpty() || source.endsWith("\n") ? "" : "\n";
+    // Keep transient execution compatible with installed ZPEX builds that predate singular `include`.
+    return source + separator + "\nincludes \"" + includePath + "\"\n";
+  }
+
+  private boolean hasCompanionLayout(EditorTab tab) {
+    if (tab == null || tab.getPath() == null) return false;
+    String fileName = Path.of(tab.getPath()).getFileName().toString();
+    String lowerName = fileName.toLowerCase(Locale.ROOT);
+    if (!lowerName.endsWith(".yas") || lowerName.endsWith(".ui.yas")) return false;
+    Path script = Path.of(tab.getPath()).toAbsolutePath().normalize();
+    Path layoutFile = script.resolveSibling(fileName.substring(0, fileName.length() - 4) + ".ui.yas");
+    return Files.isRegularFile(layoutFile);
+  }
+
+  private String removeCompanionInclude(Path script, String source) {
+    if (script == null || source == null) return source;
+    String fileName = script.getFileName().toString();
+    String lowerName = fileName.toLowerCase(Locale.ROOT);
+    if (!lowerName.endsWith(".yas") || lowerName.endsWith(".ui.yas")) return source;
+    String companionName = fileName.substring(0, fileName.length() - 4) + ".ui.yas";
+    String generatedInclude = "(?m)^[\\t ]*includes?[\\t ]+\""
+        + java.util.regex.Pattern.quote(companionName) + "\"[\\t ]*(?:\\R|$)";
+    return source.replaceAll(generatedInclude, "");
+  }
+
+  private void openLayoutBuilderFile(Path layoutFile) {
+    try {
+      String source = Files.isRegularFile(layoutFile)
+          ? Files.readString(layoutFile, StandardCharsets.UTF_8) : "";
+      if (layoutBuilderOverlay != null) workspaceStack.getChildren().remove(layoutBuilderOverlay);
+      ZUILayoutBuilder builder = new ZUILayoutBuilder(_stage, layoutFile, source,
+          () -> statusLabel.setText("Saved " + layoutFile.getFileName()),
+          () -> {
+            workspaceStack.getChildren().remove(layoutBuilderOverlay);
+            layoutBuilderOverlay = null;
+          });
+      layoutBuilderOverlay = builder.getView();
+      workspaceStack.getChildren().add(layoutBuilderOverlay);
+      layoutBuilderOverlay.toFront();
+    } catch (IOException exception) {
+      showError("Unable to open layout", exception.getMessage());
+    }
+  }
+
   private void openMSI() {
     if(getCurrentTab() == null) {
       Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -1552,7 +1642,8 @@ public class ZIDEEditor extends Application {
       debugSeparator.setVisible(true);
 
 
-      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), prepareDebugSourceWithBreakpoints(tab, tab.getEditor().getText()), false);
+      String debugSource = prepareDebugSourceWithBreakpoints(tab, tab.getEditor().getText());
+      FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), sourceWithLayout(tab, debugSource), false);
       beginProfilerSession();
       if (!runZPEProcess(tempPath, resourceDirectoryFor(tab), true, true, "")) {
         finishDebugSession();
@@ -1846,17 +1937,32 @@ public class ZIDEEditor extends Application {
 
   /** Builds the context menu for a project file or folder. */
   private ContextMenu createProjectFileMenu(File file) {
-    MenuItem rename = new MenuItem("Rename…");
+    boolean regularFile = file.isFile();
+    MenuItem open = new MenuItem(regularFile ? "Open File" : "Open Folder");
+    open.setOnAction(event -> {
+      if (regularFile) openTab(file.getName(), file.getAbsolutePath());
+      else {
+        TreeItem<File> item = findProjectTreeItem(projectTree.getRoot(), file.toPath().toAbsolutePath().normalize());
+        if (item != null) item.setExpanded(!item.isExpanded());
+      }
+    });
+
+    MenuItem openAsText = new MenuItem("Open with Text Editor");
+    openAsText.setOnAction(event -> openTab(file.getName(), file.getAbsolutePath(), false));
+
+    MenuItem rename = new MenuItem(regularFile ? "Rename File…" : "Rename Folder…");
     rename.setOnAction(event -> renameProjectFile(file));
 
-    MenuItem reveal = new MenuItem("Show in File Explorer");
-    reveal.setOnAction(event -> revealProjectFile(file));
-
-    MenuItem delete = new MenuItem("Delete…");
+    MenuItem delete = new MenuItem(regularFile ? "Delete File…" : "Delete Folder…");
     delete.setOnAction(event -> deleteProjectFile(file));
     delete.setDisable(isProjectRoot(file));
 
-    return new ContextMenu(rename, reveal, new SeparatorMenuItem(), delete);
+    ContextMenu menu = new ContextMenu(open);
+    if (regularFile && file.getName().toLowerCase(Locale.ROOT).endsWith(".ui.yas")) {
+      menu.getItems().add(openAsText);
+    }
+    menu.getItems().addAll(new SeparatorMenuItem(), rename, delete);
+    return menu;
   }
 
   private void renameProjectFile(File file) {
@@ -2256,8 +2362,16 @@ public class ZIDEEditor extends Application {
   }
 
   private void openTab(String name, String file) {
+    openTab(name, file, true);
+  }
+
+  private void openTab(String name, String file, boolean useLayoutEditor) {
     if(file != null) {
       if (new File(file).isDirectory()) {
+        return;
+      }
+      if (useLayoutEditor && file.toLowerCase(Locale.ROOT).endsWith(".ui.yas")) {
+        openLayoutBuilderFile(Path.of(file));
         return;
       }
     }
@@ -2284,7 +2398,13 @@ public class ZIDEEditor extends Application {
     setLanguage(lang, editor);
     if (file != null) {
       try {
-        editor.setText(FileHelperFunctions.readFileAsString(file));
+        String loadedSource = FileHelperFunctions.readFileAsString(file);
+        String migratedSource = removeCompanionInclude(Path.of(file), loadedSource);
+        editor.setText(migratedSource);
+        if (!migratedSource.equals(loadedSource)) {
+          Files.writeString(Path.of(file), migratedSource, StandardCharsets.UTF_8);
+          statusLabel.setText("Moved the UI include into the run and compile pipeline");
+        }
       } catch (IOException exception) {
         showError("Unable to open file", exception.getMessage());
         return;
@@ -2313,11 +2433,13 @@ public class ZIDEEditor extends Application {
   /** Configures the JavaFX editor from ZPE's shared language catalogues. */
   private void setLanguage(String lang, CodeEditorViewFX editor) {
     if(lang.equals("yass")) {
-      editor.setLineCommentMarkers("\\");
+      editor.setLineCommentMarkers("\\", "//");
       editor.setBlockCommentMarkers("/*", "*/");
       editor.setQuoteDelimiters("\"'`");
       editor.setVariableDelimiters("$");
+      editor.setContextSeparator("::");
       editor.clearKeywords();
+      editor.clearContextualKeywords();
       editor.clearAutoCompleteItems();
       for (String keyword : ZPEKit.getKeywords()) {
         editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
@@ -2327,13 +2449,30 @@ public class ZIDEEditor extends Application {
         editor.addKeyword(type, CodeSyntaxModel.Style.TYPE);
         editor.addAutoCompleteItem(type, CodeEditorViewFX.AutoCompleteItemType.Type);
       }
-      for (String function : ZPEKit.getBuiltInFunctions()) {
+      editor.addKeyword("null", CodeSyntaxModel.Style.NULL);
+      editor.addKeyword("NULL", CodeSyntaxModel.Style.NULL);
+      editor.addKeyword("true", CodeSyntaxModel.Style.BOOLEAN);
+      editor.addKeyword("false", CodeSyntaxModel.Style.BOOLEAN);
+      editor.addKeyword("this", CodeSyntaxModel.Style.VARIABLE);
+      editor.addKeyword("#breakpoint#", CodeSyntaxModel.Style.SPECIAL);
+      for (String directive : ZPEKit.getDirectiveKeywords()) {
+        editor.addKeyword(directive, CodeSyntaxModel.Style.DOC);
+        editor.addAutoCompleteItem(directive, CodeEditorViewFX.AutoCompleteItemType.Doc);
+      }
+      for (String function : ZPEKit.getAllFunctions()) {
         editor.addKeyword(function, CodeSyntaxModel.Style.FUNCTION);
         editor.addAutoCompleteItem(function, CodeEditorViewFX.AutoCompleteItemType.Function);
       }
       for (String structure : ZPEInstance.getBuiltInStructuresNames()) {
         editor.addKeyword(structure, CodeSyntaxModel.Style.TYPE);
         editor.addAutoCompleteItem(structure, CodeEditorViewFX.AutoCompleteItemType.Type);
+      }
+      for (Map.Entry<String, ZPEModule> module : ZPEKit.getBuiltinModules().entrySet()) {
+        editor.addKeyword(module.getKey(), CodeSyntaxModel.Style.TYPE);
+        editor.addAutoCompleteItem(module.getKey(), CodeEditorViewFX.AutoCompleteItemType.Type);
+        for (String method : module.getValue().getMethods()) {
+          editor.addContextualKeyword(module.getKey(), method, CodeSyntaxModel.Style.FUNCTION);
+        }
       }
       rightFooterLabel.setText("YAS");
     } else if (lang.equals("python")) {

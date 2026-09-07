@@ -42,7 +42,7 @@ public final class ZIDEAboutWindow {
     content.getStyleClass().add("about-content");
 
     ImageView icon = new ImageView(
-            new Image(Objects.requireNonNull(ZIDEAboutWindow.class.getResourceAsStream("/files/balflaf_fx/icons/jb.png")))
+            new Image(Objects.requireNonNull(ZIDEAboutWindow.class.getResourceAsStream("/files/zide.png")))
     );
     icon.setFitWidth(64);
     icon.setFitHeight(64);

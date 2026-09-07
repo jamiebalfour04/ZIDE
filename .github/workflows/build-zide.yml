@@ -1,0 +1,66 @@
+name: Build ZIDE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-zide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-macos-arm64:
+    name: macOS ARM64 native image
+    runs-on: macos-15
+
+    steps:
+      - name: Check out ZIDE
+        uses: actions/checkout@v6
+
+      - name: Install Liberica Native Image Kit 25 with JavaFX
+        uses: actions/setup-java@v6
+        with:
+          distribution: liberica-nik
+          java-version: "25"
+          java-package: jdk+fx
+          architecture: aarch64
+
+      - name: Confirm Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Show native-image version
+        run: native-image --version
+
+      - name: Build ZIDE
+        run: |
+          mkdir -p build/native
+          native-image \
+            -O3 \
+            -march=compatibility \
+            -H:+UnlockExperimentalVMOptions \
+            -H:ReflectionConfigurationFiles=build/reflect-config.json \
+            -H:ResourceConfigurationFiles=build/resource-config.json \
+            --enable-native-access=javafx.graphics \
+            '--initialize-at-run-time=com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \
+            -H:Name=build/native/zide-aarch64 \
+            -jar build/zide.jar \
+            --no-fallback
+
+      - name: Verify native image
+        run: |
+          test -x build/native/zide-aarch64
+          file build/native/zide-aarch64
+          file build/native/zide-aarch64 | grep -q arm64
+
+      - name: Upload ZIDE
+        uses: actions/upload-artifact@v6
+        with:
+          name: zide-macos-aarch64
+          path: build/native/zide-aarch64
+          if-no-files-found: error
+          compression-level: 0
