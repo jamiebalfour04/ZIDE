@@ -64,3 +64,35 @@ jobs:
           path: build/native/zide-aarch64
           if-no-files-found: error
           compression-level: 0
+
+      - name: Deploy macOS ZIDE with rsync
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USERNAME: ${{ secrets.SFTP_USERNAME }}
+          SFTP_PRIVATE_KEY: ${{ secrets.SFTP_PRIVATE_KEY }}
+          SFTP_HOST_KEY: ${{ secrets.SFTP_HOST_KEY }}
+          SFTP_DESTINATION: ${{ secrets.SFTP_DESTINATION_MACOS }}
+        run: |
+          test -n "$SFTP_HOST"
+          test -n "$SFTP_USERNAME"
+          test -n "$SFTP_PRIVATE_KEY"
+          test -n "$SFTP_HOST_KEY"
+          test -n "$SFTP_DESTINATION"
+          port="${SFTP_PORT:-22}"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%b\n' "$SFTP_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/zide_deploy"
+          printf '%b\n' "$SFTP_HOST_KEY" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/zide_deploy" "$HOME/.ssh/known_hosts"
+          if ! grep -Eq '^-----BEGIN (OPENSSH |RSA |EC |DSA )?PRIVATE KEY-----$' "$HOME/.ssh/zide_deploy"; then
+            echo "::error::SFTP_PRIVATE_KEY must contain the complete private key, including its BEGIN and END lines."
+            exit 1
+          fi
+          if ! ssh-keygen -y -P "" -f "$HOME/.ssh/zide_deploy" > /dev/null; then
+            echo "::error::SFTP_PRIVATE_KEY is invalid or passphrase-protected."
+            exit 1
+          fi
+          rsync -az --progress \
+            -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
+            build/native/zide-aarch64 \
+            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION"
