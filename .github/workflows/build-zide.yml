@@ -1,9 +1,8 @@
 name: Build ZIDE
 
 on:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -57,11 +56,14 @@ jobs:
           file build/native/zide-aarch64
           file build/native/zide-aarch64 | grep -q arm64
 
+      - name: Package ZIDE
+        run: zip -j build/native/zide-aarch64.zip build/native/zide-aarch64
+
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-macos-aarch64
-          path: build/native/zide-aarch64
+          path: build/native/zide-aarch64.zip
           if-no-files-found: error
           compression-level: 0
 
@@ -94,5 +96,149 @@ jobs:
           fi
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-aarch64 \
-            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION"
+            build/native/zide-aarch64.zip \
+            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
+
+  build-windows-x64:
+    name: Windows x64 native image
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Liberica Native Image Kit 25 with JavaFX
+        uses: actions/setup-java@v6
+        with:
+          distribution: liberica-nik
+          java-version: "25"
+          java-package: jdk+fx
+          architecture: x64
+      - name: Enable the MSVC x64 toolchain
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
+          "PATH=$env:PATH" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "INCLUDE=$env:INCLUDE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIB=$env:LIB" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIBPATH=$env:LIBPATH" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Prepare Windows reflection configuration
+        shell: pwsh
+        run: |
+          $config = Get-Content build/reflect-config.json -Raw | ConvertFrom-Json
+          @($config | Where-Object { -not $_.name.StartsWith("com.sun.glass.ui.mac.") }) |
+            ConvertTo-Json -Depth 20 | Set-Content build/reflect-config-windows.json -Encoding utf8
+      - name: Build ZIDE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/native | Out-Null
+          native-image `
+            -O3 `
+            -march=compatibility `
+            -H:+UnlockExperimentalVMOptions `
+            -H:ReflectionConfigurationFiles=build/reflect-config-windows.json `
+            -H:ResourceConfigurationFiles=build/resource-config.json `
+            --enable-native-access=javafx.graphics `
+            -H:Name=build/native/zide-win-x64 `
+            -jar build/zide.jar `
+            --no-fallback
+      - name: Verify native image
+        shell: pwsh
+        run: if (-not (Test-Path build/native/zide-win-x64.exe)) { throw "Windows ZIDE was not produced." }
+      - name: Package ZIDE
+        shell: pwsh
+        run: Compress-Archive -Path build/native/zide-win-x64.exe -DestinationPath build/native/zide-win-x64.zip
+      - name: Upload ZIDE
+        uses: actions/upload-artifact@v6
+        with:
+          name: zide-windows-x64
+          path: build/native/zide-win-x64.zip
+          if-no-files-found: error
+          compression-level: 0
+      - name: Install rsync
+        uses: msys2/setup-msys2@v2
+        with:
+          install: openssh rsync
+      - name: Deploy Windows ZIDE with rsync
+        shell: msys2 {0}
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USERNAME: ${{ secrets.SFTP_USERNAME }}
+          SFTP_PRIVATE_KEY: ${{ secrets.SFTP_PRIVATE_KEY }}
+          SFTP_HOST_KEY: ${{ secrets.SFTP_HOST_KEY }}
+          SFTP_DESTINATION: ${{ secrets.SFTP_DESTINATION_WINDOWS }}
+        run: |
+          test -n "$SFTP_HOST" && test -n "$SFTP_USERNAME" && test -n "$SFTP_PRIVATE_KEY"
+          test -n "$SFTP_HOST_KEY" && test -n "$SFTP_DESTINATION"
+          port="${SFTP_PORT:-22}"
+          ssh_dir="$(cygpath -u "$RUNNER_TEMP")/zide-ssh"
+          mkdir -p "$ssh_dir"
+          printf '%b\n' "$SFTP_PRIVATE_KEY" | tr -d '\r' > "$ssh_dir/deploy_key"
+          printf '%b\n' "$SFTP_HOST_KEY" | tr -d '\r' > "$ssh_dir/known_hosts"
+          ssh-keygen -y -P "" -f "$ssh_dir/deploy_key" > /dev/null
+          rsync -az --progress \
+            -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
+            build/native/zide-win-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
+
+  build-linux-x64:
+    name: Linux x64 native image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Liberica Native Image Kit 25 with JavaFX
+        uses: actions/setup-java@v6
+        with:
+          distribution: liberica-nik
+          java-version: "25"
+          java-package: jdk+fx
+          architecture: x64
+      - name: Install JavaFX build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libasound2-dev
+      - name: Prepare Linux reflection configuration
+        run: |
+          jq '[.[] | select(.name | startswith("com.sun.glass.ui.mac.") | not)]' \
+            build/reflect-config.json > build/reflect-config-linux.json
+      - name: Build ZIDE
+        run: |
+          mkdir -p build/native
+          native-image \
+            -O3 \
+            -march=compatibility \
+            -H:+UnlockExperimentalVMOptions \
+            -H:ReflectionConfigurationFiles=build/reflect-config-linux.json \
+            -H:ResourceConfigurationFiles=build/resource-config.json \
+            --enable-native-access=javafx.graphics \
+            -H:Name=build/native/zide-linux-x64 \
+            -jar build/zide.jar \
+            --no-fallback
+      - name: Verify native image
+        run: |
+          test -x build/native/zide-linux-x64
+          file build/native/zide-linux-x64 | grep -q x86-64
+      - name: Package ZIDE
+        run: zip -j build/native/zide-linux-x64.zip build/native/zide-linux-x64
+      - name: Upload ZIDE
+        uses: actions/upload-artifact@v6
+        with:
+          name: zide-linux-x64
+          path: build/native/zide-linux-x64.zip
+          if-no-files-found: error
+          compression-level: 0
+      - name: Deploy Linux ZIDE with rsync
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USERNAME: ${{ secrets.SFTP_USERNAME }}
+          SFTP_PRIVATE_KEY: ${{ secrets.SFTP_PRIVATE_KEY }}
+          SFTP_HOST_KEY: ${{ secrets.SFTP_HOST_KEY }}
+          SFTP_DESTINATION: ${{ secrets.SFTP_DESTINATION_LINUX }}
+        run: |
+          test -n "$SFTP_HOST" && test -n "$SFTP_USERNAME" && test -n "$SFTP_PRIVATE_KEY"
+          test -n "$SFTP_HOST_KEY" && test -n "$SFTP_DESTINATION"
+          port="${SFTP_PORT:-22}"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%b\n' "$SFTP_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/zide_deploy"
+          printf '%b\n' "$SFTP_HOST_KEY" | tr -d '\r' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/zide_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -P "" -f "$HOME/.ssh/zide_deploy" > /dev/null
+          rsync -az --progress \
+            -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
+            build/native/zide-linux-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
