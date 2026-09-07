@@ -78,6 +78,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.prefs.Preferences;
 
 public class ZIDEEditor extends Application {
@@ -123,6 +125,8 @@ public class ZIDEEditor extends Application {
   private volatile boolean watchingProjectDirectory;
   private final AtomicBoolean projectTreeRefreshQueued = new AtomicBoolean(false);
   private String cloudFileName = "";
+  private final Map<String, LanguageSupport> languageSupports = new LinkedHashMap<>();
+  private boolean languageSupportsRegistered;
 
 
 
@@ -401,6 +405,7 @@ public class ZIDEEditor extends Application {
     ComboBox<String> extensionBox = new ComboBox<>();
     extensionBox.getItems().addAll(
             "yas",
+            "zps",
             "ywp",
             "txt"
     );
@@ -1420,6 +1425,13 @@ public class ZIDEEditor extends Application {
 
   private void runCode(){
 
+    EditorTab currentTab = getCurrentTab();
+    LanguageSupport language = currentTab == null ? null : languageSupportForFile(currentTab.getPath());
+    if (language != null && language.runner != null) {
+      language.runner.accept(currentTab);
+      return;
+    }
+
     if (!getZPE()) return;
 
     if(!verifyCode()) return;
@@ -1451,6 +1463,46 @@ public class ZIDEEditor extends Application {
 
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void runZpeedyCode(EditorTab tab) {
+    if (tab == null) return;
+    try {
+      Path temporary = Files.createTempFile("zide-zpeedy-", ".zps");
+      Files.writeString(temporary, tab.getEditor().getText(), StandardCharsets.UTF_8);
+      temporary.toFile().deleteOnExit();
+
+      ProcessBuilder process;
+      if (HelperFunctions.isWindows()) {
+        process = new ProcessBuilder("cmd.exe", "/c", "zpeedy", "-r", temporary.toString());
+      } else {
+        process = new ProcessBuilder("zpeedy", "-r", temporary.toString());
+      }
+      Path workingDirectory = resourceDirectoryFor(tab);
+      if (workingDirectory != null && Files.isDirectory(workingDirectory)) {
+        process.directory(workingDirectory.toFile());
+      }
+
+      consoleOutputTextArea.clear();
+      consoleOutputTextArea.append("Zpeedy Script runtime\n\n", InteractiveConsoleFX.OutputKind.KEY);
+      consoleTab.setSelected(true);
+      showBottomPanel(consoleView);
+      runBtn.getStyleClass().add("running");
+      statusLabel.setText("Executing Zpeedy Script");
+      consoleOutputTextArea.addProcessFinishedListener(() -> Platform.runLater(() -> {
+        runBtn.getStyleClass().remove("running");
+        statusLabel.setText("Ready");
+      }));
+      consoleOutputTextArea.runProcess(process);
+    } catch (IOException exception) {
+      runBtn.getStyleClass().remove("running");
+      statusLabel.setText("Ready");
+      consoleOutputTextArea.append(
+              "[Could not start Zpeedy Script. Install its runtime so the zpeedy command is available: "
+                      + exception.getMessage() + "]\n",
+              InteractiveConsoleFX.OutputKind.ERROR
+      );
     }
   }
 
@@ -2421,18 +2473,25 @@ public class ZIDEEditor extends Application {
 
   }
 
-  /** Determines the small language profile needed by the JavaFX editor. */
+  /** Resolves a file through the language registry used by editing, help and execution. */
   private String languageForFile(String file) {
-    if (file == null) return "txt";
-    String lowerCaseName = file.toLowerCase(Locale.ROOT);
-    if (lowerCaseName.endsWith(".yas")) return "yass";
-    if (lowerCaseName.endsWith(".py")) return "python";
-    return "txt";
+    LanguageSupport language = languageSupportForFile(file);
+    return language == null ? "txt" : language.id;
   }
 
-  /** Configures the JavaFX editor from ZPE's shared language catalogues. */
-  private void setLanguage(String lang, CodeEditorViewFX editor) {
-    if(lang.equals("yass")) {
+  private void setLanguage(String id, CodeEditorViewFX editor) {
+    registerLanguageSupports();
+    LanguageSupport language = languageSupports.get(id);
+    if (language == null) {
+      configurePlainText(editor);
+      rightFooterLabel.setText("Text");
+      return;
+    }
+    language.configure.accept(editor);
+    rightFooterLabel.setText(language.label);
+  }
+
+  private void configureYass(CodeEditorViewFX editor) {
       editor.setLineCommentMarkers("\\", "//");
       editor.setBlockCommentMarkers("/*", "*/");
       editor.setQuoteDelimiters("\"'`");
@@ -2474,15 +2533,88 @@ public class ZIDEEditor extends Application {
           editor.addContextualKeyword(module.getKey(), method, CodeSyntaxModel.Style.FUNCTION);
         }
       }
-      rightFooterLabel.setText("YAS");
-    } else if (lang.equals("python")) {
+  }
+
+  private void configureZpeedy(CodeEditorViewFX editor) {
+    editor.setLineCommentMarkers("#");
+    editor.setBlockCommentMarkers("", "");
+    editor.setQuoteDelimiters("\"'");
+    editor.setVariableDelimiters("");
+    editor.setContextSeparator("");
+    editor.clearKeywords();
+    editor.clearContextualKeywords();
+    editor.clearAutoCompleteItems();
+
+    String[] keywords = {
+            "a", "alternatively", "as", "at", "attempt", "back", "based", "call",
+            "choice", "continue", "display", "divide", "do", "error", "every", "for",
+            "forever", "give", "gives", "greater", "has", "if", "in", "is", "least",
+            "less", "minus", "most", "not", "on", "otherwise", "plus", "repeat",
+            "routine", "set", "stop", "takes", "than", "then", "thing", "times", "to",
+            "when", "while", "with"
+    };
+    for (String keyword : keywords) {
+      editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
+      editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
+    }
+    addLiteral(editor, "true", CodeSyntaxModel.Style.BOOLEAN);
+    addLiteral(editor, "false", CodeSyntaxModel.Style.BOOLEAN);
+    addLiteral(editor, "nothing", CodeSyntaxModel.Style.NULL);
+    addLiteral(editor, "unknown", CodeSyntaxModel.Style.NULL);
+  }
+
+  private void addLiteral(CodeEditorViewFX editor, String literal, CodeSyntaxModel.Style style) {
+    editor.addKeyword(literal, style);
+    editor.addAutoCompleteItem(literal, CodeEditorViewFX.AutoCompleteItemType.Keyword);
+  }
+
+  private void registerLanguageSupports() {
+    if (languageSupportsRegistered) return;
+    languageSupportsRegistered = true;
+    registerLanguage(new LanguageSupport(
+            "yass", "YAS", Set.of("yas"), this::configureYass,
+            this::yassInfo, null
+    ));
+    registerLanguage(new LanguageSupport(
+            "zpeedy",
+            "Zpeedy Script",
+            Set.of("zps"),
+            this::configureZpeedy,
+            token -> zpeedyInfo(token.toLowerCase(Locale.ROOT)),
+            this::runZpeedyCode
+    ));
+    registerLanguage(new LanguageSupport(
+            "python", "Python", Set.of("py"), this::configurePython,
+            null, null
+    ));
+  }
+
+  private void registerLanguage(LanguageSupport support) {
+    languageSupports.put(support.id, support);
+  }
+
+  private LanguageSupport languageSupportForFile(String file) {
+    if (file == null) return null;
+    registerLanguageSupports();
+    String name = file.toLowerCase(Locale.ROOT);
+    int dot = name.lastIndexOf('.');
+    String extension = dot < 0 ? "" : name.substring(dot + 1);
+    for (LanguageSupport support : languageSupports.values()) {
+      if (support.extensions.contains(extension)) return support;
+    }
+    return null;
+  }
+
+  private void configurePython(CodeEditorViewFX editor) {
       // Python files were previously treated as plain text, which made a
       // dark editor look washed out and left the source almost uncoloured.
       editor.setLineCommentMarkers("#");
       editor.setBlockCommentMarkers("", "");
       editor.setQuoteDelimiters("\"'");
       editor.setVariableDelimiters("");
+      editor.setContextSeparator("");
       editor.clearKeywords();
+      editor.clearContextualKeywords();
       editor.clearAutoCompleteItems();
 
       String[] pythonKeywords = {
@@ -2508,15 +2640,78 @@ public class ZIDEEditor extends Application {
       editor.addKeyword("True", CodeSyntaxModel.Style.BOOLEAN);
       editor.addKeyword("False", CodeSyntaxModel.Style.BOOLEAN);
       editor.addKeyword("None", CodeSyntaxModel.Style.BOOLEAN);
-      rightFooterLabel.setText("Python");
-    } else {
+  }
+
+  private void configurePlainText(CodeEditorViewFX editor) {
       editor.setLineCommentMarkers("//");
       editor.setBlockCommentMarkers("/*", "*/");
       editor.setQuoteDelimiters("\"'");
       editor.setVariableDelimiters("$");
+      editor.setContextSeparator("");
       editor.clearKeywords();
+      editor.clearContextualKeywords();
       editor.clearAutoCompleteItems();
-      rightFooterLabel.setText("Text");
+  }
+
+  EditorInfo editorInfo(String path, String token) {
+    if (token == null || token.isEmpty() || path == null) return null;
+    LanguageSupport registered = languageSupportForFile(path);
+    if (registered != null && registered.information != null) return registered.information.apply(token);
+    return null;
+  }
+
+  private EditorInfo yassInfo(String token) {
+    if (!ZPEKit.getAllFunctions().contains(token)) return null;
+    String header = ZPEKit.getFunctionManualHeader(token);
+    String entry = ZPEKit.getFunctionManualEntry(token);
+    String title = token + (header == null || header.isBlank() ? "" : "(" + header + ")");
+    return new EditorInfo(title, entry == null || entry.isBlank() ? "Built-in YASS function" : entry);
+  }
+
+  private EditorInfo zpeedyInfo(String token) {
+    switch (token) {
+      case "display": return new EditorInfo("display value", "Writes one value to the program output.");
+      case "set": return new EditorInfo("set name to value", "Creates or updates a named value.");
+      case "routine": return new EditorInfo("routine name takes values", "Declares a reusable Zpeedy routine.");
+      case "call": return new EditorInfo("call routine with values", "Invokes a declared or host-provided routine.");
+      case "thing": return new EditorInfo("thing Name", "Declares a structured Zpeedy type and its properties.");
+      case "repeat": return new EditorInfo("repeat count times", "Repeats an indented block a fixed number of times, or forever.");
+      case "when": return new EditorInfo("when value", "Selects the first matching indented branch.");
+      case "attempt": return new EditorInfo("attempt", "Runs a block with an optional otherwise-on-error handler.");
+      case "nothing": return new EditorInfo("nothing", "Zpeedy's null value.");
+      case "unknown": return new EditorInfo("unknown", "Zpeedy's undefined value.");
+      default: return null;
+    }
+  }
+
+  static final class EditorInfo {
+    final String title;
+    final String body;
+
+    EditorInfo(String title, String body) {
+      this.title = title;
+      this.body = body;
+    }
+  }
+
+  private static final class LanguageSupport {
+    final String id;
+    final String label;
+    final Set<String> extensions;
+    final Consumer<CodeEditorViewFX> configure;
+    final Function<String, EditorInfo> information;
+    final Consumer<EditorTab> runner;
+
+    LanguageSupport(String id, String label, Set<String> extensions,
+                    Consumer<CodeEditorViewFX> configure,
+                    Function<String, EditorInfo> information,
+                    Consumer<EditorTab> runner) {
+      this.id = id;
+      this.label = label;
+      this.extensions = extensions;
+      this.configure = configure;
+      this.information = information;
+      this.runner = runner;
     }
   }
 

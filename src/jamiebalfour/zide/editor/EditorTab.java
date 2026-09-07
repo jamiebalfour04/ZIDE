@@ -10,9 +10,13 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Popup;
 import javafx.util.Duration;
 
 import java.util.HashSet;
@@ -39,6 +43,8 @@ public class EditorTab extends Tab {
   private String path;
   private final CodeEditorViewFX editor;
   private final PauseTransition analysisTimer = new PauseTransition(Duration.millis(ANALYSIS_DELAY_MS));
+  private final PauseTransition infoTimer = new PauseTransition(Duration.millis(450));
+  private final Popup infoPopup = new Popup();
   private final AtomicInteger analysisVersion = new AtomicInteger();
   private final Set<Integer> breakpointLines = new HashSet<>();
   private final HBox errorIndicator = new HBox(4);
@@ -54,6 +60,7 @@ public class EditorTab extends Tab {
     this.path = path;
     this.editor = editor;
     editor.setLineNumberClickListener(this::toggleSpecialLine);
+    installInformationPopup();
 
     Label errorIcon = new Label("❗");
     errorIcon.getStyleClass().add("editor-error-icon");
@@ -93,6 +100,62 @@ public class EditorTab extends Tab {
     scheduleAnalysis();
   }
 
+  private void installInformationPopup() {
+    infoPopup.setAutoFix(true);
+    infoPopup.setAutoHide(true);
+    infoPopup.setHideOnEscape(true);
+
+    editor.getEditor().addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+      int offset = editor.getEditor().hit(event.getX(), event.getY()).getInsertionIndex();
+      String token = tokenAt(editor.getText(), offset);
+      ZIDEEditor.EditorInfo information = owner.editorInfo(path, token);
+      infoTimer.stop();
+      infoPopup.hide();
+      if (information == null) return;
+      double screenX = event.getScreenX();
+      double screenY = event.getScreenY();
+      infoTimer.setOnFinished(ignored -> showInformation(information, screenX, screenY));
+      infoTimer.playFromStart();
+    });
+    editor.getEditor().addEventHandler(MouseEvent.MOUSE_EXITED, event -> hideInformation());
+    editor.getEditor().addEventHandler(KeyEvent.KEY_PRESSED, event -> hideInformation());
+  }
+
+  private void showInformation(ZIDEEditor.EditorInfo information, double screenX, double screenY) {
+    Label title = new Label(information.title);
+    title.getStyleClass().add("editor-info-title");
+    Label body = new Label(information.body);
+    body.setWrapText(true);
+    body.getStyleClass().add("editor-info-body");
+    VBox card = new VBox(6, title, body);
+    card.getStyleClass().add("editor-info-popup");
+    if (editor.isDarkMode()) card.getStyleClass().add("editor-info-popup-dark");
+    card.setMaxWidth(380);
+    infoPopup.getContent().setAll(card);
+    infoPopup.show(editor.getEditor(), screenX + 12, screenY + 18);
+  }
+
+  private void hideInformation() {
+    infoTimer.stop();
+    infoPopup.hide();
+  }
+
+  private static String tokenAt(String text, int offset) {
+    if (text == null || text.isEmpty()) return "";
+    int position = Math.max(0, Math.min(offset, text.length() - 1));
+    if (!isTokenCharacter(text.charAt(position)) && position > 0) position--;
+    if (!isTokenCharacter(text.charAt(position))) return "";
+    int start = position;
+    int end = position + 1;
+    while (start > 0 && isTokenCharacter(text.charAt(start - 1))) start--;
+    while (end < text.length() && isTokenCharacter(text.charAt(end))) end++;
+    return text.substring(start, end);
+  }
+
+  private static boolean isTokenCharacter(char character) {
+    return Character.isLetterOrDigit(character) || character == '_' || character == ':';
+  }
+
   void scheduleAnalysis() {
     if (path != null && !path.toLowerCase().endsWith(".yas")) return;
     analysisVersion.incrementAndGet();
@@ -113,7 +176,7 @@ public class EditorTab extends Tab {
     });
   }
 
-  void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); }
+  void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); hideInformation(); }
   void setDiagnosticCounts(int errors, int warnings) {
     errorCountLabel.setText(String.valueOf(errors));
     errorIndicator.setVisible(errors > 0);

@@ -276,6 +276,38 @@
     -fx-background-color: #737d89;
 }
 
+.editor-info-popup {
+    -fx-background-color: rgba(250, 250, 250, 0.97);
+    -fx-background-radius: 6px;
+    -fx-border-color: #c7ccd2;
+    -fx-border-radius: 6px;
+    -fx-padding: 10px 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 18, 0.12, 0, 5);
+}
+
+.editor-info-title {
+    -fx-font-weight: bold;
+    -fx-text-fill: #17191d;
+}
+
+.editor-info-body {
+    -fx-text-fill: #444a52;
+    -fx-font-size: 12px;
+}
+
+.editor-info-popup.editor-info-popup-dark {
+    -fx-background-color: rgba(35, 40, 48, 0.98);
+    -fx-border-color: #59616d;
+}
+
+.editor-info-popup-dark .editor-info-title {
+    -fx-text-fill: #f0f3f6;
+}
+
+.editor-info-popup-dark .editor-info-body {
+    -fx-text-fill: #c5cbd3;
+}
+
 /* JavaFX system terminal: separate from the Swing program-output console. */
 .terminal-pane {
     -fx-background-color: #111318;
