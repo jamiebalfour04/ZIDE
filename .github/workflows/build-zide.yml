@@ -56,16 +56,12 @@ jobs:
           file build/native/zide-aarch64
           file build/native/zide-aarch64 | grep -q arm64
 
-      - name: Package ZIDE
-        run: zip -j build/native/zide-aarch64.zip build/native/zide-aarch64
-
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-macos-aarch64
-          path: build/native/zide-aarch64.zip
+          path: build/native/zide-aarch64
           if-no-files-found: error
-          compression-level: 0
 
       - name: Deploy macOS ZIDE with rsync
         env:
@@ -96,8 +92,8 @@ jobs:
           fi
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-aarch64.zip \
-            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
+            build/native/zide-aarch64 \
+            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
 
   build-windows-x64:
     name: Windows x64 native image
@@ -142,16 +138,12 @@ jobs:
       - name: Verify native image
         shell: pwsh
         run: if (-not (Test-Path build/native/zide-win-x64.exe)) { throw "Windows ZIDE was not produced." }
-      - name: Package ZIDE
-        shell: pwsh
-        run: Compress-Archive -Path build/native/zide-win-x64.exe -DestinationPath build/native/zide-win-x64.zip
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-windows-x64
-          path: build/native/zide-win-x64.zip
+          path: build/native/zide-win-x64.exe
           if-no-files-found: error
-          compression-level: 0
       - name: Install rsync
         uses: msys2/setup-msys2@v2
         with:
@@ -176,7 +168,7 @@ jobs:
           ssh-keygen -y -P "" -f "$ssh_dir/deploy_key" > /dev/null
           rsync -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
-            build/native/zide-win-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
+            build/native/zide-win-x64.exe "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.exe"
 
   build-linux-x64:
     name: Linux x64 native image
@@ -213,15 +205,12 @@ jobs:
         run: |
           test -x build/native/zide-linux-x64
           file build/native/zide-linux-x64 | grep -q x86-64
-      - name: Package ZIDE
-        run: zip -j build/native/zide-linux-x64.zip build/native/zide-linux-x64
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-linux-x64
-          path: build/native/zide-linux-x64.zip
+          path: build/native/zide-linux-x64
           if-no-files-found: error
-          compression-level: 0
       - name: Deploy Linux ZIDE with rsync
         env:
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
@@ -241,4 +230,4 @@ jobs:
           ssh-keygen -y -P "" -f "$HOME/.ssh/zide_deploy" > /dev/null
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-linux-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
+            build/native/zide-linux-x64 "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
