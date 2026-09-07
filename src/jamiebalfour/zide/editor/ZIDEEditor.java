@@ -86,7 +86,7 @@ public class ZIDEEditor extends Application {
 
   Stage _stage;
   ZPERuntimeEnvironment runtime;
-  Label rightFooterLabel;
+  ComboBox<LanguageSupport> languageSelector;
   InteractiveConsoleFX consoleOutputTextArea;
   private ZIDESystemTerminal systemTerminal;
   Button runBtn;
@@ -105,6 +105,14 @@ public class ZIDEEditor extends Application {
   MenuItem runProject;
   MenuItem debugProject;
   MenuItem stopExecution = new MenuItem("Stop Execution");
+  private Node formatDocumentMenuItem;
+  private Node runScriptMenuItem;
+  private Node debugScriptMenuItem;
+  private Node stopScriptMenuItem;
+  private Node compileScriptMenuItem;
+  private Node compileNativeMenuItem;
+  private Node layoutBuilderMenuItem;
+  private final List<Node> transpileMenuItems = new ArrayList<>();
   private File currentProjectRoot;
   File projectDir;
   final Label statusLabel = new Label("Ready");
@@ -127,6 +135,8 @@ public class ZIDEEditor extends Application {
   private String cloudFileName = "";
   private final Map<String, LanguageSupport> languageSupports = new LinkedHashMap<>();
   private boolean languageSupportsRegistered;
+  private boolean updatingLanguageSelector;
+  private List<String> zpeedyKeywords;
 
 
 
@@ -232,6 +242,7 @@ public class ZIDEEditor extends Application {
     root.setTop(new BalfTitleBar(stage, "ZIDE", aboutHandler));
     Node menuBar = buildMenuBar();
     Node toolBar = buildToolBar();
+    updateLanguageCommands(null);
 
 
     BalfTitleBar.addWindowResizing(stage, root);
@@ -406,6 +417,7 @@ public class ZIDEEditor extends Application {
     extensionBox.getItems().addAll(
             "yas",
             "zps",
+            "sqarl",
             "ywp",
             "txt"
     );
@@ -534,7 +546,7 @@ public class ZIDEEditor extends Application {
       if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
     });
 
-    edit.createItem("Format document", "", this::beautifyCurrentDocument);
+    formatDocumentMenuItem = edit.createItem("Format document", "", this::beautifyCurrentDocument);
 
     var viewMenu = bar.menu("View");
 
@@ -579,30 +591,28 @@ public class ZIDEEditor extends Application {
 
     var script = bar.menu("Script");
 
-    script.createItem("Run", "F5", this::runCode);
-    script.createItem("Debug", "⇧⌘R", this::debug);
-    script.separator();
-    script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
-    script.separator();
-    script.createItem("Compile project to ZEX", "", this::compileProject);
-    script.createItem("Compile project Native", "", this::compileNative);
-    script.separator();
+    runScriptMenuItem = script.createItem("Run", "F5", this::runCode);
+    debugScriptMenuItem = script.createItem("Debug", "⇧⌘R", this::debug);
+    stopScriptMenuItem = script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
+    compileScriptMenuItem = script.createItem("Compile project to ZEX", "", this::compileCurrentLanguage);
+    compileNativeMenuItem = script.createItem("Compile project Native", "", this::compileNative);
     List<String> transpilers = ZPEKit.listTranspilerNames();
     if (!transpilers.isEmpty()) {
       for (String language : transpilers) {
         String transpilerName = ZPEKit.getTranspilerByName(language).transpilerName();
-        script.createItem(
+        Node transpileItem = script.createItem(
                 "Transpile to " + language + " (" + transpilerName + ")",
                 "",
                 () -> transpileCurrentFile(language)
         );
+        transpileMenuItems.add(transpileItem);
       }
     }
 
     var tools = bar.menu("Tools");
 
     tools.createItem("Open Macro Scripting Interface", "", this::openMSI);
-    tools.createItem("Open ZUI Layout Builder", "", this::openLayoutBuilder);
+    layoutBuilderMenuItem = tools.createItem("Open ZUI Layout Builder", "", this::openLayoutBuilder);
 
 
 
@@ -637,6 +647,7 @@ public class ZIDEEditor extends Application {
     help.createItem("Download ZPE Runtime Environment", "", this::downloadZPERuntime);
     help.createItem("Download ZPE Native", "", this::downloadZPENative);
 
+    updateLanguageCommands(null);
     return bar;
   }
 
@@ -1114,6 +1125,85 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  private void compileCurrentLanguage() {
+    EditorTab tab = getCurrentTab();
+    LanguageSupport language = tab == null ? null : languageSupports.get(tab.getLanguageId());
+    if (language == null || !language.canCompile()) return;
+    if (language.isYass()) compileProject();
+    else if ("zpeedy".equals(language.id)) compileZpeedy(tab);
+    else if ("sqarl".equals(language.id)) compileSqarl(tab);
+  }
+
+  private void compileZpeedy(EditorTab tab) {
+    File output = chooseOutputFile(_stage, sourceFile(tab),
+            new FileChooser.ExtensionFilter("ZPE Executable", "*.yex"));
+    if (output == null) return;
+    try {
+      Path source = writeTemporarySource(tab, "zide-zpeedy-", ".zps");
+      runZpeedyCommand("-c", source.toString(), output.getAbsolutePath());
+      showCompilationSuccess("Zpeedy Script", output);
+    } catch (Exception exception) {
+      showError("Zpeedy compilation failed", exception.getMessage());
+    }
+  }
+
+  private void compileSqarl(EditorTab tab) {
+    File output = chooseOutputFile(_stage, sourceFile(tab),
+            new FileChooser.ExtensionFilter("ZPE Executable", "*.yex"));
+    if (output == null) return;
+    try {
+      Path source = writeTemporarySource(tab, "zide-sqarl-", ".sqarl");
+      Process process = commandFor("sqarl", "-e", source.toString()).start();
+      String errors = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+      if (process.waitFor() != 0) throw new IOException(errors.isBlank() ? "SQARL compilation failed." : errors.trim());
+      Path generated = source.resolveSibling(source.getFileName().toString().replaceFirst("\\.sqarl$", ".yex"));
+      Files.move(generated, output.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      showCompilationSuccess("SQARL", output);
+    } catch (Exception exception) {
+      showError("SQARL compilation failed", exception.getMessage());
+    }
+  }
+
+  private Path writeTemporarySource(EditorTab tab, String prefix, String suffix) throws IOException {
+    Path source = Files.createTempFile(prefix, suffix);
+    Files.writeString(source, tab.getEditor().getText(), StandardCharsets.UTF_8);
+    source.toFile().deleteOnExit();
+    return source;
+  }
+
+  private ProcessBuilder commandFor(String command, String... arguments) {
+    List<String> invocation = new ArrayList<>();
+    if (HelperFunctions.isWindows()) {
+      invocation.add("cmd.exe");
+      invocation.add("/c");
+    }
+    invocation.add(command);
+    invocation.addAll(Arrays.asList(arguments));
+    return new ProcessBuilder(invocation);
+  }
+
+  private String runZpeedyCommand(String... arguments) throws Exception {
+    ProcessBuilder builder = commandFor("zpeedy", arguments);
+    builder.redirectErrorStream(true);
+    Process process = builder.start();
+    String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    if (process.waitFor() != 0) {
+      throw new IOException(output.isBlank() ? "Zpeedy command failed." : output.trim());
+    }
+    return output;
+  }
+
+  private File sourceFile(EditorTab tab) {
+    return tab == null || tab.getPath() == null ? null : new File(tab.getPath());
+  }
+
+  private void showCompilationSuccess(String language, File output) {
+    Alert alert = new Alert(Alert.AlertType.INFORMATION,
+            "Successfully compiled " + language + " to " + output.getAbsolutePath() + ".");
+    alert.setHeaderText(null);
+    alert.showAndWait();
+  }
+
   /** Uses an explicit folder selection; otherwise the current tab defines the project folder. */
   private File getCompileProjectDirectory(File currentFile) {
     if (projectTree != null) {
@@ -1165,7 +1255,7 @@ public class ZIDEEditor extends Application {
     }
 
     String extension = transpiler.getFileExtension();
-    File sourceFile = new File(currentTab.getPath());
+    File sourceFile = currentTab.getPath() == null ? new File("program") : new File(currentTab.getPath());
     FileChooser chooser = new FileChooser();
     chooser.setTitle("Transpile to " + language);
     chooser.setInitialFileName(
@@ -1192,11 +1282,17 @@ public class ZIDEEditor extends Application {
     }
 
     try {
-      String transpiledCode = ZPEKit.transpileCode(
-              sourceWithLayout(currentTab, currentTab.getEditor().getText()),
-              "",
-              transpiler
-      );
+      String transpiledCode;
+      if ("zpeedy".equals(currentTab.getLanguageId())) {
+        Path source = writeTemporarySource(currentTab, "zide-zpeedy-", ".zps");
+        transpiledCode = runZpeedyCommand("-t", source.toString(), language);
+      } else {
+        transpiledCode = ZPEKit.transpileCode(
+                sourceWithLayout(currentTab, currentTab.getEditor().getText()),
+                "",
+                transpiler
+        );
+      }
       FileHelperFunctions.writeFile(outputPath, transpiledCode, false);
 
       Alert success = new Alert(Alert.AlertType.INFORMATION);
@@ -1377,6 +1473,7 @@ public class ZIDEEditor extends Application {
       }
     }
     tab.setDiagnosticCounts(errorCount, warningCount);
+    tab.showDiagnostics(diagnostics);
 
     if (tab != getCurrentTab()) {
       return;
@@ -1385,9 +1482,12 @@ public class ZIDEEditor extends Application {
     problemsRows.clear();
     for (YASSDiagnostic diagnostic : diagnostics) {
       problemsRows.add(new ProblemRow(
+              tab,
               diagnostic.getSeverity().toString(),
               diagnostic.getLine(),
               diagnostic.getColumn(),
+              diagnostic.getStartOffset(),
+              diagnostic.getEndOffset(),
               diagnostic.getMessage()
       ));
     }
@@ -1426,7 +1526,7 @@ public class ZIDEEditor extends Application {
   private void runCode(){
 
     EditorTab currentTab = getCurrentTab();
-    LanguageSupport language = currentTab == null ? null : languageSupportForFile(currentTab.getPath());
+    LanguageSupport language = currentTab == null ? null : languageSupports.get(currentTab.getLanguageId());
     if (language != null && language.runner != null) {
       language.runner.accept(currentTab);
       return;
@@ -1835,6 +1935,11 @@ public class ZIDEEditor extends Application {
     buildBtn = createExpandableToolbarButton("Build", "/files/tools.png", this::debug);
     buildBtn.setOnAction(e -> {
       if(getCurrentTab() == null) return;
+      LanguageSupport language = languageSupports.get(getCurrentTab().getLanguageId());
+      if (language != null && !language.isYass()) {
+        compileCurrentLanguage();
+        return;
+      }
       try {
         if(ZPEKit.validateCode(getCurrentTab().getEditor().getText())){
           Alert alert = new Alert(Alert.AlertType.INFORMATION, "Code builds successfully", ButtonType.OK);
@@ -2365,28 +2470,7 @@ public class ZIDEEditor extends Application {
         ((EditorTab) newTab).scheduleAnalysis();
       }
 
-      Object ud = newTab.getUserData();
-      String path = (ud == null) ? null : ud.toString();
-
-      String lang = newTab.idProperty().getValue();
-
-      String ext = "";
-
-      if (lang != null) {
-        int dot = lang.lastIndexOf('.');
-        if (dot >= 0 && dot < lang.length() - 1) {
-          ext = lang.substring(dot + 1).toLowerCase();
-        }
-      }
-      if(rightFooterLabel != null){
-        if(ext.equals("yas")) {
-          rightFooterLabel.setText("YASS");
-        } else if (ext.equals("ywp")) {
-          rightFooterLabel.setText("YWP");
-        } else{
-          rightFooterLabel.setText("Text");
-        }
-      }
+      if (newTab instanceof EditorTab) syncLanguageSelector((EditorTab) newTab);
 
     });
 
@@ -2465,6 +2549,7 @@ public class ZIDEEditor extends Application {
     editor.setCaretPosition(0);
 
     Tab tab = createEditorTab(name, editor, file, editor.getView());
+    ((EditorTab) tab).setLanguageId(lang);
     if (file != null) tab.setId(file);
     editorTabs.getTabs().add(tab);
     editorTabs.getSelectionModel().select(tab);
@@ -2484,11 +2569,81 @@ public class ZIDEEditor extends Application {
     LanguageSupport language = languageSupports.get(id);
     if (language == null) {
       configurePlainText(editor);
-      rightFooterLabel.setText("Text");
       return;
     }
     language.configure.accept(editor);
-    rightFooterLabel.setText(language.label);
+  }
+
+  void applyLanguageForPath(EditorTab tab) {
+    if (tab == null) return;
+    String languageId = languageForFile(tab.getPath());
+    tab.setLanguageId(languageId);
+    setLanguage(languageId, tab.getEditor());
+    if (tab == getCurrentTab()) syncLanguageSelector(tab);
+  }
+
+  private void selectLanguage(EditorTab tab, LanguageSupport language) {
+    if (tab == null || language == null) return;
+    tab.setLanguageId(language.id);
+    setLanguage(language.id, tab.getEditor());
+    updateLanguageCommands(language);
+    statusLabel.setText(language.label + " language mode");
+  }
+
+  private void syncLanguageSelector(EditorTab tab) {
+    if (languageSelector == null || tab == null) return;
+    registerLanguageSupports();
+    String id = tab.getLanguageId();
+    if (id == null) {
+      id = languageForFile(tab.getPath());
+      tab.setLanguageId(id);
+    }
+    updatingLanguageSelector = true;
+    languageSelector.getSelectionModel().select(languageSupports.get(id));
+    updatingLanguageSelector = false;
+    updateLanguageCommands(languageSupports.get(id));
+  }
+
+  private void updateLanguageCommands(LanguageSupport language) {
+    boolean runnable = language != null && language.canRun();
+    boolean compilable = language != null && language.canCompile();
+    boolean yass = language != null && language.isYass();
+    setMenuItemAvailable(runScriptMenuItem, runnable);
+    setMenuItemAvailable(stopScriptMenuItem, runnable);
+    setMenuItemAvailable(debugScriptMenuItem, yass);
+    setMenuItemAvailable(compileScriptMenuItem, compilable);
+    setMenuItemAvailable(compileNativeMenuItem, yass);
+    setMenuItemAvailable(formatDocumentMenuItem, yass);
+    setMenuItemAvailable(layoutBuilderMenuItem, yass);
+    boolean transpilable = yass || (language != null && "zpeedy".equals(language.id));
+    for (Node item : transpileMenuItems) setMenuItemAvailable(item, transpilable);
+    if (runBtn != null) runBtn.setDisable(!runnable);
+    if (debugBtn != null) debugBtn.setDisable(!yass);
+    if (buildBtn != null) buildBtn.setDisable(!compilable);
+    if (compileScriptMenuItem != null && language != null) {
+      setGlassMenuItemText(compileScriptMenuItem,
+              yass ? "Compile YASS project to ZEX" : "Compile " + language.label + " to ZEX");
+    }
+    if (runScriptMenuItem != null && language != null) {
+      setGlassMenuItemText(runScriptMenuItem, "Run " + language.label);
+    }
+  }
+
+  private static void setMenuItemAvailable(Node item, boolean available) {
+    if (item == null) return;
+    item.setVisible(available);
+    item.setManaged(available);
+    item.setDisable(!available);
+  }
+
+  private static void setGlassMenuItemText(Node item, String text) {
+    if (!(item instanceof Pane)) return;
+    for (Node child : ((Pane) item).getChildren()) {
+      if (child instanceof Label && child.getStyleClass().contains("glass-menu-item-text")) {
+        ((Label) child).setText(text);
+        return;
+      }
+    }
   }
 
   private void configureYass(CodeEditorViewFX editor) {
@@ -2545,15 +2700,7 @@ public class ZIDEEditor extends Application {
     editor.clearContextualKeywords();
     editor.clearAutoCompleteItems();
 
-    String[] keywords = {
-            "a", "alternatively", "as", "at", "attempt", "back", "based", "call",
-            "choice", "continue", "display", "divide", "do", "error", "every", "for",
-            "forever", "give", "gives", "greater", "has", "if", "in", "is", "least",
-            "less", "minus", "most", "not", "on", "otherwise", "plus", "repeat",
-            "routine", "set", "stop", "takes", "than", "then", "thing", "times", "to",
-            "when", "while", "with"
-    };
-    for (String keyword : keywords) {
+    for (String keyword : getZpeedyKeywords()) {
       editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
       editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
     }
@@ -2561,6 +2708,35 @@ public class ZIDEEditor extends Application {
     addLiteral(editor, "false", CodeSyntaxModel.Style.BOOLEAN);
     addLiteral(editor, "nothing", CodeSyntaxModel.Style.NULL);
     addLiteral(editor, "unknown", CodeSyntaxModel.Style.NULL);
+  }
+
+  private List<String> getZpeedyKeywords() {
+    if (zpeedyKeywords != null) return zpeedyKeywords;
+    try {
+      ProcessBuilder builder = commandFor("zpeedy", "--keywords");
+      builder.redirectErrorStream(true);
+      Process process = builder.start();
+      List<String> keywords = new BufferedReader(new InputStreamReader(
+              process.getInputStream(), StandardCharsets.UTF_8)).lines()
+              .map(String::trim)
+              .filter(keyword -> keyword.matches("[a-z]+"))
+              .collect(java.util.stream.Collectors.toList());
+      if (process.waitFor() == 0 && !keywords.isEmpty()) {
+        zpeedyKeywords = Collections.unmodifiableList(keywords);
+        return zpeedyKeywords;
+      }
+    } catch (Exception ignored) {
+      // Keep editing available while the optional runtime is not installed.
+    }
+    zpeedyKeywords = List.of(
+            "a", "alternatively", "as", "at", "attempt", "back", "based", "call",
+            "choice", "continue", "display", "divide", "do", "error", "every", "for",
+            "forever", "give", "gives", "greater", "has", "if", "in", "is", "least",
+            "less", "loop", "minus", "most", "not", "on", "otherwise", "plus", "repeat",
+            "routine", "set", "stop", "takes", "than", "then", "thing", "times", "to",
+            "when", "while", "with"
+    );
+    return zpeedyKeywords;
   }
 
   private void addLiteral(CodeEditorViewFX editor, String literal, CodeSyntaxModel.Style style) {
@@ -2585,6 +2761,18 @@ public class ZIDEEditor extends Application {
     ));
     registerLanguage(new LanguageSupport(
             "python", "Python", Set.of("py"), this::configurePython,
+            null, null
+    ));
+    registerLanguage(new LanguageSupport(
+            "sqarl", "SQARL", Set.of("sqarl"), this::configureSqarl,
+            null, this::runSqarlCode
+    ));
+    registerLanguage(new LanguageSupport(
+            "ywp", "YWP", Set.of("ywp"), this::configurePlainText,
+            null, null
+    ));
+    registerLanguage(new LanguageSupport(
+            "txt", "Text", Set.of("txt", "md", "log"), this::configurePlainText,
             null, null
     ));
   }
@@ -2653,9 +2841,66 @@ public class ZIDEEditor extends Application {
       editor.clearAutoCompleteItems();
   }
 
-  EditorInfo editorInfo(String path, String token) {
-    if (token == null || token.isEmpty() || path == null) return null;
-    LanguageSupport registered = languageSupportForFile(path);
+  private void configureSqarl(CodeEditorViewFX editor) {
+      editor.setLineCommentMarkers("//");
+      editor.setBlockCommentMarkers("/*", "*/");
+      editor.setQuoteDelimiters("\"'");
+      editor.setVariableDelimiters("");
+      editor.setContextSeparator("");
+      editor.clearKeywords();
+      editor.clearContextualKeywords();
+      editor.clearAutoCompleteItems();
+
+      String[] keywords = {
+              "DECLARE", "INITIALLY", "WHILE", "RECEIVE", "FROM", "KEYBOARD", "END",
+              "SEND", "FOR", "EACH", "DO", "IF", "THEN", "SET", "TO", "DISPLAY",
+              "ARRAY", "STRING", "RECORD", "CLASS", "INTEGER", "REAL", "BOOLEAN",
+              "CHARACTER", "FUNCTION", "RETURN", "PROCEDURE", "AND", "OR", "NOT",
+              "MOD", "OPEN", "CLOSE", "CREATE", "METHODS", "THIS", "WITH", "OVERRIDE",
+              "INHERITS", "CONSTRUCTOR", "IS", "AS", "ELSE"
+      };
+      for (String keyword : keywords) {
+        editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
+        editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
+      }
+  }
+
+  private void runSqarlCode(EditorTab tab) {
+    if (tab == null) return;
+    try {
+      Path temporary = Files.createTempFile("zide-sqarl-", ".sqarl");
+      Files.writeString(temporary, tab.getEditor().getText(), StandardCharsets.UTF_8);
+      temporary.toFile().deleteOnExit();
+      ProcessBuilder process = HelperFunctions.isWindows()
+              ? new ProcessBuilder("cmd.exe", "/c", "sqarl", "-r", temporary.toString())
+              : new ProcessBuilder("sqarl", "-r", temporary.toString());
+      Path workingDirectory = resourceDirectoryFor(tab);
+      if (workingDirectory != null && Files.isDirectory(workingDirectory)) {
+        process.directory(workingDirectory.toFile());
+      }
+      consoleOutputTextArea.clear();
+      consoleOutputTextArea.append("SQARL runtime\n\n", InteractiveConsoleFX.OutputKind.KEY);
+      consoleTab.setSelected(true);
+      showBottomPanel(consoleView);
+      runBtn.getStyleClass().add("running");
+      statusLabel.setText("Executing SQARL");
+      consoleOutputTextArea.addProcessFinishedListener(() -> Platform.runLater(() -> {
+        runBtn.getStyleClass().remove("running");
+        statusLabel.setText("Ready");
+      }));
+      consoleOutputTextArea.runProcess(process);
+    } catch (IOException exception) {
+      runBtn.getStyleClass().remove("running");
+      statusLabel.setText("Ready");
+      consoleOutputTextArea.append("SQARL could not be started: " + exception.getMessage() + "\n",
+              InteractiveConsoleFX.OutputKind.ERROR);
+    }
+  }
+
+  EditorInfo editorInfo(String languageId, String path, String token) {
+    if (token == null || token.isEmpty()) return null;
+    LanguageSupport registered = languageSupports.get(languageId);
+    if (registered == null && path != null) registered = languageSupportForFile(path);
     if (registered != null && registered.information != null) return registered.information.apply(token);
     return null;
   }
@@ -2664,8 +2909,18 @@ public class ZIDEEditor extends Application {
     if (!ZPEKit.getAllFunctions().contains(token)) return null;
     String header = ZPEKit.getFunctionManualHeader(token);
     String entry = ZPEKit.getFunctionManualEntry(token);
-    String title = token + (header == null || header.isBlank() ? "" : "(" + header + ")");
-    return new EditorInfo(title, entry == null || entry.isBlank() ? "Built-in YASS function" : entry);
+    String returnType = ZPEHelperFunctions.typeByteToString(ZPEKit.getFunctionReturnType(token));
+    String title = (header == null || header.isBlank() ? token + "()" : header) + " : " + returnType;
+    String category = ZPEKit.getFunctionCategory(token);
+    String categoryPath = category == null ? null
+            : category.toLowerCase(Locale.ROOT).replace("/", "").replace(" ", "_");
+    String url = categoryPath == null ? null
+            : "https://www.jamiebalfour.scot/projects/zpe/documentation/functions/" + categoryPath + "/" + token;
+    return new EditorInfo(title,
+            entry == null || entry.isBlank() ? "Built-in YASS function" : entry,
+            "Function version " + ZPEKit.getFunctionVersion(token),
+            category == null ? null : "Category: " + category,
+            url);
   }
 
   private EditorInfo zpeedyInfo(String token) {
@@ -2687,10 +2942,20 @@ public class ZIDEEditor extends Application {
   static final class EditorInfo {
     final String title;
     final String body;
+    final String version;
+    final String category;
+    final String url;
 
     EditorInfo(String title, String body) {
+      this(title, body, null, null, null);
+    }
+
+    EditorInfo(String title, String body, String version, String category, String url) {
       this.title = title;
       this.body = body;
+      this.version = version;
+      this.category = category;
+      this.url = url;
     }
   }
 
@@ -2713,6 +2978,13 @@ public class ZIDEEditor extends Application {
       this.information = information;
       this.runner = runner;
     }
+
+    @Override
+    public String toString() { return label; }
+
+    boolean isYass() { return "yass".equals(id); }
+    boolean canRun() { return isYass() || runner != null; }
+    boolean canCompile() { return isYass() || "zpeedy".equals(id) || "sqarl".equals(id); }
   }
 
   private boolean confirmClose(String tabTitle) {
@@ -3556,20 +3828,13 @@ public class ZIDEEditor extends Application {
 
     problemsTable.getColumns().setAll(typeCol, lineCol, columnCol, msgCol);
 
-    problemsTable.setRowFactory(tv -> {
-      TableRow<ProblemRow> row = new TableRow<>();
-
-      row.setOnMouseClicked(e -> {
-        if (e.getClickCount() == 2 && !row.isEmpty()) {
-          int line = Integer.parseInt(row.getItem().lineProperty().get());
-          getCurrentTab().getEditor().goToLine(line);
-        }
-      });
-
-      return row;
-    });
-
     problemsTable.setRowFactory(tv -> new TableRow<>() {
+      {
+        setOnMouseClicked(event -> {
+          if (event.getClickCount() == 2 && !isEmpty()) navigateToProblem(getItem());
+        });
+      }
+
       @Override
       protected void updateItem(ProblemRow item, boolean empty) {
         super.updateItem(item, empty);
@@ -3591,18 +3856,32 @@ public class ZIDEEditor extends Application {
     return problemsTable;
   }
 
+  private void navigateToProblem(ProblemRow problem) {
+    if (problem == null || problem.tab == null) return;
+    editorTabs.getSelectionModel().select(problem.tab);
+    problem.tab.navigateToDiagnostic(problem.getLine(), problem.getColumn(),
+            problem.startOffset, problem.endOffset);
+  }
+
   public class ProblemRow {
 
+    private final EditorTab tab;
     private final SimpleStringProperty severity;
     private final SimpleStringProperty line;
     private final SimpleStringProperty column;
     private final SimpleStringProperty message;
+    private final int startOffset;
+    private final int endOffset;
 
-    public ProblemRow(String severity, int line, int column, String message) {
+    public ProblemRow(EditorTab tab, String severity, int line, int column,
+                      int startOffset, int endOffset, String message) {
+      this.tab = tab;
       this.severity = new SimpleStringProperty(severity);
       this.line = new SimpleStringProperty(String.valueOf(line));
       this.column = new SimpleStringProperty(String.valueOf(column));
       this.message = new SimpleStringProperty(message);
+      this.startOffset = startOffset;
+      this.endOffset = endOffset;
     }
 
     public StringProperty severityProperty() { return severity; }
@@ -3612,6 +3891,8 @@ public class ZIDEEditor extends Application {
     public String getSeverity() {
       return severity.get();
     }
+    public int getLine() { return Integer.parseInt(line.get()); }
+    public int getColumn() { return Integer.parseInt(column.get()); }
   }
 
   private VBox buildVariablesPane() {
@@ -3699,15 +3980,21 @@ public class ZIDEEditor extends Application {
 
   private Node buildStatusBar() {
     var centre = new Label("ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion() + " build " + ZIDE.getBuildNumber() + " © Jamie Balfour 2024 - 2026.");
-    rightFooterLabel = new Label("Text");
+    registerLanguageSupports();
+    languageSelector = new ComboBox<>();
+    languageSelector.getItems().setAll(languageSupports.values());
+    languageSelector.getSelectionModel().select(languageSupports.get("txt"));
+    languageSelector.getStyleClass().add("language-selector");
+    languageSelector.setAccessibleText("Editor language");
+    languageSelector.setTooltip(new Tooltip("Editor language"));
 
     centre.setStyle("-fx-font-size: 13px;");
 
-    rightFooterLabel.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-      if (getCurrentTab() != null) setLanguage("yass", getCurrentTab().getEditor());
+    languageSelector.valueProperty().addListener((observable, previous, language) -> {
+      if (!updatingLanguageSelector) selectLanguage(getCurrentTab(), language);
     });
 
-    var bar = new HBox(statusLabel, new Region(), centre, new Region(), rightFooterLabel);
+    var bar = new HBox(statusLabel, new Region(), centre, new Region(), languageSelector);
     HBox.setHgrow(bar.getChildren().get(1), Priority.ALWAYS);
     HBox.setHgrow(bar.getChildren().get(3), Priority.ALWAYS);
 

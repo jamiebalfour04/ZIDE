@@ -281,18 +281,33 @@
     -fx-background-radius: 6px;
     -fx-border-color: #c7ccd2;
     -fx-border-radius: 6px;
-    -fx-padding: 10px 12px;
+    -fx-padding: 14px 16px;
     -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 18, 0.12, 0, 5);
 }
 
 .editor-info-title {
     -fx-font-weight: bold;
     -fx-text-fill: #17191d;
+    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    -fx-font-size: 13px;
 }
 
 .editor-info-body {
     -fx-text-fill: #444a52;
+    -fx-font-size: 13px;
+}
+
+.editor-info-meta {
+    -fx-text-fill: #686f78;
     -fx-font-size: 12px;
+}
+
+.editor-info-link {
+    -fx-padding: 0;
+    -fx-text-fill: #008fcf;
+    -fx-font-size: 13px;
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
 }
 
 .editor-info-popup.editor-info-popup-dark {
@@ -306,6 +321,14 @@
 
 .editor-info-popup-dark .editor-info-body {
     -fx-text-fill: #c5cbd3;
+}
+
+.editor-info-popup-dark .editor-info-meta {
+    -fx-text-fill: #aeb5bf;
+}
+
+.editor-info-popup-dark .editor-info-link {
+    -fx-text-fill: #18b8f2;
 }
 
 /* JavaFX system terminal: separate from the Swing program-output console. */

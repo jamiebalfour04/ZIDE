@@ -8,6 +8,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.input.KeyEvent;
@@ -53,6 +54,7 @@ public class EditorTab extends Tab {
   private final Label warningCountLabel = new Label();
   private final HBox diagnosticOverlay = new HBox(7);
   private boolean changes;
+  private String languageId;
 
   public EditorTab(ZIDEEditor owner, String title, String path, CodeEditorViewFX editor, Node content) {
     super(title, content);
@@ -108,7 +110,7 @@ public class EditorTab extends Tab {
     editor.getEditor().addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
       int offset = editor.getEditor().hit(event.getX(), event.getY()).getInsertionIndex();
       String token = tokenAt(editor.getText(), offset);
-      ZIDEEditor.EditorInfo information = owner.editorInfo(path, token);
+      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, token);
       infoTimer.stop();
       infoPopup.hide();
       if (information == null) return;
@@ -117,7 +119,6 @@ public class EditorTab extends Tab {
       infoTimer.setOnFinished(ignored -> showInformation(information, screenX, screenY));
       infoTimer.playFromStart();
     });
-    editor.getEditor().addEventHandler(MouseEvent.MOUSE_EXITED, event -> hideInformation());
     editor.getEditor().addEventHandler(KeyEvent.KEY_PRESSED, event -> hideInformation());
   }
 
@@ -127,10 +128,34 @@ public class EditorTab extends Tab {
     Label body = new Label(information.body);
     body.setWrapText(true);
     body.getStyleClass().add("editor-info-body");
-    VBox card = new VBox(6, title, body);
+    VBox card = new VBox(9, title, body);
+    if (information.version != null) {
+      Label version = new Label(information.version);
+      version.getStyleClass().add("editor-info-meta");
+      card.getChildren().add(version);
+    }
+    if (information.category != null) {
+      Label category = new Label(information.category);
+      category.getStyleClass().add("editor-info-meta");
+      card.getChildren().add(category);
+    }
+    if (information.url != null) {
+      Hyperlink more = new Hyperlink("More information online");
+      more.getStyleClass().add("editor-info-link");
+      more.setOnAction(event -> {
+        try {
+          jamiebalfour.helpers.HelperFunctions.openWebsite(information.url);
+        } catch (Exception ignored) {
+          // A documentation link should never interrupt editing.
+        }
+        infoPopup.hide();
+      });
+      card.getChildren().add(more);
+    }
     card.getStyleClass().add("editor-info-popup");
     if (editor.isDarkMode()) card.getStyleClass().add("editor-info-popup-dark");
-    card.setMaxWidth(380);
+    card.setPrefWidth(500);
+    card.setMaxWidth(520);
     infoPopup.getContent().setAll(card);
     infoPopup.show(editor.getEditor(), screenX + 12, screenY + 18);
   }
@@ -176,6 +201,83 @@ public class EditorTab extends Tab {
     });
   }
 
+  void showDiagnostics(List<YASSDiagnostic> diagnostics) {
+    var area = editor.getEditor();
+    int length = area.getLength();
+    if (length == 0) return;
+
+    int position = 0;
+    for (var span : area.getStyleSpans(0, length)) {
+      int end = position + span.getLength();
+      area.setStyle(position, end, withoutDiagnosticStyle(span.getStyle()));
+      position = end;
+    }
+
+    for (YASSDiagnostic diagnostic : diagnostics) {
+      int start = diagnostic.getStartOffset();
+      int end = diagnostic.getEndOffset();
+      if (start < 0 || start >= length || end <= start) {
+        int[] range = rangeAt(diagnostic.getLine(), diagnostic.getColumn());
+        start = range[0];
+        end = range[1];
+      }
+      start = Math.max(0, Math.min(start, length - 1));
+      end = Math.max(start + 1, Math.min(end, length));
+      addDiagnosticStyle(start, end, "ERROR".equals(diagnostic.getSeverity().toString()));
+    }
+  }
+
+  private void addDiagnosticStyle(int start, int end, boolean error) {
+    var area = editor.getEditor();
+    String colour = error ? "#d93025" : "#d97706";
+    int position = start;
+    for (var span : area.getStyleSpans(start, end)) {
+      int spanEnd = position + span.getLength();
+      String base = withoutDiagnosticStyle(span.getStyle());
+      area.setStyle(position, spanEnd, base + " -rtfx-underline-color: " + colour
+              + "; -rtfx-underline-width: 1.4; -rtfx-underline-wave-radius: 1.5;");
+      position = spanEnd;
+    }
+  }
+
+  private static String withoutDiagnosticStyle(String style) {
+    if (style == null) return "";
+    return style.replaceAll("\\s*-rtfx-underline-(?:color|width|wave-radius)\\s*:[^;]+;?", "");
+  }
+
+  private int[] rangeAt(int line, int column) {
+    String text = editor.getText();
+    int offset = 0;
+    int currentLine = 1;
+    while (currentLine < Math.max(1, line) && offset < text.length()) {
+      if (text.charAt(offset++) == '\n') currentLine++;
+    }
+    offset = Math.min(text.length(), offset + Math.max(0, column - 1));
+    if (offset == text.length() && offset > 0) offset--;
+    int start = offset;
+    int end = Math.min(text.length(), offset + 1);
+    if (offset < text.length() && isTokenCharacter(text.charAt(offset))) {
+      while (start > 0 && isTokenCharacter(text.charAt(start - 1))) start--;
+      while (end < text.length() && isTokenCharacter(text.charAt(end))) end++;
+    }
+    return new int[]{start, end};
+  }
+
+  void navigateToDiagnostic(int line, int column, int start, int end) {
+    editor.goToLine(line);
+    int length = editor.getText().length();
+    if (start < 0 || start >= length || end <= start) {
+      int[] range = rangeAt(line, column);
+      start = range[0];
+      end = range[1];
+    }
+    start = Math.max(0, Math.min(start, length));
+    end = Math.max(start, Math.min(end, length));
+    if (end > start) editor.getEditor().selectRange(start, end);
+    editor.getEditor().requestFollowCaret();
+    editor.requestFocus();
+  }
+
   void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); hideInformation(); }
   void setDiagnosticCounts(int errors, int warnings) {
     errorCountLabel.setText(String.valueOf(errors));
@@ -188,7 +290,12 @@ public class EditorTab extends Tab {
 
   public String getPath() { return path; }
   /** Updates the backing path after a project-tree rename or move. */
-  void setPath(String path) { this.path = path; }
+  void setPath(String path) {
+    this.path = path;
+    owner.applyLanguageForPath(this);
+  }
+  String getLanguageId() { return languageId; }
+  void setLanguageId(String languageId) { this.languageId = languageId; }
   public CodeEditorViewFX getEditor() { return editor; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
   public void toggleSpecialLine(int line) {
