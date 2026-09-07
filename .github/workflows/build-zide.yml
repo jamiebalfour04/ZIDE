@@ -97,7 +97,7 @@ jobs:
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
             build/native/zide-aarch64.zip \
-            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
+            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
 
   build-windows-x64:
     name: Windows x64 native image
@@ -176,7 +176,7 @@ jobs:
           ssh-keygen -y -P "" -f "$ssh_dir/deploy_key" > /dev/null
           rsync -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
-            build/native/zide-win-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
+            build/native/zide-win-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
 
   build-linux-x64:
     name: Linux x64 native image
@@ -241,4 +241,4 @@ jobs:
           ssh-keygen -y -P "" -f "$HOME/.ssh/zide_deploy" > /dev/null
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-linux-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION.zip"
+            build/native/zide-linux-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.zip"
