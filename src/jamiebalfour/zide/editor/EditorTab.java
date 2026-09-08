@@ -129,7 +129,7 @@ public class EditorTab extends Tab {
       infoHideTimer.stop();
       int offset = editor.getEditor().hit(event.getX(), event.getY()).getInsertionIndex();
       String token = tokenAt(editor.getText(), offset);
-      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, editor.getText(), token);
+      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, editor.getText(), token, offset);
       infoTimer.stop();
       if (information == null) {
         scheduleInformationHide();
@@ -304,7 +304,7 @@ public class EditorTab extends Tab {
   }
 
   private static boolean isTokenCharacter(char character) {
-    return Character.isLetterOrDigit(character) || character == '_' || character == ':';
+    return Character.isLetterOrDigit(character) || character == '_' || character == ':' || character == '$';
   }
 
   void scheduleAnalysis() {

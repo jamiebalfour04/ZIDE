@@ -243,13 +243,19 @@ public class BalfGlassMenuBar extends HBox {
     }
 
     public GlassMenu separator() {
+      separatorNode();
+      return this;
+    }
+
+    /** Adds a separator and returns it so dynamic menus can manage its visibility. */
+    public Node separatorNode() {
       Region line = new Region();
       line.getStyleClass().add("glass-menu-separator");
       line.setPrefHeight(1);
       line.setMaxHeight(1);
       VBox.setMargin(line, new Insets(5, 10, 5, 10));
       box.getChildren().add(line);
-      return this;
+      return line;
     }
 
     public Node createItem(String text, String shortcut, Runnable action) {

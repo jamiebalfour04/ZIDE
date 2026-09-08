@@ -110,7 +110,8 @@ public class ZIDEEditor extends Application {
   private TableView<VarRow> varTable;
   private ObservableList<VarRow> varRows;
   private VBox variablesPane;
-  private ZPEDebugger.BreakPoint currentBreakpoint;
+  private volatile ZPEDebugger.BreakPoint currentBreakpoint;
+  private final Map<String, RuntimeVariable> breakpointVariables = new java.util.concurrent.ConcurrentHashMap<>();
   MenuItem runProject;
   MenuItem debugProject;
   MenuItem stopExecution = new MenuItem("Stop Execution");
@@ -120,6 +121,8 @@ public class ZIDEEditor extends Application {
   private Node stopScriptMenuItem;
   private Node compileScriptMenuItem;
   private Node compileNativeMenuItem;
+  private Node scriptCompileSeparator;
+  private Node scriptTranspileSeparator;
   private Node layoutBuilderMenuItem;
   private Node aiBuilderMenuItem;
   private final List<Node> transpileMenuItems = new ArrayList<>();
@@ -692,8 +695,10 @@ public class ZIDEEditor extends Application {
     runScriptMenuItem = script.createItem("Run", "F5", this::runCode);
     debugScriptMenuItem = script.createItem("Debug", "⇧⌘R", this::debug);
     stopScriptMenuItem = script.createItem("Stop Execution", "⇧⌘S", () -> consoleOutputTextArea.destroyCurrentProcess());
+    scriptCompileSeparator = script.separatorNode();
     compileScriptMenuItem = script.createItem("Compile project to ZEX", "", this::compileCurrentLanguage);
     compileNativeMenuItem = script.createItem("Compile project Native", "", this::compileNative);
+    scriptTranspileSeparator = script.separatorNode();
     List<String> transpilers = ZPEKit.listTranspilerNames();
     if (!transpilers.isEmpty()) {
       for (String language : transpilers) {
@@ -2146,6 +2151,8 @@ public class ZIDEEditor extends Application {
   private void finishDebugSession() {
     if (!debuggingSession) return;
     debuggingSession = false;
+    currentBreakpoint = null;
+    breakpointVariables.clear();
     endProfilerSession();
     Platform.runLater(() -> {
       debugBtn.getStyleClass().remove("running");
@@ -2254,11 +2261,11 @@ public class ZIDEEditor extends Application {
     }
     stepping = false;
     ZPEDebugger.addBreakPointReachedListener((b, varData) -> {
+      currentBreakpoint = b;
+      setVariables(varData);
       if(!stepping) {
         showVariablesPane();
-        setVariables(varData);
       }
-      currentBreakpoint = b;
 
     });
 
@@ -2381,6 +2388,8 @@ public class ZIDEEditor extends Application {
     }
     stepping = false;
     currentBreakpoint.resume();
+    currentBreakpoint = null;
+    breakpointVariables.clear();
   }
 
   private void stepOver(){
@@ -2389,6 +2398,8 @@ public class ZIDEEditor extends Application {
     }
     stepping = true;
     currentBreakpoint.stepOver();
+    currentBreakpoint = null;
+    breakpointVariables.clear();
   }
 
   private void stopExecution(){
@@ -2396,6 +2407,8 @@ public class ZIDEEditor extends Application {
       return;
     }
     currentBreakpoint.stopExecution();
+    currentBreakpoint = null;
+    breakpointVariables.clear();
   }
 
   private Node buildProjectTree(File projectDir) {
@@ -3041,6 +3054,8 @@ public class ZIDEEditor extends Application {
     setMenuItemAvailable(aiBuilderMenuItem, yass && isChatGPTConfigured());
     boolean transpilable = yass || (language != null && "zpeedy".equals(language.id));
     for (Node item : transpileMenuItems) setMenuItemAvailable(item, transpilable);
+    setMenuItemAvailable(scriptCompileSeparator, runnable && (compilable || transpilable));
+    setMenuItemAvailable(scriptTranspileSeparator, compilable && transpilable);
     if (runBtn != null) runBtn.setDisable(!runnable);
     if (debugBtn != null) debugBtn.setDisable(!debuggable);
     if (buildBtn != null) buildBtn.setDisable(!compilable);
@@ -3546,14 +3561,123 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  EditorInfo editorInfo(String languageId, String path, String source, String token) {
+  EditorInfo editorInfo(String languageId, String path, String source, String token, int offset) {
     if (token == null || token.isEmpty()) return null;
+    EditorInfo variable = variableInfo(languageId, source, token, offset);
+    if (variable != null) return variable;
     EditorInfo userDefined = sourceInfo(languageId, source, token);
     if (userDefined != null) return userDefined;
     LanguageSupport registered = languageSupports.get(languageId);
     if (registered == null && path != null) registered = languageSupportForFile(path);
     if (registered != null && registered.information != null) return registered.information.apply(token);
     return null;
+  }
+
+  private EditorInfo variableInfo(String languageId, String source, String token, int offset) {
+    if (!"yass".equals(languageId) && !"zpeedy".equals(languageId)) return null;
+    String name = normaliseVariableName(token);
+    RuntimeVariable live = breakpointVariables.get(name);
+    if (currentBreakpoint != null && live != null) {
+      String context = live.function == null || live.function.isBlank()
+              ? "Paused at the current breakpoint"
+              : "Paused in " + live.function;
+      return new EditorInfo(token + (live.type.isBlank() ? "" : " : " + live.type),
+              live.value, context, "Live debugger value", null);
+    }
+    return predictedVariableInfo(languageId, source, token, offset);
+  }
+
+  private EditorInfo predictedVariableInfo(String languageId, String source, String token, int offset) {
+    if (source == null || source.isBlank()) return null;
+    String lookup = normaliseVariableName(token);
+    int lineEnd = source.indexOf('\n', Math.max(0, Math.min(offset, source.length())));
+    int limit = lineEnd < 0 ? source.length() : lineEnd;
+    String available = source.substring(0, limit);
+    Assignment assignment = "zpeedy".equals(languageId)
+            ? lastZpeedyAssignment(available, lookup)
+            : lastYassAssignment(available, lookup);
+    if (assignment == null) return parameterInfo(languageId, available, token, lookup);
+
+    Prediction prediction = predictExpression(languageId, available, assignment.expression, assignment.start, 0);
+    String body;
+    if (prediction.known) {
+      body = "Predicted value: " + prediction.description;
+    } else if (prediction.call) {
+      body = "Value will come from " + prediction.description + ". The result is available when the call returns.";
+    } else {
+      body = "Value will be calculated from " + prediction.description + ".";
+    }
+    return new EditorInfo(token + (prediction.type == null ? "" : " : " + prediction.type), body,
+            "Assigned on line " + lineNumberAt(available, assignment.start),
+            prediction.known ? "Predicted value" : "Static value origin", null);
+  }
+
+  private EditorInfo parameterInfo(String languageId, String source, String token, String lookup) {
+    String name = Pattern.quote(lookup);
+    Pattern pattern = "zpeedy".equals(languageId)
+            ? Pattern.compile("(?im)^\\s*routine\\s+\\w+\\s+takes\\s+[^#\\r\\n]*\\b" + name + "\\b")
+            : Pattern.compile("(?im)^\\s*(?:(?:public|private|protected|static|final)\\s+)*function\\s+\\w+\\s*\\([^)]*\\$?" + name + "\\b[^)]*\\)");
+    if (!pattern.matcher(source).find()) return null;
+    return new EditorInfo(token, "Value is supplied by the caller when this routine runs.",
+            null, "Function parameter", null);
+  }
+
+  private Assignment lastYassAssignment(String source, String name) {
+    Pattern pattern = Pattern.compile("(?m)^\\s*\\$" + Pattern.quote(name)
+            + "\\s*=(?!=)\\s*(.+?)\\s*$");
+    return lastAssignment(source, pattern);
+  }
+
+  private Assignment lastZpeedyAssignment(String source, String name) {
+    Pattern pattern = Pattern.compile("(?im)^\\s*set\\s+" + Pattern.quote(name)
+            + "\\s+to\\s+(.+?)(?:\\s*#.*)?$");
+    return lastAssignment(source, pattern);
+  }
+
+  private Assignment lastAssignment(String source, Pattern pattern) {
+    Matcher matcher = pattern.matcher(source);
+    Assignment result = null;
+    while (matcher.find()) result = new Assignment(matcher.start(), matcher.group(1).trim());
+    return result;
+  }
+
+  private Prediction predictExpression(String languageId, String source, String expression, int before, int depth) {
+    String value = expression.trim();
+    if (value.matches("[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)")) {
+      return Prediction.known(value, value.contains(".") ? "real" : "number");
+    }
+    if (value.matches("(?s)[\"'].*[\"']")) return Prediction.known(value, "string");
+    if (value.matches("(?i:true|false)")) return Prediction.known(value.toLowerCase(Locale.ROOT), "boolean");
+    if (value.matches("(?i:null|nothing|unknown)")) return Prediction.known(value, "null");
+    if (value.matches("\\[.*]")) return Prediction.known(value, "list");
+    if (value.matches("\\{.*}")) return Prediction.known(value, "map");
+
+    Matcher call = Pattern.compile("^([A-Za-z_][A-Za-z0-9_:]*)\\s*\\(.*\\)$").matcher(value);
+    if (call.matches()) return Prediction.call("the function call " + value);
+    Matcher zpeedyCall = Pattern.compile("(?i)^call\\s+([A-Za-z_][A-Za-z0-9_]*)\\b.*$").matcher(value);
+    if (zpeedyCall.matches()) return Prediction.call("the routine call " + value);
+
+    Matcher reference = Pattern.compile("^\\$?([A-Za-z_][A-Za-z0-9_]*)$").matcher(value);
+    if (reference.matches() && depth < 8) {
+      String referenced = reference.group(1);
+      Assignment earlier = "zpeedy".equals(languageId)
+              ? lastZpeedyAssignment(source.substring(0, Math.min(before, source.length())), referenced)
+              : lastYassAssignment(source.substring(0, Math.min(before, source.length())), referenced);
+      if (earlier != null) return predictExpression(languageId, source, earlier.expression, earlier.start, depth + 1);
+    }
+    return Prediction.expression(value);
+  }
+
+  private static String normaliseVariableName(String token) {
+    String name = token == null ? "" : token.trim();
+    while (name.startsWith("$")) name = name.substring(1);
+    return name;
+  }
+
+  private static int lineNumberAt(String source, int offset) {
+    int line = 1;
+    for (int i = 0; i < Math.min(offset, source.length()); i++) if (source.charAt(i) == '\n') line++;
+    return line;
   }
 
   private EditorInfo yassInfo(String token) {
@@ -4685,24 +4809,66 @@ public class ZIDEEditor extends Application {
 
   public void setVariables(ZPEMap vars) {
     java.util.List<VarRow> rows = new java.util.ArrayList<>();
+    Map<String, RuntimeVariable> live = new HashMap<>();
 
     for (ZPEType o : vars) {
       ZPEMap m = (ZPEMap) vars.get(o);
 
       String type = ZPEHelperFunctions.getTypeString(m.get("type"));
 
-      rows.add(new VarRow(
-              String.valueOf(m.get("id")),
-              type,
-              String.valueOf(m.get("function")),
-              String.valueOf(m.get("value"))
-      ));
+      String id = String.valueOf(m.get("id"));
+      String function = String.valueOf(m.get("function"));
+      String value = String.valueOf(m.get("value"));
+      rows.add(new VarRow(id, type, function, value));
+      live.put(normaliseVariableName(id), new RuntimeVariable(type, function, value));
     }
+    breakpointVariables.clear();
+    breakpointVariables.putAll(live);
 
     Platform.runLater(() -> {
       varRows.setAll(rows);   // clear + repopulate in one go
       showVariablesPane();    // if you're hiding it until needed
     });
+  }
+
+  private static final class RuntimeVariable {
+    final String type;
+    final String function;
+    final String value;
+
+    RuntimeVariable(String type, String function, String value) {
+      this.type = type == null || "null".equals(type) ? "" : type;
+      this.function = function == null || "null".equals(function) ? "" : function;
+      this.value = value == null ? "null" : value;
+    }
+  }
+
+  private static final class Assignment {
+    final int start;
+    final String expression;
+
+    Assignment(int start, String expression) {
+      this.start = start;
+      this.expression = expression;
+    }
+  }
+
+  private static final class Prediction {
+    final boolean known;
+    final boolean call;
+    final String description;
+    final String type;
+
+    Prediction(boolean known, boolean call, String description, String type) {
+      this.known = known;
+      this.call = call;
+      this.description = description;
+      this.type = type;
+    }
+
+    static Prediction known(String value, String type) { return new Prediction(true, false, value, type); }
+    static Prediction call(String value) { return new Prediction(false, true, value, null); }
+    static Prediction expression(String value) { return new Prediction(false, false, value, null); }
   }
 
   private void clearRows(){
