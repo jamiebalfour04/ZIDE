@@ -3,17 +3,23 @@ package jamiebalfour.balflaf_fx;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
+import javafx.css.PseudoClass;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.*;
 import javafx.stage.Popup;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 public class BalfGlassMenuBar extends HBox {
 
   private Popup activeMenu;
   private Label activeMenuOwner;
+  private final List<GlassMenu> menus = new ArrayList<>();
+  private boolean darkMode;
+  private static final PseudoClass DARK = PseudoClass.getPseudoClass("dark");
 
   public BalfGlassMenuBar() {
     getStyleClass().add("glass-menubar");
@@ -35,11 +41,18 @@ public class BalfGlassMenuBar extends HBox {
 
 
     GlassMenu menu = new GlassMenu(label);
+    menus.add(menu);
 
     getChildren().add(hitBox);
     attachMenu(hitBox, menu.popup);
 
     return menu;
+  }
+
+  public void setDarkMode(boolean enabled) {
+    darkMode = enabled;
+    pseudoClassStateChanged(DARK, enabled);
+    for (GlassMenu menu : menus) menu.setDarkMode(enabled);
   }
 
   private Label createMenuTitle(String text) {
@@ -94,6 +107,7 @@ public class BalfGlassMenuBar extends HBox {
     private final Label owner;
     private final Popup popup;
     private final VBox box;
+    private final StackPane root;
 
     private GlassMenu(Label owner) {
       this.owner = owner;
@@ -101,7 +115,12 @@ public class BalfGlassMenuBar extends HBox {
       this.popup.setAutoHide(true);
       this.popup.setConsumeAutoHidingEvents(false);
 
-      StackPane root = new StackPane();
+      root = new StackPane();
+      root.getStyleClass().add("glass-menu-container");
+      root.getStylesheets().add(
+              getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
+      );
+      setDarkMode(darkMode);
 
 // Shadow layer (non-interactive)
       Region shadow = new Region();
@@ -130,6 +149,10 @@ public class BalfGlassMenuBar extends HBox {
           hideActiveMenu();
         }
       });
+    }
+
+    private void setDarkMode(boolean enabled) {
+      root.pseudoClassStateChanged(DARK, enabled);
     }
 
     public GlassCheckMenuItem checkItem(String text, boolean selected, Consumer<Boolean> action) {
@@ -224,7 +247,7 @@ public class BalfGlassMenuBar extends HBox {
       line.getStyleClass().add("glass-menu-separator");
       line.setPrefHeight(1);
       line.setMaxHeight(1);
-      VBox.setMargin(line, new Insets(3, 0, 3, 0));
+      VBox.setMargin(line, new Insets(5, 10, 5, 10));
       box.getChildren().add(line);
       return this;
     }

@@ -3,11 +3,11 @@
     -fx-font-family: "Inter", "Segoe UI", system;
     -fx-font-size: 13px;
 
-    -fx-base: #f5f6f8;
+    -fx-base: #f3f3f3;
     -fx-control-inner-background: #ffffff;
     -fx-background-color: -fx-base;
 
-    -fx-accent: #ff8000;
+    -fx-accent: #007acc;
     -fx-focus-color: -fx-accent;
     -fx-faint-focus-color: rgba(255,128,0,0.18);
 }
@@ -18,6 +18,47 @@
     -fx-control-inner-background: #1b1f26;
     -fx-background-color: -fx-base;
     -fx-text-fill: #e6e9ee;
+}
+
+/* Keep the entire workspace on the same dark surface as the code editor. */
+.app-root:dark .app-toolbar,
+.app-root:dark .side-pane,
+.app-root:dark .pane-wrapper,
+.app-root:dark .bottom-panel,
+.app-root:dark .bottom-content-stack,
+.app-root:dark .status-bar,
+.app-root:dark .split-pane,
+.app-root:dark .tool-bar {
+    -fx-background-color: #14171c;
+}
+
+.app-root:dark .label,
+.app-root:dark .check-box,
+.app-root:dark .radio-button,
+.app-root:dark .tab-label {
+    -fx-text-fill: #e6e9ee;
+}
+
+.app-root:dark .tree-view,
+.app-root:dark .tree-cell {
+    -fx-background-color: #1b1f26;
+    -fx-text-fill: #e6e9ee;
+}
+
+.app-root:dark .tree-cell:filled:hover {
+    -fx-background-color: #252b35;
+}
+
+.app-root:dark .combo-box,
+.app-root:dark .combo-box .list-cell,
+.app-root:dark .text-field {
+    -fx-background-color: #242a33;
+    -fx-text-fill: #e6e9ee;
+    -fx-prompt-text-fill: #929aa6;
+}
+
+.app-root:dark .separator .line {
+    -fx-border-color: rgba(255,255,255,0.12);
 }
 
 .app-menubar {
@@ -83,7 +124,7 @@
 }
 
 .side-pane, .console-pane {
-    -fx-background-color: -fx-control-inner-background;
+    -fx-background-color: #f3f3f3;
     -fx-border-color: rgba(0,0,0,0.08);
     -fx-border-width: 0 1 0 0;
 }
@@ -107,13 +148,13 @@
 }
 
 .project-tree {
-    -fx-background-color: -fx-control-inner-background;
+    -fx-background-color: #f3f3f3;
     -fx-padding: 6;
 }
 
 
 .tree-view:focused .tree-cell:selected {
-    -fx-background-color: #ff8000 !important;
+    -fx-background-color: #007acc !important;
     -fx-text-fill: white !important;
 }
 
@@ -161,7 +202,7 @@
 
 .editor-tabs .tab:selected {
     -fx-background-color: transparent;
-    -fx-border-color: transparent transparent #517 transparent;
+    -fx-border-color: transparent transparent #007acc transparent;
 }
 
 .editor-tabs .tab .focus-indicator,
@@ -206,11 +247,12 @@
 
 /* Low-profile editor scrollbars matching the desktop ZPE code editor. */
 .code-editor-scroll-pane .scroll-bar:vertical {
-    -fx-pref-width: 10px;
-    -fx-min-width: 10px;
-    -fx-max-width: 10px;
+    /* Horizontal padding gives the skin a 30px minimum thumb, with a slim grip. */
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
+    -fx-max-width: 18px;
     -fx-background-color: #f4f6f8;
-    -fx-padding: 1px;
+    -fx-padding: 0 6px 0 6px;
 }
 
 .code-editor-scroll-pane .scroll-bar:horizontal {
@@ -229,12 +271,8 @@
 
 .code-editor-scroll-pane .scroll-bar .thumb {
     -fx-background-color: #b9bec5;
-    -fx-background-insets: 2px;
+    -fx-background-insets: 2px 0 2px 0;
     -fx-background-radius: 3px;
-}
-
-.code-editor-scroll-pane .scroll-bar:vertical .thumb {
-    -fx-min-height: 24px;
 }
 
 .code-editor-scroll-pane .scroll-bar:horizontal .thumb {
@@ -243,6 +281,62 @@
 
 .code-editor-scroll-pane .scroll-bar .thumb:hover {
     -fx-background-color: #969da6;
+}
+
+/* Console, terminal, project and data panes use the editor scrollbar language. */
+.console-output .scroll-bar:vertical,
+.terminal-output .scroll-bar:vertical,
+.project-tree .scroll-bar:vertical,
+.table-view .scroll-bar:vertical {
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
+    -fx-max-width: 18px;
+    -fx-padding: 0 6px 0 6px;
+    -fx-background-color: #f4f6f8;
+}
+
+.console-output .scroll-bar:horizontal,
+.terminal-output .scroll-bar:horizontal,
+.project-tree .scroll-bar:horizontal,
+.table-view .scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-padding: 1px;
+    -fx-background-color: #f4f6f8;
+}
+
+.console-output .scroll-bar .track,
+.terminal-output .scroll-bar .track,
+.project-tree .scroll-bar .track,
+.table-view .scroll-bar .track,
+.console-output .scroll-bar .track-background,
+.terminal-output .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.console-output .scroll-bar .thumb,
+.terminal-output .scroll-bar .thumb,
+.project-tree .scroll-bar .thumb,
+.table-view .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px 0 2px 0;
+    -fx-background-radius: 3px;
+}
+
+.app-root:dark .console-output .scroll-bar,
+.app-root:dark .terminal-output .scroll-bar,
+.app-root:dark .project-tree .scroll-bar,
+.app-root:dark .table-view .scroll-bar {
+    -fx-background-color: #21262f;
+}
+
+.app-root:dark .console-output .scroll-bar .thumb,
+.app-root:dark .terminal-output .scroll-bar .thumb,
+.app-root:dark .project-tree .scroll-bar .thumb,
+.app-root:dark .table-view .scroll-bar .thumb {
+    -fx-background-color: #59616d;
 }
 
 .code-editor-scroll-pane .scroll-bar .increment-button,
@@ -277,24 +371,48 @@
 }
 
 .editor-info-popup {
-    -fx-background-color: rgba(250, 250, 250, 0.97);
-    -fx-background-radius: 6px;
-    -fx-border-color: #c7ccd2;
-    -fx-border-radius: 6px;
-    -fx-padding: 14px 16px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 18, 0.12, 0, 5);
+    -fx-background-color: rgba(248, 248, 250, 0.98);
+    -fx-background-radius: 8px;
+    -fx-border-color: #c4c7cc;
+    -fx-border-radius: 8px;
+    -fx-padding: 16px 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 20, 0.14, 0, 6);
 }
 
 .editor-info-title {
-    -fx-font-weight: bold;
-    -fx-text-fill: #17191d;
     -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
     -fx-font-size: 13px;
 }
 
+.editor-info-function {
+    -fx-fill: #871094;
+    -fx-font-weight: bold;
+}
+
+.editor-info-type {
+    -fx-fill: #0257ac;
+    -fx-font-style: italic;
+}
+
+.editor-info-parameter {
+    -fx-fill: #f06400;
+}
+
+.editor-info-signature-text {
+    -fx-fill: #17191d;
+}
+
 .editor-info-body {
-    -fx-text-fill: #444a52;
     -fx-font-size: 13px;
+}
+
+.editor-info-body-text {
+    -fx-fill: #444a52;
+}
+
+.editor-info-body-parameter {
+    -fx-fill: #444a52;
+    -fx-font-style: italic;
 }
 
 .editor-info-meta {
@@ -311,16 +429,29 @@
 }
 
 .editor-info-popup.editor-info-popup-dark {
-    -fx-background-color: rgba(35, 40, 48, 0.98);
-    -fx-border-color: #59616d;
+    -fx-background-color: rgba(31, 31, 31, 0.99);
+    -fx-border-color: #454545;
 }
 
-.editor-info-popup-dark .editor-info-title {
-    -fx-text-fill: #f0f3f6;
+.editor-info-popup-dark .editor-info-function {
+    -fx-fill: #c678de;
 }
 
-.editor-info-popup-dark .editor-info-body {
-    -fx-text-fill: #c5cbd3;
+.editor-info-popup-dark .editor-info-type {
+    -fx-fill: #698fa3;
+}
+
+.editor-info-popup-dark .editor-info-parameter {
+    -fx-fill: #ff7a18;
+}
+
+.editor-info-popup-dark .editor-info-signature-text {
+    -fx-fill: #f0f3f6;
+}
+
+.editor-info-popup-dark .editor-info-body-text,
+.editor-info-popup-dark .editor-info-body-parameter {
+    -fx-fill: #c5cbd3;
 }
 
 .editor-info-popup-dark .editor-info-meta {
@@ -386,6 +517,28 @@
     -fx-background-color: -fx-control-inner-background;
     -fx-border-color: rgba(0,0,0,0.08);
     -fx-border-width: 1 0 0 0;
+}
+
+.language-selector {
+    -fx-padding: 0 3px;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 11px;
+    -fx-cursor: hand;
+}
+
+.language-selector:hover {
+    -fx-background-color: rgba(0, 122, 204, 0.10);
+}
+
+.language-selector > .label {
+    -fx-padding: 0;
+}
+
+.language-selector > .arrow-button {
+    -fx-padding: 0;
+    -fx-max-width: 0;
+    -fx-opacity: 0;
 }
 .app-root:dark .status-bar {
     -fx-border-color: rgba(255,255,255,0.08);
@@ -880,6 +1033,39 @@
     -fx-text-fill: #aeb8c5;
 }
 
+.table-row-cell.problem-row-error,
+.table-row-cell.problem-row-error:selected {
+    -fx-background-color: #ffecec;
+}
+
+.table-row-cell.problem-row-warning,
+.table-row-cell.problem-row-warning:selected {
+    -fx-background-color: #fff6e5;
+}
+
+.table-row-cell.problem-row-error .table-cell,
+.table-row-cell.problem-row-warning .table-cell {
+    -fx-text-fill: #242424;
+}
+
+.app-root:dark .table-row-cell.problem-row-error,
+.app-root:dark .table-row-cell.problem-row-error:selected {
+    -fx-background-color: #4b2026;
+}
+
+.app-root:dark .table-row-cell.problem-row-warning,
+.app-root:dark .table-row-cell.problem-row-warning:selected {
+    -fx-background-color: #493817;
+}
+
+.app-root:dark .table-row-cell.problem-row-error .table-cell {
+    -fx-text-fill: #ffd7d7;
+}
+
+.app-root:dark .table-row-cell.problem-row-warning .table-cell {
+    -fx-text-fill: #ffe5ad;
+}
+
 /* ZUI builder previews approximate the platform-native controls used at run time. */
 .layout-builder-resize-handle {
     -fx-background-color: #26734d;
@@ -1216,4 +1402,101 @@
 .app-root:dark .editor-warning-icon,
 .app-root:dark .editor-warning-count {
     -fx-text-fill: #ffb74d;
+}
+
+/* VS Code Light+ workspace palette. Keep these last so legacy component
+   rules cannot reintroduce ZIDE's older grey or black surfaces. */
+.app-root {
+    -fx-base: #f3f3f3;
+    -fx-control-inner-background: #ffffff;
+    -fx-background-color: #ffffff;
+    -fx-accent: #007acc;
+    -fx-focus-color: #007acc;
+    -fx-faint-focus-color: rgba(0, 122, 204, 0.16);
+}
+
+.app-toolbar,
+.status-bar,
+.pane-wrapper,
+.bottom-panel,
+.bottom-content-stack,
+.console-pane,
+.split-pane {
+    -fx-background-color: #ffffff;
+}
+
+.app-toolbar,
+.status-bar,
+.side-pane,
+.console-pane,
+.pane-header,
+.bottom-panel {
+    -fx-border-color: #e5e5e5;
+}
+
+.side-pane,
+.pane-header,
+.project-tree,
+.project-tree .tree-cell,
+.editor-tabs .tab-header-area,
+.editor-tabs .tab-header-background {
+    -fx-background-color: #f3f3f3;
+}
+
+.pane-header {
+    -fx-background-color: #f3f3f3;
+}
+
+.project-tree .tree-cell:filled:hover,
+.editor-tabs .tab:hover {
+    -fx-background-color: #e8e8e8;
+}
+
+.tree-view:focused .tree-cell:selected {
+    -fx-background-color: #0060c0 !important;
+}
+
+.editor-tabs .tab:selected {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent #007acc transparent;
+}
+
+.editor-tabs .tab-content-area,
+.console-output,
+.console-output .content {
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: #000000;
+}
+
+.code-editor-scroll-pane .scroll-bar,
+.console-output .scroll-bar,
+.terminal-output .scroll-bar,
+.project-tree .scroll-bar,
+.table-view .scroll-bar {
+    -fx-background-color: #ffffff;
+}
+
+.code-editor-scroll-pane .scroll-bar .thumb,
+.console-output .scroll-bar .thumb,
+.terminal-output .scroll-bar .thumb,
+.project-tree .scroll-bar .thumb,
+.table-view .scroll-bar .thumb {
+    -fx-background-color: #c1c1c1;
+}
+
+.status-bar {
+    -fx-border-width: 1 0 0 0;
+}
+
+/* Dark mode must win over the light palette above. */
+.app-root:dark,
+.app-root:dark .app-toolbar,
+.app-root:dark .status-bar,
+.app-root:dark .pane-wrapper,
+.app-root:dark .bottom-panel,
+.app-root:dark .bottom-content-stack,
+.app-root:dark .console-pane,
+.app-root:dark .split-pane {
+    -fx-background-color: #14171c;
 }

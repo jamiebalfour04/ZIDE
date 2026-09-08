@@ -174,7 +174,8 @@
 }
 
 .glass-menu-separator {
-    -fx-background-color: rgba(0,0,0,0.18);
+    -fx-background-color: rgba(60,60,67,0.22);
+    -fx-background-insets: 0;
 }
 
 .glass-menu-title {
@@ -206,6 +207,32 @@
 .glass-menu-popup {
     -fx-background-color: rgba(255,255,255,0.92);
     -fx-background-radius: 10;
+}
+
+.glass-menu-container:dark .glass-menu-shadow {
+    -fx-background-color: #24262b;
+}
+
+.glass-menu-container:dark .glass-menu-popup {
+    -fx-background-color: rgba(36,38,43,0.96);
+}
+
+.glass-menu-container:dark .glass-menu-item-text,
+.glass-menu-container:dark .glass-menu-check {
+    -fx-text-fill: #f2f2f7;
+}
+
+.glass-menu-container:dark .glass-menu-shortcut {
+    -fx-text-fill: #a9abb3;
+}
+
+.glass-menu-container:dark .glass-menu-separator {
+    -fx-background-color: rgba(235,235,245,0.18);
+}
+
+.glass-menu-container:dark .glass-menu-item:disabled .glass-menu-item-text,
+.glass-menu-container:dark .glass-menu-item:disabled .glass-menu-shortcut {
+    -fx-text-fill: #696b72;
 }
 
 .context-menu {

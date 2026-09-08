@@ -18,6 +18,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
 import java.util.HashSet;
@@ -34,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class EditorTab extends Tab {
   private static final int ANALYSIS_DELAY_MS = 400;
+  private static final int INFORMATION_DELAY_MS = 500;
   private static final ExecutorService ANALYSER = Executors.newSingleThreadExecutor(r -> {
     Thread thread = new Thread(r, "zide-syntax-analyser");
     thread.setDaemon(true);
@@ -44,7 +47,9 @@ public class EditorTab extends Tab {
   private String path;
   private final CodeEditorViewFX editor;
   private final PauseTransition analysisTimer = new PauseTransition(Duration.millis(ANALYSIS_DELAY_MS));
-  private final PauseTransition infoTimer = new PauseTransition(Duration.millis(450));
+  private final PauseTransition symbolTimer = new PauseTransition(Duration.millis(250));
+  private final PauseTransition infoTimer = new PauseTransition(Duration.millis(INFORMATION_DELAY_MS));
+  private final PauseTransition infoHideTimer = new PauseTransition(Duration.millis(350));
   private final Popup infoPopup = new Popup();
   private final AtomicInteger analysisVersion = new AtomicInteger();
   private final Set<Integer> breakpointLines = new HashSet<>();
@@ -53,8 +58,11 @@ public class EditorTab extends Tab {
   private final HBox warningIndicator = new HBox(4);
   private final Label warningCountLabel = new Label();
   private final HBox diagnosticOverlay = new HBox(7);
+  private Label tabTitleLabel;
   private boolean changes;
   private String languageId;
+  private String currentInfoToken;
+  private boolean pointerOverInfoPopup;
 
   public EditorTab(ZIDEEditor owner, String title, String path, CodeEditorViewFX editor, Node content) {
     super(title, content);
@@ -95,10 +103,13 @@ public class EditorTab extends Tab {
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
+    symbolTimer.setOnFinished(e -> owner.refreshDocumentSymbols(this));
     editor.getEditor().textProperty().addListener((observable, oldText, newText) -> {
       changes = true;
       scheduleAnalysis();
+      symbolTimer.playFromStart();
     });
+    symbolTimer.playFromStart();
     scheduleAnalysis();
   }
 
@@ -106,28 +117,45 @@ public class EditorTab extends Tab {
     infoPopup.setAutoFix(true);
     infoPopup.setAutoHide(true);
     infoPopup.setHideOnEscape(true);
+    infoHideTimer.setOnFinished(event -> {
+      if (!pointerOverInfoPopup) hideInformation();
+    });
+    infoPopup.setOnHidden(event -> {
+      currentInfoToken = null;
+      pointerOverInfoPopup = false;
+    });
 
     editor.getEditor().addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+      infoHideTimer.stop();
       int offset = editor.getEditor().hit(event.getX(), event.getY()).getInsertionIndex();
       String token = tokenAt(editor.getText(), offset);
-      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, token);
+      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, editor.getText(), token);
       infoTimer.stop();
-      infoPopup.hide();
-      if (information == null) return;
+      if (information == null) {
+        scheduleInformationHide();
+        return;
+      }
+      if (token.equals(currentInfoToken) && infoPopup.isShowing()) return;
       double screenX = event.getScreenX();
       double screenY = event.getScreenY();
-      infoTimer.setOnFinished(ignored -> showInformation(information, screenX, screenY));
+      infoTimer.setOnFinished(ignored -> {
+        if (!pointerStillOverToken(token)) return;
+        if (infoPopup.isShowing()) infoPopup.hide();
+        currentInfoToken = token;
+        showInformation(information, screenX, screenY);
+      });
       infoTimer.playFromStart();
+    });
+    editor.getEditor().addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+      infoTimer.stop();
+      scheduleInformationHide();
     });
     editor.getEditor().addEventHandler(KeyEvent.KEY_PRESSED, event -> hideInformation());
   }
 
   private void showInformation(ZIDEEditor.EditorInfo information, double screenX, double screenY) {
-    Label title = new Label(information.title);
-    title.getStyleClass().add("editor-info-title");
-    Label body = new Label(information.body);
-    body.setWrapText(true);
-    body.getStyleClass().add("editor-info-body");
+    TextFlow title = createSignature(information.title);
+    TextFlow body = createDescription(information.body);
     VBox card = new VBox(9, title, body);
     if (information.version != null) {
       Label version = new Label(information.version);
@@ -154,15 +182,113 @@ public class EditorTab extends Tab {
     }
     card.getStyleClass().add("editor-info-popup");
     if (editor.isDarkMode()) card.getStyleClass().add("editor-info-popup-dark");
-    card.setPrefWidth(500);
-    card.setMaxWidth(520);
+    java.net.URL stylesheet = getClass().getResource("/zide.css");
+    if (stylesheet != null) card.getStylesheets().add(stylesheet.toExternalForm());
+    card.setOnMouseEntered(event -> {
+      pointerOverInfoPopup = true;
+      infoTimer.stop();
+      infoHideTimer.stop();
+    });
+    card.setOnMouseExited(event -> {
+      pointerOverInfoPopup = false;
+      scheduleInformationHide();
+    });
+    card.setPrefWidth(560);
+    card.setMaxWidth(600);
     infoPopup.getContent().setAll(card);
     infoPopup.show(editor.getEditor(), screenX + 12, screenY + 18);
   }
 
   private void hideInformation() {
     infoTimer.stop();
+    infoHideTimer.stop();
     infoPopup.hide();
+    currentInfoToken = null;
+    pointerOverInfoPopup = false;
+  }
+
+  private void scheduleInformationHide() {
+    if (!pointerOverInfoPopup) infoHideTimer.playFromStart();
+  }
+
+  private boolean pointerStillOverToken(String expectedToken) {
+    javafx.geometry.Point2D screen = new javafx.scene.robot.Robot().getMousePosition();
+    if (infoPopup.isShowing()
+            && screen.getX() >= infoPopup.getX()
+            && screen.getX() <= infoPopup.getX() + infoPopup.getWidth()
+            && screen.getY() >= infoPopup.getY()
+            && screen.getY() <= infoPopup.getY() + infoPopup.getHeight()) {
+      return false;
+    }
+    javafx.geometry.Point2D local = editor.getEditor().screenToLocal(screen);
+    if (!editor.getEditor().getBoundsInLocal().contains(local)) return false;
+    int offset = editor.getEditor().hit(local.getX(), local.getY()).getInsertionIndex();
+    return expectedToken.equals(tokenAt(editor.getText(), offset));
+  }
+
+  private TextFlow createSignature(String signature) {
+    TextFlow flow = new TextFlow();
+    flow.getStyleClass().add("editor-info-title");
+    String value = signature == null ? "" : signature.replaceAll("\\s+\\(", "(");
+    int functionEnd = value.indexOf('(');
+    if (functionEnd < 0) functionEnd = value.indexOf(' ');
+    if (functionEnd < 0) functionEnd = value.length();
+
+    addSignatureText(flow, value.substring(0, functionEnd), "editor-info-function");
+    int position = functionEnd;
+    while (position < value.length()) {
+      int typeStart = value.indexOf('{', position);
+      if (typeStart < 0) {
+        addSignatureText(flow, value.substring(position), "editor-info-signature-text");
+        break;
+      }
+      addSignatureText(flow, value.substring(position, typeStart), "editor-info-signature-text");
+      int typeEnd = value.indexOf('}', typeStart + 1);
+      if (typeEnd < 0) {
+        addSignatureText(flow, value.substring(typeStart + 1), "editor-info-type");
+        break;
+      }
+      addSignatureText(flow, value.substring(typeStart + 1, typeEnd), "editor-info-type");
+      position = typeEnd + 1;
+      int comma = value.indexOf(',', position);
+      int close = value.indexOf(')', position);
+      int parameterEnd = comma < 0 ? close : close < 0 ? comma : Math.min(comma, close);
+      if (parameterEnd > position && !value.substring(position, parameterEnd).trim().isEmpty()) {
+        addSignatureText(flow, value.substring(position, parameterEnd), "editor-info-parameter");
+        position = parameterEnd;
+      }
+    }
+    return flow;
+  }
+
+  private TextFlow createDescription(String description) {
+    TextFlow flow = new TextFlow();
+    flow.getStyleClass().add("editor-info-body");
+    String value = description == null ? "" : description;
+    int position = 0;
+    while (position < value.length()) {
+      int markerStart = value.indexOf("__", position);
+      if (markerStart < 0) {
+        addSignatureText(flow, value.substring(position), "editor-info-body-text");
+        break;
+      }
+      addSignatureText(flow, value.substring(position, markerStart), "editor-info-body-text");
+      int markerEnd = value.indexOf("__", markerStart + 2);
+      if (markerEnd < 0) {
+        addSignatureText(flow, value.substring(markerStart + 2), "editor-info-body-text");
+        break;
+      }
+      addSignatureText(flow, value.substring(markerStart + 2, markerEnd), "editor-info-body-parameter");
+      position = markerEnd + 2;
+    }
+    return flow;
+  }
+
+  private void addSignatureText(TextFlow flow, String value, String styleClass) {
+    if (value.isEmpty()) return;
+    Text text = new Text(value);
+    text.getStyleClass().add(styleClass);
+    flow.getChildren().add(text);
   }
 
   private static String tokenAt(String text, int offset) {
@@ -182,7 +308,12 @@ public class EditorTab extends Tab {
   }
 
   void scheduleAnalysis() {
-    if (path != null && !path.toLowerCase().endsWith(".yas")) return;
+    if (!"yass".equals(languageId) && !"python".equals(languageId)) {
+      analysisVersion.incrementAndGet();
+      analysisTimer.stop();
+      owner.updateProblems(this, List.of());
+      return;
+    }
     analysisVersion.incrementAndGet();
     analysisTimer.playFromStart();
   }
@@ -191,7 +322,7 @@ public class EditorTab extends Tab {
     final int version = analysisVersion.get();
     final String source = editor.getText();
     ANALYSER.submit(() -> {
-      List<YASSDiagnostic> diagnostics = ZPEKit.analyseCode(source, 0, source.length());
+      List<YASSDiagnostic> diagnostics = owner.analyseCodeForTab(this, source);
       if (version != analysisVersion.get()) return;
       Platform.runLater(() -> {
         if (version == analysisVersion.get() && source.equals(editor.getText())) {
@@ -289,6 +420,14 @@ public class EditorTab extends Tab {
   }
 
   public String getPath() { return path; }
+  void setTabTitleLabel(Label label) { tabTitleLabel = label; }
+  void setDisplayTitle(String title) {
+    setText("");
+    if (tabTitleLabel != null) tabTitleLabel.setText(title);
+  }
+  String getDisplayTitle() {
+    return tabTitleLabel == null ? getText() : tabTitleLabel.getText();
+  }
   /** Updates the backing path after a project-tree rename or move. */
   void setPath(String path) {
     this.path = path;
