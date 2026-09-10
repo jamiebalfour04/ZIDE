@@ -245,6 +245,18 @@
     -fx-text-fill: #e6e9ee;
 }
 
+/* Modena on Windows paints RichTextFX's empty viewport independently. */
+.app-root.dark .console-output,
+.app-root.dark .console-output .virtual-flow,
+.app-root.dark .console-output .viewport,
+.app-root.dark .console-output .styled-text-area,
+.app-root.dark .console-output .styled-text-area .content,
+.app-root.dark .console-output .paragraph-box {
+    -fx-background: #1e1e1e;
+    -fx-background-color: #1e1e1e;
+    -fx-control-inner-background: #1e1e1e;
+}
+
 .app-root.dark .code-area .caret {
     -fx-stroke: #ffffff;
 }
