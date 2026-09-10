@@ -3,8 +3,15 @@ import jamiebalfour.zide.editor.ZIDEEditor;
 
 public class ZIDE {
 
-  final static String MAJOR_VERSION = "0.1";
-  final static String MINOR_VERSION = "1";
+  static {
+    if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+      System.setProperty("apple.awt.application.name", "ZIDE");
+      System.setProperty("com.apple.mrj.application.apple.menu.about.name", "ZIDE");
+    }
+  }
+
+  final static String MAJOR_VERSION = "1.26";
+  final static String MINOR_VERSION = "10";
 
   public static void main(String[] args) {
 
