@@ -199,6 +199,7 @@ public final class ZUILayoutBuilder {
     design.setCenter(buildCanvas());
     TabPane inspector = new TabPane();
     inspector.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+    inspector.getStyleClass().add("layout-builder-inspector");
     inspector.getTabs().add(new Tab("Properties", buildProperties()));
     generatedCode.setEditable(false);
     generatedCode.setStyle("-fx-font-family: 'JetBrains Mono', monospace;");
@@ -214,6 +215,7 @@ public final class ZUILayoutBuilder {
     palette.setAlignment(Pos.TOP_CENTER);
     for (Kind kind : Kind.values()) {
       Button button = new Button();
+      button.getStyleClass().add("layout-builder-tool-button");
       button.setGraphic(paletteIcon(kind));
       button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
       button.setTooltip(new Tooltip(kind.title));
@@ -330,7 +332,7 @@ public final class ZUILayoutBuilder {
     canvas.setPrefSize(640, 560);
     canvas.setMinSize(640, 560);
     canvas.setFocusTraversable(true);
-    canvas.setStyle("-fx-background-color: #f7f8fa; -fx-border-color: #bec2c8;");
+    canvas.getStyleClass().add("layout-builder-canvas");
     canvas.setOnMousePressed(e -> {
       if (e.getTarget() == canvas) {
         select(null);
@@ -339,7 +341,7 @@ public final class ZUILayoutBuilder {
     });
     StackPane surround = new StackPane(canvas);
     surround.setPadding(new Insets(22));
-    surround.setStyle("-fx-background-color: #e0e3e7;");
+    surround.getStyleClass().add("layout-builder-canvas-surround");
     ScrollPane scroll = new ScrollPane(surround);
     scroll.setFitToWidth(true);
     scroll.setFitToHeight(true);
@@ -351,6 +353,8 @@ public final class ZUILayoutBuilder {
     grid.setPadding(new Insets(14));
     grid.setHgap(10); grid.setVgap(10);
     ColumnConstraints label = new ColumnConstraints();
+    label.setMinWidth(72);
+    label.setPrefWidth(72);
     ColumnConstraints field = new ColumnConstraints();
     field.setHgrow(Priority.ALWAYS);
     grid.getColumnConstraints().addAll(label, field);
