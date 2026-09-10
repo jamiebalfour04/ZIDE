@@ -138,6 +138,60 @@
     -fx-background-color: #681984;
 }
 
+.jb-glass-menu.context-menu {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(60,60,67,0.24);
+    -fx-border-radius: 10px;
+    -fx-border-width: 1px;
+    -fx-padding: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
+}
+
+.jb-glass-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7px;
+    -fx-padding: 5px 10px;
+}
+
+.jb-glass-menu .menu-item:hover {
+    -fx-background-color: rgba(255,128,0,0.94);
+}
+
+.jb-glass-menu .menu-item .label {
+    -fx-text-fill: #202020;
+    -fx-font-size: 13px;
+}
+
+.jb-glass-menu .menu-item:hover .label {
+    -fx-text-fill: white;
+}
+
+.jb-glass-menu:dark.context-menu,
+.jb-glass-menu-dark.context-menu {
+    -fx-background-color: #24262b;
+    -fx-border-color: rgba(235,235,245,0.18);
+}
+
+.jb-glass-menu:dark .menu-item .label,
+.jb-glass-menu-dark .menu-item .label {
+    -fx-text-fill: #f2f2f7;
+}
+
+.jb-glass-menu .separator-menu-item {
+    -fx-padding: 1px 4px;
+}
+
+.jb-glass-menu .separator:horizontal .line {
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(60,60,67,0.22) transparent transparent transparent;
+}
+
+.jb-glass-menu:dark .separator:horizontal .line,
+.jb-glass-menu-dark .separator:horizontal .line {
+    -fx-border-color: rgba(235,235,245,0.18) transparent transparent transparent;
+}
+
 .glass-menu-item {
     -fx-background-radius: 8px;
 }
@@ -161,9 +215,46 @@
     -fx-text-fill: #555555;
 }
 
+.glass-menu-zoom-row {
+    -fx-alignment: center-left;
+    -fx-min-width: 200px;
+    -fx-padding: 2px 6px;
+}
+
+.glass-menu-zoom-button {
+    -fx-min-width: 30px;
+    -fx-pref-width: 30px;
+    -fx-min-height: 28px;
+    -fx-pref-height: 28px;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-border-width: 0;
+    -fx-font-size: 15px;
+    -fx-text-fill: #202020;
+    -fx-cursor: hand;
+}
+
+.glass-menu-zoom-button:hover {
+    -fx-background-color: rgba(0,0,0,0.08);
+}
+
+.glass-menu-zoom-value {
+    -fx-min-width: 56px;
+    -fx-pref-width: 56px;
+}
+
+.glass-menu-zoom-value .label {
+    -fx-text-fill: #202020;
+    -fx-font-size: 13px;
+}
+
 .glass-menu-separator {
     -fx-background-color: rgba(60,60,67,0.22);
     -fx-background-insets: 0;
+    -fx-min-height: 1px;
+    -fx-pref-height: 1px;
+    -fx-max-height: 1px;
 }
 
 .glass-menu-title {
@@ -193,8 +284,11 @@
 }
 
 .glass-menu-popup {
-    -fx-background-color: rgba(255,255,255,0.92);
+    -fx-background-color: #ffffff;
     -fx-background-radius: 10;
+    -fx-border-color: rgba(60,60,67,0.24);
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
 }
 
 .glass-menu-container:dark .glass-menu-shadow {
@@ -202,7 +296,8 @@
 }
 
 .glass-menu-container:dark .glass-menu-popup {
-    -fx-background-color: rgba(36,38,43,0.96);
+    -fx-background-color: #24262b;
+    -fx-border-color: rgba(235,235,245,0.18);
 }
 
 .glass-menu-container:dark .glass-menu-item-text,
@@ -212,6 +307,15 @@
 
 .glass-menu-container:dark .glass-menu-shortcut {
     -fx-text-fill: #a9abb3;
+}
+
+.glass-menu-container:dark .glass-menu-zoom-button,
+.glass-menu-container:dark .glass-menu-zoom-value .label {
+    -fx-text-fill: #f2f2f7;
+}
+
+.glass-menu-container:dark .glass-menu-zoom-button:hover {
+    -fx-background-color: rgba(255,255,255,0.12);
 }
 
 .glass-menu-container:dark .glass-menu-separator {

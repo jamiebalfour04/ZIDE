@@ -25,6 +25,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
+import javafx.css.PseudoClass;
 import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -51,6 +52,7 @@ public class BalfTitleBar extends Region {
   private final Button jbMenu;
   private ContextMenu jbContextMenu;
   private MenuItem settingsMenuItem;
+  private boolean darkMode;
   private final Canvas titleCanvas = new Canvas();
 
   private final Insets padding = new Insets(0, 10, 0, 10);
@@ -64,6 +66,7 @@ public class BalfTitleBar extends Region {
   private final boolean enableWindowMinimise;
 
   private final EventHandler<ActionEvent> onAbout;
+  private Runnable onCloseRequest;
 
   public BalfTitleBar(Stage stage, String title, EventHandler<ActionEvent> aboutAction) {
     this(stage, title, aboutAction, true, true, true, true);
@@ -143,6 +146,34 @@ public class BalfTitleBar extends Region {
   /** Connects the application's settings action to the title-bar application menu. */
   public void setOnSettings(EventHandler<ActionEvent> handler) {
     if (settingsMenuItem != null) settingsMenuItem.setOnAction(handler);
+  }
+
+  /** Lets the owning application present its own close confirmation surface. */
+  public void setOnCloseRequest(Runnable handler) {
+    onCloseRequest = handler;
+  }
+
+  private void requestClose() {
+    if (onCloseRequest != null) {
+      onCloseRequest.run();
+    } else if (confirmClose()) {
+      stage.close();
+    }
+  }
+
+  /** Keeps the title-bar application popup in step with the application theme. */
+  public void setDarkMode(boolean enabled) {
+    darkMode = enabled;
+    if (jbContextMenu != null) {
+      jbContextMenu.pseudoClassStateChanged(PseudoClass.getPseudoClass("dark"), enabled);
+      if (enabled) {
+        if (!jbContextMenu.getStyleClass().contains("jb-glass-menu-dark")) {
+          jbContextMenu.getStyleClass().add("jb-glass-menu-dark");
+        }
+      } else {
+        jbContextMenu.getStyleClass().remove("jb-glass-menu-dark");
+      }
+    }
   }
 
   @Override
@@ -279,12 +310,7 @@ public class BalfTitleBar extends Region {
 
     if(enableWindowClose) {
       var close = trafficLight("balf-close", Color.web("#ff5f57"));
-      close.setOnMouseClicked(e -> {
-        if (confirmClose()) {
-          Platform.exit();
-          System.exit(0);
-        }
-      });
+      close.setOnMouseClicked(e -> requestClose());
 
       box.getChildren().add(close);
     }
@@ -393,12 +419,7 @@ public class BalfTitleBar extends Region {
     }
 
     if(enableWindowClose) {
-      close.setOnAction(e -> {
-        if (confirmClose()) {
-          Platform.exit();
-          System.exit(0);
-        }
-      });
+      close.setOnAction(e -> requestClose());
       box.getChildren().add(close);
     }
 
@@ -477,13 +498,18 @@ public class BalfTitleBar extends Region {
   private void enableDoubleClickZoom(Stage stage) {
     setOnMouseClicked(e -> {
       if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
-        if(isMac()){
-          toggleMacZoom(stage);
-        } else{
-          stage.setMaximized(!stage.isMaximized());
-        }
+        toggleMaximise();
       }
     });
+  }
+
+  /** Applies the same platform-appropriate maximise action used by the title bar. */
+  public void toggleMaximise() {
+    if (isMac()) {
+      toggleMacZoom(stage);
+    } else {
+      stage.setMaximized(!stage.isMaximized());
+    }
   }
 
   private static boolean isMac() {
@@ -518,11 +544,11 @@ public class BalfTitleBar extends Region {
       }
     });
 
-    MenuItem github   = new MenuItem("GitHub");
+    MenuItem github = new MenuItem("Visit the ZIDE GitHub page");
 
     github.setOnAction(e -> {
       try {
-        HelperFunctions.openWebsite("https://github.com/jamiebalfour04");
+        HelperFunctions.openWebsite("https://github.com/jamiebalfour04/ZIDE");
       }catch (URISyntaxException | IOException ex) {
         //Ignore
       }
@@ -533,12 +559,7 @@ public class BalfTitleBar extends Region {
     settingsMenuItem = new MenuItem("Settings");
     MenuItem quit     = new MenuItem("Quit");
 
-    quit.setOnAction(e -> {
-      if(confirmClose()){
-        Platform.exit();
-        System.exit(0);
-      }
-    });
+    quit.setOnAction(e -> requestClose());
 
     jbContextMenu = new ContextMenu(
             website,
@@ -549,6 +570,9 @@ public class BalfTitleBar extends Region {
             new SeparatorMenuItem(),
             quit
     );
+    jbContextMenu.getStyleClass().add("jb-glass-menu");
+    jbContextMenu.pseudoClassStateChanged(PseudoClass.getPseudoClass("dark"), darkMode);
+    if (darkMode) jbContextMenu.getStyleClass().add("jb-glass-menu-dark");
 
     // Show/hide on click
     jb.setOnAction(e -> {

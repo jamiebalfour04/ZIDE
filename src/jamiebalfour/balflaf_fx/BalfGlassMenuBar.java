@@ -5,7 +5,9 @@ import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.css.PseudoClass;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.stage.Popup;
 
@@ -20,6 +22,7 @@ public class BalfGlassMenuBar extends HBox {
   private final List<GlassMenu> menus = new ArrayList<>();
   private boolean darkMode;
   private static final PseudoClass DARK = PseudoClass.getPseudoClass("dark");
+  private static final PseudoClass HOVER = PseudoClass.getPseudoClass("hover");
 
   public BalfGlassMenuBar() {
     getStyleClass().add("glass-menubar");
@@ -30,6 +33,15 @@ public class BalfGlassMenuBar extends HBox {
   }
 
   public GlassMenu menu(String title) {
+    return menu(title, false);
+  }
+
+  /** Creates a menu whose popup opens above its owner, for bottom status bars. */
+  public GlassMenu menuAbove(String title) {
+    return menu(title, true);
+  }
+
+  private GlassMenu menu(String title, boolean opensAbove) {
     Label label = createMenuTitle(title);
 
     StackPane hitBox = new StackPane(label);
@@ -40,11 +52,11 @@ public class BalfGlassMenuBar extends HBox {
     hitBox.setPrefHeight(30);
 
 
-    GlassMenu menu = new GlassMenu(label);
+    GlassMenu menu = new GlassMenu(label, opensAbove);
     menus.add(menu);
 
     getChildren().add(hitBox);
-    attachMenu(hitBox, menu.popup);
+    attachMenu(hitBox, menu);
 
     return menu;
   }
@@ -53,6 +65,11 @@ public class BalfGlassMenuBar extends HBox {
     darkMode = enabled;
     pseudoClassStateChanged(DARK, enabled);
     for (GlassMenu menu : menus) menu.setDarkMode(enabled);
+  }
+
+  /** Closes the currently displayed top-level menu, if any. */
+  public void hideMenus() {
+    hideActiveMenu();
   }
 
   private Label createMenuTitle(String text) {
@@ -71,10 +88,11 @@ public class BalfGlassMenuBar extends HBox {
     return label;
   }
 
-  private void attachMenu(Node owner, Popup popup) {
+  private void attachMenu(Node owner, GlassMenu menu) {
+    Popup popup = menu.popup;
     owner.setOnMouseEntered(e -> {
       if (activeMenu != null && activeMenu != popup) {
-        showMenu(owner, popup);
+        showMenu(owner, menu);
       }
     });
 
@@ -85,20 +103,28 @@ public class BalfGlassMenuBar extends HBox {
         return;
       }
 
-      showMenu(owner, popup);
+      showMenu(owner, menu);
       e.consume();
     });
   }
 
-  private void showMenu(Node owner, Popup popup) {
+  private void showMenu(Node owner, GlassMenu menu) {
+    Popup popup = menu.popup;
     if (activeMenu == popup && popup.isShowing()) {
       return;
     }
 
     hideActiveMenu();
 
-    Point2D p = owner.localToScreen(-20, owner.getBoundsInLocal().getHeight() - 10);
-    popup.show(owner.getScene().getWindow(), p.getX(), p.getY());
+    rootCssAndLayout(menu.root);
+    double popupWidth = menu.root.prefWidth(-1);
+    double popupHeight = menu.root.prefHeight(popupWidth);
+    Point2D p = menu.opensAbove
+            ? owner.localToScreen(owner.getBoundsInLocal().getWidth(), 0)
+            : owner.localToScreen(-20, owner.getBoundsInLocal().getHeight() - 10);
+    double x = menu.opensAbove ? p.getX() - popupWidth : p.getX();
+    double y = menu.opensAbove ? p.getY() - popupHeight + 2 : p.getY();
+    popup.show(owner.getScene().getWindow(), x, y);
 
     activeMenu = popup;
   }
@@ -108,9 +134,11 @@ public class BalfGlassMenuBar extends HBox {
     private final Popup popup;
     private final VBox box;
     private final StackPane root;
+    private final boolean opensAbove;
 
-    private GlassMenu(Label owner) {
+    private GlassMenu(Label owner, boolean opensAbove) {
       this.owner = owner;
+      this.opensAbove = opensAbove;
       this.popup = new Popup();
       this.popup.setAutoHide(true);
       this.popup.setConsumeAutoHidingEvents(false);
@@ -134,25 +162,33 @@ public class BalfGlassMenuBar extends HBox {
 
 // Stack them
       root.getChildren().addAll(shadow, box);
+      root.setOnMouseExited(e -> clearHoverState(root));
+      root.addEventFilter(MouseEvent.MOUSE_MOVED, e -> {
+        // Dismiss when the pointer leaves the item rows, even if it is still
+        // inside the popup's surrounding surface.
+        if (!isMenuItemTarget((Node) e.getTarget(), root)) {
+          hideActiveMenu();
+        }
+      });
 
 // Add to popup
       this.popup.getContent().add(root);
 
       this.popup.setOnHidden(e -> {
+        clearHoverState(root);
         if (activeMenu == this.popup) {
           activeMenu = null;
-          activeMenuOwner = null;
-        }
-      });
-      this.popup.setOnHidden(e -> {
-        if (activeMenu == this.popup) {
-          hideActiveMenu();
+          setActiveOwner(null);
         }
       });
     }
 
     private void setDarkMode(boolean enabled) {
       root.pseudoClassStateChanged(DARK, enabled);
+    }
+
+    public void setText(String text) {
+      owner.setText(text);
     }
 
     /** Shows or removes the complete top-level menu, including its hit target. */
@@ -206,12 +242,12 @@ public class BalfGlassMenuBar extends HBox {
             return;
           }
 
-          if (this.action != null) {
-            this.action.run();
-          }
-
           if (this.hideAfterClick) {
             hideActiveMenu();
+          }
+
+          if (this.action != null) {
+            this.action.run();
           }
 
           e.consume();
@@ -257,13 +293,26 @@ public class BalfGlassMenuBar extends HBox {
       return this;
     }
 
+    /** Adds a purpose-built control row while retaining the menu popup styling. */
+    public Node customItem(Node node) {
+      box.getChildren().add(node);
+      return node;
+    }
+
+    /** Runs just before this menu is displayed. */
+    public GlassMenu onShowing(Runnable action) {
+      popup.setOnShowing(e -> action.run());
+      return this;
+    }
+
     /** Adds a separator and returns it so dynamic menus can manage its visibility. */
     public Node separatorNode() {
       Region line = new Region();
       line.getStyleClass().add("glass-menu-separator");
+      line.setMinHeight(1);
       line.setPrefHeight(1);
       line.setMaxHeight(1);
-      VBox.setMargin(line, new Insets(5, 10, 5, 10));
+      VBox.setMargin(line, new Insets(1, 10, 1, 10));
       box.getChildren().add(line);
       return line;
     }
@@ -291,12 +340,12 @@ public class BalfGlassMenuBar extends HBox {
       row.getChildren().addAll(title, spacer, keys);
 
       row.setOnMouseClicked(e -> {
-        if (action != null) {
-          action.run();
-        }
-
         if (hideAfterClick) {
           hideActiveMenu();
+        }
+
+        if (action != null) {
+          action.run();
         }
 
         e.consume();
@@ -328,9 +377,8 @@ public class BalfGlassMenuBar extends HBox {
       row.setOnMouseClicked(e -> {
         state[0] = !state[0];
         tick.setText(state[0] ? "✓" : "");
-        action.accept(state[0]);
-
         hideActiveMenu();
+        action.accept(state[0]);
         e.consume();
       });
 
@@ -342,11 +390,34 @@ public class BalfGlassMenuBar extends HBox {
 
   private void hideActiveMenu() {
     if (activeMenu != null) {
+      for (Node content : activeMenu.getContent()) clearHoverState(content);
       activeMenu.hide();
       activeMenu = null;
     }
 
     setActiveOwner(null);
+  }
+
+  /** Clears JavaFX's latched hover state when a popup disappears under the pointer. */
+  private static void clearHoverState(Node node) {
+    node.pseudoClassStateChanged(HOVER, false);
+    if (node instanceof Parent parent) {
+      for (Node child : parent.getChildrenUnmodifiable()) clearHoverState(child);
+    }
+  }
+
+  private static boolean isMenuItemTarget(Node target, Parent root) {
+    Node current = target;
+    while (current != null && current != root) {
+      if (current.getStyleClass().contains("glass-menu-item")) return true;
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private static void rootCssAndLayout(Region root) {
+    root.applyCss();
+    root.layout();
   }
 
   private void setActiveOwner(Label owner) {
@@ -361,7 +432,7 @@ public class BalfGlassMenuBar extends HBox {
     }
   }
 
-  public static class GlassCheckMenuItem {
+  public class GlassCheckMenuItem {
 
     private final HBox row;
     private final Label tick;
@@ -392,11 +463,12 @@ public class BalfGlassMenuBar extends HBox {
       row.setOnMouseClicked(e -> {
         setSelected(!this.selected);
 
+        hideActiveMenu();
+
         if (this.action != null) {
           this.action.accept(this.selected);
         }
 
-        //hideActiveMenu();
         e.consume();
       });
     }
