@@ -13,6 +13,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
+import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.TextField;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -66,6 +69,12 @@ public class EditorTab extends Tab {
   private final HBox warningIndicator = new HBox(4);
   private final Label warningCountLabel = new Label();
   private final HBox diagnosticOverlay = new HBox(7);
+  private final VBox editorTopRight = new VBox(6);
+  private final VBox findReplacePanel = new VBox(6);
+  private final TextField findField = new TextField();
+  private final TextField replaceField = new TextField();
+  private final CheckBox matchCase = new CheckBox("Match case");
+  private final Label findResult = new Label();
   private final Node editorContent;
   private final StackPane editorContainer;
   private SplitPane markdownSplit;
@@ -78,6 +87,7 @@ public class EditorTab extends Tab {
   private String currentInfoToken;
   private boolean pointerOverInfoPopup;
   private final List<DiagnosticHint> diagnosticHints = new ArrayList<>();
+  private List<YASSDiagnostic> diagnostics = List.of();
 
   public EditorTab(ZIDEEditor owner, String title, String path, CodeEditorViewFX editor, Node content) {
     super(title, content);
@@ -113,10 +123,17 @@ public class EditorTab extends Tab {
     diagnosticOverlay.getStyleClass().add("editor-diagnostic-overlay");
     diagnosticOverlay.setAlignment(Pos.CENTER_RIGHT);
     diagnosticOverlay.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+    diagnosticOverlay.setVisible(false);
+    diagnosticOverlay.setManaged(false);
 
-    editorContainer = new StackPane(content, diagnosticOverlay);
-    StackPane.setAlignment(diagnosticOverlay, Pos.TOP_RIGHT);
-    StackPane.setMargin(diagnosticOverlay, new Insets(10, 18, 0, 0));
+    buildFindReplacePanel();
+    editorTopRight.getChildren().addAll(diagnosticOverlay, findReplacePanel);
+    editorTopRight.setAlignment(Pos.TOP_RIGHT);
+    editorTopRight.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+
+    editorContainer = new StackPane(content, editorTopRight);
+    StackPane.setAlignment(editorTopRight, Pos.TOP_RIGHT);
+    StackPane.setMargin(editorTopRight, new Insets(10, 18, 0, 0));
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
@@ -130,6 +147,113 @@ public class EditorTab extends Tab {
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
+  }
+
+  private void buildFindReplacePanel() {
+    findField.setPromptText("Find");
+    replaceField.setPromptText("Replace with");
+    findField.setPrefColumnCount(18);
+    replaceField.setPrefColumnCount(18);
+    findResult.getStyleClass().add("editor-find-result");
+
+    Button previous = new Button("Previous");
+    Button next = new Button("Next");
+    Button close = new Button("Close");
+    Button replace = new Button("Replace");
+    Button replaceAll = new Button("Replace all");
+    previous.setOnAction(event -> find(false));
+    next.setOnAction(event -> find(true));
+    close.setOnAction(event -> hideFindReplace());
+    replace.setOnAction(event -> replaceCurrent());
+    replaceAll.setOnAction(event -> replaceAll());
+
+    HBox findRow = new HBox(5, findField, previous, next, findResult, close);
+    HBox replaceRow = new HBox(5, replaceField, replace, replaceAll, matchCase);
+    findRow.setAlignment(Pos.CENTER_LEFT);
+    replaceRow.setAlignment(Pos.CENTER_LEFT);
+    findReplacePanel.getChildren().addAll(findRow, replaceRow);
+    findReplacePanel.getStyleClass().add("editor-find-replace");
+    findReplacePanel.setVisible(false);
+    findReplacePanel.setManaged(false);
+    findField.textProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
+    matchCase.selectedProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
+    findField.setOnAction(event -> find(true));
+    replaceField.setOnAction(event -> replaceCurrent());
+    findReplacePanel.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+      if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+        hideFindReplace();
+        event.consume();
+      }
+    });
+  }
+
+  void showFindReplace(boolean focusReplacement) {
+    findReplacePanel.setVisible(true);
+    findReplacePanel.setManaged(true);
+    String selected = editor.getEditor().getSelectedText();
+    if (selected != null && !selected.isBlank() && !selected.contains("\n")) findField.setText(selected);
+    Platform.runLater(() -> {
+      TextField target = focusReplacement ? replaceField : findField;
+      target.requestFocus();
+      target.selectAll();
+      updateFindResult();
+    });
+  }
+
+  private void hideFindReplace() {
+    findReplacePanel.setVisible(false);
+    findReplacePanel.setManaged(false);
+    editor.requestFocus();
+  }
+
+  private void find(boolean forwards) {
+    String query = findField.getText();
+    if (query == null || query.isEmpty()) return;
+    String source = editor.getText();
+    String haystack = matchCase.isSelected() ? source : source.toLowerCase(java.util.Locale.ROOT);
+    String needle = matchCase.isSelected() ? query : query.toLowerCase(java.util.Locale.ROOT);
+    int caret = editor.getEditor().getCaretPosition();
+    int index = forwards ? haystack.indexOf(needle, caret) : haystack.lastIndexOf(needle, Math.max(0, caret - query.length() - 1));
+    if (index < 0) index = forwards ? haystack.indexOf(needle) : haystack.lastIndexOf(needle);
+    if (index < 0) { updateFindResult(); return; }
+    editor.getEditor().selectRange(index, index + query.length());
+    editor.getEditor().requestFollowCaret();
+    updateFindResult();
+  }
+
+  private void replaceCurrent() {
+    String query = findField.getText();
+    if (query == null || query.isEmpty()) return;
+    String selected = editor.getEditor().getSelectedText();
+    boolean matches = matchCase.isSelected() ? query.equals(selected) : query.equalsIgnoreCase(selected);
+    if (matches) {
+      int start = editor.getEditor().getSelection().getStart();
+      editor.getEditor().replaceText(start, editor.getEditor().getSelection().getEnd(), replaceField.getText());
+    }
+    find(true);
+  }
+
+  private void replaceAll() {
+    String query = findField.getText();
+    if (query == null || query.isEmpty()) return;
+    String replacement = replaceField.getText();
+    String source = editor.getText();
+    String updated = matchCase.isSelected()
+            ? source.replace(query, replacement)
+            : Pattern.compile(Pattern.quote(query), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+                    .matcher(source).replaceAll(Matcher.quoteReplacement(replacement));
+    editor.setText(updated);
+    updateFindResult();
+  }
+
+  private void updateFindResult() {
+    String query = findField.getText();
+    if (query == null || query.isEmpty()) { findResult.setText(""); return; }
+    String source = matchCase.isSelected() ? editor.getText() : editor.getText().toLowerCase(java.util.Locale.ROOT);
+    String needle = matchCase.isSelected() ? query : query.toLowerCase(java.util.Locale.ROOT);
+    int count = 0;
+    for (int at = 0; (at = source.indexOf(needle, at)) >= 0; at += Math.max(1, needle.length())) count++;
+    findResult.setText(count + (count == 1 ? " match" : " matches"));
   }
 
   private void installInformationPopup() {
@@ -379,6 +503,7 @@ public class EditorTab extends Tab {
   }
 
   void showDiagnostics(List<YASSDiagnostic> diagnostics) {
+    this.diagnostics = List.copyOf(diagnostics);
     var area = editor.getEditor();
     int length = area.getLength();
     diagnosticHints.clear();
@@ -495,6 +620,8 @@ public class EditorTab extends Tab {
     warningCountLabel.setText(String.valueOf(warnings));
     warningIndicator.setVisible(warnings > 0);
     warningIndicator.setManaged(warnings > 0);
+    diagnosticOverlay.setVisible(errors > 0 || warnings > 0);
+    diagnosticOverlay.setManaged(errors > 0 || warnings > 0);
   }
 
   public String getPath() { return path; }
@@ -517,12 +644,21 @@ public class EditorTab extends Tab {
     setMarkdownPreviewEnabled("md".equals(languageId));
   }
   public CodeEditorViewFX getEditor() { return editor; }
+  List<YASSDiagnostic> getDiagnostics() { return diagnostics; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
   public void toggleSpecialLine(int line) {
     if (!breakpointLines.add(line)) breakpointLines.remove(line);
   }
-  void switchOnDarkMode() { editor.setDarkMode(true); renderMarkdownPreview(); }
-  void switchOffDarkMode() { editor.setDarkMode(false); renderMarkdownPreview(); }
+  void switchOnDarkMode() {
+    if (editor.isDarkMode()) return;
+    editor.setDarkMode(true);
+    renderMarkdownPreview();
+  }
+  void switchOffDarkMode() {
+    if (!editor.isDarkMode()) return;
+    editor.setDarkMode(false);
+    renderMarkdownPreview();
+  }
   void setHasChanges(boolean hasChanges) { changes = hasChanges; }
   boolean hasChanges() { return changes; }
   String getLastDiskContent() { return lastDiskContent; }

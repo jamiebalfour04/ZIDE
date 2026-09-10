@@ -5,15 +5,10 @@ import jamiebalfour.helpers.HelperFunctions;
 import jamiebalfour.helpers.MacApplicationMenuJNA;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
-import jamiebalfour.codeeditor.CodeEditorView;
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
 import jamiebalfour.console.InteractiveConsoleFX;
 import jamiebalfour.parsers.json.ZenithJSONParser;
-import jamiebalfour.parsers.json.MalformedJSONException;
-import jamiebalfour.ui.components.BalfPanel;
-import jamiebalfour.ui.components.BalfScrollbarPane;
-import jamiebalfour.ui.components.BalfSearchBox;
 import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.ai.ZIDEOpenAIClient;
 import jamiebalfour.zide.core.ZIDE;
@@ -107,7 +102,8 @@ public class ZIDEEditor extends Application {
 
   Stage _stage;
   ZPERuntimeEnvironment runtime;
-  MenuButton languageSelector;
+  BalfGlassMenuBar.GlassMenu languageSelector;
+  private BalfGlassMenuBar languageMenuBar;
   InteractiveConsoleFX consoleOutputTextArea;
   private ZIDESystemTerminal systemTerminal;
   Button runBtn;
@@ -118,7 +114,9 @@ public class ZIDEEditor extends Application {
   Button continueButton;
   Separator debugSeparator;
   BalfGlassMenuBar.GlassCheckMenuItem darkThemeMenuItem;
+  private Label zoomPercentageLabel;
   private BalfGlassMenuBar applicationMenuBar;
+  private BalfTitleBar titleBar;
   private BalfGlassMenuBar.GlassMenu scriptMenu;
   private BalfGlassMenuBar.GlassMenu zpeOnlineMenu;
   private TextField editorSearchField;
@@ -160,6 +158,10 @@ public class ZIDEEditor extends Application {
   boolean USE_WORD_WRAP = false;
   Node loadFromOnline;
   Node saveToOnline;
+  Node loginToZPEOnlineMenuItem;
+  Node zpeOnlineAuthSeparator;
+  Node recentOnlineFilesMenuItem;
+  private ZPEList recentOnlineFiles;
   String username = null;
   String password = null;
   boolean loggedIn = false;
@@ -259,7 +261,10 @@ public class ZIDEEditor extends Application {
     stage.setHeight(height);
     normalWindowWidth = width;
     normalWindowHeight = height;
-    stage.setMaximized(Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("MAXIMISED", "false")));
+    String maximised = MAIN_PROPERTIES.getProperty("MAXIMISE",
+            MAIN_PROPERTIES.getProperty("MAXIMISED",
+                    MAIN_PROPERTIES.getProperty("MAXIMIZED", "false")));
+    stage.setMaximized(Boolean.parseBoolean(maximised));
   }
 
   private double propertyDouble(String name, double fallback) {
@@ -299,7 +304,7 @@ public class ZIDEEditor extends Application {
     if (Double.isFinite(normalWindowY)) MAIN_PROPERTIES.setProperty("YPOS", Double.toString(normalWindowY));
     MAIN_PROPERTIES.setProperty("WIDTH", Double.toString(normalWindowWidth));
     MAIN_PROPERTIES.setProperty("HEIGHT", Double.toString(normalWindowHeight));
-    MAIN_PROPERTIES.setProperty("MAXIMISED", Boolean.toString(_stage.isMaximized()));
+    MAIN_PROPERTIES.setProperty("MAXIMISE", Boolean.toString(_stage.isMaximized()));
     saveProps();
   }
 
@@ -324,6 +329,9 @@ public class ZIDEEditor extends Application {
       saveProps();
 
     }
+
+    username = MAIN_PROPERTIES.getProperty("LOGIN_USERNAME", "");
+    password = MAIN_PROPERTIES.getProperty("LOGIN_PASSCODE", "");
 
 
     USE_WORD_WRAP = Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("USE_WORD_WRAP", "false"));
@@ -352,7 +360,9 @@ public class ZIDEEditor extends Application {
 
     // Keep the title bar outside the workspace stack so full-workspace tools
     // can cover the menus and editor without covering the window controls.
-    BalfTitleBar titleBar = new BalfTitleBar(stage, "ZIDE", aboutHandler);
+    titleBar = new BalfTitleBar(stage, "ZIDE", aboutHandler);
+    titleBar.setDarkMode(darkThemeEnabled);
+    titleBar.setOnCloseRequest(this::requestApplicationClose);
     if (isMacPlatform()) titleBar.setOnSettings(event -> openSettings());
     root.setTop(titleBar);
     Node menuBar = buildMenuBar();
@@ -466,6 +476,7 @@ public class ZIDEEditor extends Application {
       stopProjectDirectoryWatcher();
     });
     stage.show();
+    restoreZPEOnlineSession();
     externalFileChangeTimer = new PauseTransition(Duration.millis(350));
     externalFileChangeTimer.setOnFinished(event -> checkPendingExternalFileChanges());
     installMacApplicationMenuItems();
@@ -544,10 +555,15 @@ public class ZIDEEditor extends Application {
     scene.getAccelerators().put(
             new KeyCodeCombination(KeyCode.F, KeyCombination.SHORTCUT_DOWN),
             () -> {
-              if (editorSearchField != null) {
-                editorSearchField.requestFocus();
-                editorSearchField.selectAll();
-              }
+              EditorTab tab = getCurrentTab();
+              if (tab != null) tab.showFindReplace(false);
+            }
+    );
+    scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.H, KeyCombination.SHORTCUT_DOWN),
+            () -> {
+              EditorTab tab = getCurrentTab();
+              if (tab != null) tab.showFindReplace(true);
             }
     );
   }
@@ -772,6 +788,15 @@ public class ZIDEEditor extends Application {
     BalfGlassMenuBar bar = new BalfGlassMenuBar();
     applicationMenuBar = bar;
     bar.getStyleClass().add("main-menu-bar");
+    bar.setOnMouseClicked(event -> {
+      if (event.getTarget() == bar
+              && event.getButton() == javafx.scene.input.MouseButton.PRIMARY
+              && event.getClickCount() == 2) {
+        bar.hideMenus();
+        titleBar.toggleMaximise();
+        event.consume();
+      }
+    });
 
     var file = bar.menu("File");
     file.createItem("New Project", "⇧⌘N", this::newProject, true);
@@ -785,7 +810,7 @@ public class ZIDEEditor extends Application {
       file.createItem("Settings", "", this::openSettings, true);
       file.separator();
     }
-    file.createItem("Exit", "", () -> System.exit(0), true);
+    file.createItem("Exit", "", this::requestApplicationClose, true);
 
     var edit = bar.menu("Edit");
 
@@ -817,9 +842,48 @@ public class ZIDEEditor extends Application {
       if (getCurrentTab() != null) getCurrentTab().getEditor().selectAll();
     });
 
+    edit.separator();
+    edit.createItem("Find", "⌘F", () -> {
+      EditorTab tab = getCurrentTab();
+      if (tab != null) tab.showFindReplace(false);
+    });
+    edit.createItem("Find and Replace", "⌘H", () -> {
+      EditorTab tab = getCurrentTab();
+      if (tab != null) tab.showFindReplace(true);
+    });
+
     formatDocumentMenuItem = edit.createItem("Format document", "", this::beautifyCurrentDocument);
 
     var viewMenu = bar.menu("View");
+
+    HBox zoomRow = new HBox(4);
+    zoomRow.getStyleClass().add("glass-menu-zoom-row");
+    Label zoomTitle = new Label("Zoom");
+    zoomTitle.getStyleClass().add("glass-menu-item-text");
+    Region zoomSpacer = new Region();
+    HBox.setHgrow(zoomSpacer, Priority.ALWAYS);
+
+    Button zoomOut = new Button("-");
+    zoomOut.getStyleClass().add("glass-menu-zoom-button");
+    zoomOut.setTooltip(new Tooltip("Zoom out"));
+    zoomOut.setOnAction(e -> changeEditorZoom(-0.1));
+
+    zoomPercentageLabel = new Label("100%");
+    Button resetZoom = new Button();
+    resetZoom.getStyleClass().addAll("glass-menu-zoom-button", "glass-menu-zoom-value");
+    resetZoom.setGraphic(zoomPercentageLabel);
+    resetZoom.setTooltip(new Tooltip("Reset zoom to 100%"));
+    resetZoom.setOnAction(e -> resetEditorZoom());
+
+    Button zoomIn = new Button("+");
+    zoomIn.getStyleClass().add("glass-menu-zoom-button");
+    zoomIn.setTooltip(new Tooltip("Zoom in"));
+    zoomIn.setOnAction(e -> changeEditorZoom(0.1));
+
+    zoomRow.getChildren().addAll(zoomTitle, zoomSpacer, zoomOut, resetZoom, zoomIn);
+    viewMenu.customItem(zoomRow);
+    viewMenu.separator();
+    viewMenu.onShowing(this::updateZoomPercentage);
 
     darkThemeMenuItem = viewMenu.checkItem("Dark theme",
             darkThemeEnabled,
@@ -872,16 +936,28 @@ public class ZIDEEditor extends Application {
 
     zpeOnlineMenu = bar.menu("ZPE Online");
 
-    zpeOnlineMenu.createItem("Login to ZPE Online", "", this::loginToZPEOnline);
+    loginToZPEOnlineMenuItem = zpeOnlineMenu.createItem("Login to ZPE Online", "", this::toggleZPEOnlineLogin);
+    zpeOnlineMenu.createItem("Register for ZPE Online", "", () -> openZPEOnlinePage(
+            "https://www.jamiebalfour.scot/projects/zpe/online/register/"));
     zpeOnlineMenu.separator();
+    zpeOnlineMenu.createItem("Visit ZPE Online website", "", () -> openZPEOnlinePage(
+            "https://www.jamiebalfour.scot/projects/zpe/online/"));
+    zpeOnlineMenu.createItem("View public uploads", "", () -> openZPEOnlinePage(
+            "https://www.jamiebalfour.scot/projects/zpe/online/code/"));
+    zpeOnlineMenu.separator();
+    zpeOnlineMenu.createItem("Load from public repository", "", this::loadFromPublicCloudFX);
+    zpeOnlineAuthSeparator = zpeOnlineMenu.separatorNode();
+    recentOnlineFilesMenuItem = zpeOnlineMenu.createItem("Recent online files", "", this::showRecentZPEOnlineFiles);
     loadFromOnline = zpeOnlineMenu.createItem("Load from ZPE Online", "", () -> {});
 
     loadFromOnline.setOnMouseClicked(e -> loadFromUsersCloudFX());
     saveToOnline = zpeOnlineMenu.createItem("Save to ZPE Online", "", this::saveToZPEOnline);
 
 
-    loadFromOnline.setDisable(true);
-    saveToOnline.setDisable(true);
+    setMenuItemAvailable(zpeOnlineAuthSeparator, false);
+    setMenuItemAvailable(recentOnlineFilesMenuItem, false);
+    setMenuItemAvailable(loadFromOnline, true);
+    setMenuItemAvailable(saveToOnline, false);
 
     var help = bar.menu("Help");
 
@@ -897,11 +973,35 @@ public class ZIDEEditor extends Application {
     return bar;
   }
 
+  private void changeEditorZoom(double amount) {
+    EditorTab tab = getCurrentTab();
+    if (tab == null) return;
+    tab.getEditor().setZoomFactor(tab.getEditor().getZoomFactor() + amount);
+    updateZoomPercentage();
+  }
+
+  private void resetEditorZoom() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null) return;
+    if (applicationMenuBar != null) applicationMenuBar.hideMenus();
+    tab.getEditor().resetZoom();
+    updateZoomPercentage();
+  }
+
+  private void updateZoomPercentage() {
+    if (zoomPercentageLabel == null) return;
+    EditorTab tab = getCurrentTab();
+    double zoom = tab == null ? 1.0 : tab.getEditor().getZoomFactor();
+    zoomPercentageLabel.setText(Math.round(zoom * 100) + "%");
+  }
+
   private void applyWorkspaceDarkMode(boolean enabled) {
     Scene scene = _stage == null ? null : _stage.getScene();
     if (scene == null || scene.getRoot() == null) return;
 
     if (appRoot != null) setDarkStyleClass(appRoot, enabled);
+    if (titleBar != null) titleBar.setDarkMode(enabled);
+    if (languageMenuBar != null) languageMenuBar.setDarkMode(enabled);
     if (activeModalOverlay != null) {
       if (enabled && !activeModalOverlay.getStyleClass().contains("in-window-modal-dark")) {
         activeModalOverlay.getStyleClass().add("in-window-modal-dark");
@@ -1084,6 +1184,10 @@ public class ZIDEEditor extends Application {
   }
 
   void loadFromUsersCloudFX() {
+    if (!loggedIn || !hasText(username) || !hasText(password)) {
+      loginToZPEOnline();
+      return;
+    }
     HashMap<String, String> arguments = new HashMap<>();
     arguments.put("username", username);
     arguments.put("password", password);
@@ -1093,7 +1197,24 @@ public class ZIDEEditor extends Application {
       return;
     }
 
-    showZPEOnlineBrowser(arguments, files);
+    showZPEOnlineBrowser(arguments, files, false);
+  }
+
+  private void loadFromPublicCloudFX() {
+    try {
+      String response = HelperFunctions.makePOSTRequest(
+              ZPEInstance.getOnlinePathProperty() + "/public.php?type=list&version=10",
+              new HashMap<>());
+      ZPEMap json = (ZPEMap) new ZenithJSONParser().jsonDecode(response, false);
+      if (!json.containsKey(new ZPEString("result"))
+              || HelperFunctions.stringToInteger(json.get(new ZPEString("result")).toString()) != 1) {
+        showError("ZPE Online", "The public repository could not be loaded.");
+        return;
+      }
+      showZPEOnlineBrowser(new HashMap<>(), (ZPEList) json.get(new ZPEString("list")), true);
+    } catch (Exception exception) {
+      showError("ZPE Online", exception.getMessage());
+    }
   }
 
   private void cloneRepo() {
@@ -1363,37 +1484,29 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  private Node createZPEOnlineFileCard(String name, String id, Runnable openAction) {
-    VBox card = new VBox(8);
-    card.getStyleClass().add("zpe-online-file-card");
-    card.setPadding(new Insets(14));
-    card.setPrefWidth(220);
-    card.setUserData(name);
-
-    Label icon = new Label("☁");
-    icon.getStyleClass().add("zpe-online-file-icon");
+  private Node createZPEOnlineFileRow(String name, Runnable openAction) {
+    HBox row = new HBox(10);
+    row.getStyleClass().add("zpe-online-file-row");
+    row.setAlignment(Pos.CENTER_LEFT);
+    row.setUserData(name);
 
     Label nameLabel = new Label(name);
     nameLabel.getStyleClass().add("zpe-online-file-name");
-    nameLabel.setWrapText(true);
-
-    Label idLabel = new Label("ID: " + id);
-    idLabel.getStyleClass().add("zpe-online-file-meta");
+    nameLabel.setMaxWidth(Double.MAX_VALUE);
+    HBox.setHgrow(nameLabel, Priority.ALWAYS);
 
     Button openButton = new Button("Open");
     openButton.getStyleClass().add("zpe-online-open-button");
-    openButton.setMaxWidth(Double.MAX_VALUE);
     openButton.setOnAction(e -> openAction.run());
 
-    card.setOnMouseClicked(e -> {
+    row.setOnMouseClicked(e -> {
       if (e.getClickCount() == 2) {
         openAction.run();
       }
     });
 
-    card.getChildren().addAll(icon, nameLabel, idLabel, openButton);
-
-    return card;
+    row.getChildren().addAll(nameLabel, openButton);
+    return row;
   }
 
   void loadFromCloudFile(String file, Map<String, String> arguments, ZPEMap selections, boolean publicrepo) {
@@ -1454,32 +1567,20 @@ public class ZIDEEditor extends Application {
     }
   }
 
-  private void showZPEOnlineBrowser(Map<String, String> arguments, ZPEList files) {
-    Stage dialog = new Stage();
-    dialog.initOwner(_stage);
-    dialog.setTitle("Load from ZPE Online");
-
-    VBox root = new VBox(14);
-    root.setPadding(new Insets(18));
-    root.getStyleClass().add("zpe-online-browser");
-
-    Label title = new Label("Load from ZPE Online");
-    title.getStyleClass().add("zpe-online-title");
-
+  private void showZPEOnlineBrowser(Map<String, String> arguments, ZPEList files, boolean publicRepository) {
     TextField search = new TextField();
-    search.setPromptText("Search your cloud files...");
+    search.setPromptText("Search files");
     search.getStyleClass().add("zpe-online-search");
 
-    FlowPane fileGrid = new FlowPane();
-    fileGrid.setHgap(12);
-    fileGrid.setVgap(12);
-    fileGrid.setPadding(new Insets(4));
+    VBox fileList = new VBox(1);
+    fileList.getStyleClass().add("zpe-online-file-list");
 
-    ScrollPane scrollPane = new ScrollPane(fileGrid);
+    ScrollPane scrollPane = new ScrollPane(fileList);
     scrollPane.setFitToWidth(true);
+    scrollPane.setPrefViewportHeight(360);
     scrollPane.getStyleClass().add("zpe-online-scroll");
 
-    ArrayList<Node> cards = new ArrayList<>();
+    ArrayList<Node> rows = new ArrayList<>();
 
     for (Object item : files) {
       ZPEMap file = (ZPEMap) item;
@@ -1487,37 +1588,56 @@ public class ZIDEEditor extends Application {
       String name = file.get(new ZPEString("name")).toString();
       String id = file.get(new ZPEString("id")).toString();
 
-      Node card = createZPEOnlineFileCard(name, id, () -> {
-        dialog.close();
-        loadZPEOnlineFile(arguments, id, name);
+      Node row = createZPEOnlineFileRow(name, () -> {
+        closeInWindowModal();
+        if (publicRepository) {
+          Map<String, String> loadArgs = new HashMap<>(arguments);
+          loadArgs.put("id", id);
+          loadArgs.put("name", name);
+          loadFromCloudFile(id, loadArgs, new ZPEMap(), true);
+        } else {
+          loadZPEOnlineFile(arguments, id, name);
+        }
       });
 
-      cards.add(card);
-      fileGrid.getChildren().add(card);
+      rows.add(row);
+      fileList.getChildren().add(row);
     }
 
     search.textProperty().addListener((obs, oldText, newText) -> {
-      String q = newText == null ? "" : newText.toLowerCase();
-
-      fileGrid.getChildren().setAll(
-              cards.stream()
-                      .filter(card -> {
-                        Object name = card.getUserData();
-                        return name != null && name.toString().toLowerCase().contains(q);
+      String q = newText == null ? "" : newText.strip().toLowerCase(Locale.ROOT);
+      List<Node> matches = rows.stream()
+                      .filter(row -> {
+                        Object name = row.getUserData();
+                        return name != null && name.toString().toLowerCase(Locale.ROOT).contains(q);
                       })
-                      .toList()
-      );
+                      .toList();
+      if (matches.isEmpty()) {
+        Label empty = new Label(q.isEmpty() ? "No files are available." : "No matching files.");
+        empty.getStyleClass().add("zpe-online-empty");
+        fileList.getChildren().setAll(empty);
+      } else {
+        fileList.getChildren().setAll(matches);
+      }
     });
 
-    root.getChildren().addAll(title, search, scrollPane);
+    if (rows.isEmpty()) {
+      Label empty = new Label("No files are available.");
+      empty.getStyleClass().add("zpe-online-empty");
+      fileList.getChildren().setAll(empty);
+    }
 
-    Scene scene = new Scene(root, 760, 520);
-    scene.getStylesheets().add(
-            getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
+    VBox content = new VBox(10, search, scrollPane);
+    content.getStyleClass().add("zpe-online-browser");
+    content.setPrefWidth(600);
+    showInWindowModal(
+            publicRepository ? "ZPE Online public repository" : "Load from ZPE Online",
+            publicRepository ? "Choose a shared program to open" : "Choose a file from your account",
+            content,
+            List.of(new ModalAction("Cancel", false, () -> true))
     );
-
-    dialog.setScene(scene);
-    dialog.show();
+    setActiveModalWidth(660);
+    Platform.runLater(search::requestFocus);
   }
 
   private void newProject() {
@@ -1777,7 +1897,7 @@ public class ZIDEEditor extends Application {
   }
 
   private void loginToZPEOnline() {
-    TextField usernameField = new TextField();
+    TextField usernameField = new TextField(username == null ? "" : username);
     usernameField.setPromptText("Username");
     PasswordField passwordField = new PasswordField();
     passwordField.setPromptText("Password");
@@ -1820,6 +1940,74 @@ public class ZIDEEditor extends Application {
     Platform.runLater(usernameField::requestFocus);
   }
 
+  private void toggleZPEOnlineLogin() {
+    if (loggedIn) {
+      logoutOfZPEOnline();
+    } else {
+      loginToZPEOnline();
+    }
+  }
+
+  private void restoreZPEOnlineSession() {
+    if (!hasText(username) || !hasText(password)) return;
+    authenticateZPEOnline(null, null, null);
+  }
+
+  private void logoutOfZPEOnline() {
+    username = "";
+    password = "";
+    loggedIn = false;
+    recentOnlineFiles = null;
+    MAIN_PROPERTIES.remove("LOGIN_USERNAME");
+    MAIN_PROPERTIES.remove("LOGIN_PASSCODE");
+    saveProps();
+    updateZPEOnlineLoginState(false);
+    statusLabel.setText("Signed out of ZPE Online");
+  }
+
+  private void updateZPEOnlineLoginState(boolean signedIn) {
+    loggedIn = signedIn;
+    setMenuItemText(loginToZPEOnlineMenuItem,
+            signedIn ? "Logout of ZPE Online" : "Login to ZPE Online");
+    setMenuItemAvailable(zpeOnlineAuthSeparator, signedIn);
+    setMenuItemAvailable(recentOnlineFilesMenuItem,
+            signedIn && recentOnlineFiles != null && !recentOnlineFiles.isEmpty());
+    setMenuItemAvailable(loadFromOnline, true);
+    updateZPEOnlineSaveAvailability();
+  }
+
+  private void updateZPEOnlineSaveAvailability() {
+    EditorTab tab = getCurrentTab();
+    boolean supported = tab != null && "yass".equals(tab.getLanguageId());
+    setMenuItemAvailable(saveToOnline, loggedIn && supported);
+  }
+
+  private void showRecentZPEOnlineFiles() {
+    if (recentOnlineFiles == null || recentOnlineFiles.isEmpty()) return;
+    Map<String, String> arguments = new HashMap<>();
+    arguments.put("username", username);
+    arguments.put("password", password);
+    showZPEOnlineBrowser(arguments, recentOnlineFiles, false);
+  }
+
+  private static void setMenuItemText(Node item, String text) {
+    if (!(item instanceof Pane pane)) return;
+    for (Node child : pane.getChildren()) {
+      if (child instanceof Label label && label.getStyleClass().contains("glass-menu-item-text")) {
+        label.setText(text);
+        return;
+      }
+    }
+  }
+
+  private void openZPEOnlinePage(String url) {
+    try {
+      HelperFunctions.openWebsite(url);
+    } catch (Exception exception) {
+      showError("Could not open ZPE Online", exception.getMessage());
+    }
+  }
+
   private void authenticateZPEOnline(TextField usernameField, PasswordField passwordField, Label status) {
     Task<ZPEMap> task = new Task<>() {
       @Override protected ZPEMap call() throws Exception {
@@ -1829,26 +2017,41 @@ public class ZIDEEditor extends Application {
     task.setOnSucceeded(event -> {
       ZPEMap res = task.getValue();
       if (res == null || !res.containsKey(new ZPEString("result"))) {
-        status.setText("The server returned an invalid response.");
+        if (status != null) status.setText("The server returned an invalid response.");
       } else if (Integer.parseInt(res.get(new ZPEString("result")).toString()) != 1) {
         Object message = res.get(new ZPEString("message"));
-        status.setText(message == null ? "Login was not accepted." : message.toString());
+        if (status != null) status.setText(message == null ? "Login was not accepted." : message.toString());
+        if (usernameField == null) logoutOfZPEOnline();
       } else {
-        loadFromOnline.setDisable(false);
-        saveToOnline.setDisable(false);
-        loggedIn = true;
-        closeInWindowModal();
-        showMessage("ZPE Online", "Successfully signed in to ZPE Online.");
+        Object token = res.get(new ZPEString("login_token"));
+        if (token != null && !token.toString().isBlank()) password = token.toString();
+        Object recent = res.get(new ZPEString("list"));
+        recentOnlineFiles = recent instanceof ZPEList ? (ZPEList) recent : null;
+        MAIN_PROPERTIES.setProperty("LOGIN_USERNAME", username);
+        MAIN_PROPERTIES.setProperty("LOGIN_PASSCODE", password);
+        saveProps();
+        updateZPEOnlineLoginState(true);
+        if (usernameField != null) {
+          closeInWindowModal();
+          showMessage("ZPE Online", "Successfully signed in to ZPE Online.");
+        } else {
+          statusLabel.setText("Signed in to ZPE Online as " + username);
+        }
         return;
       }
-      usernameField.setDisable(false);
-      passwordField.setDisable(false);
-      passwordField.requestFocus();
+      if (usernameField != null) {
+        usernameField.setDisable(false);
+        passwordField.setDisable(false);
+        passwordField.requestFocus();
+      }
     });
     task.setOnFailed(event -> {
-      status.setText(rootMessage(task.getException()));
-      usernameField.setDisable(false);
-      passwordField.setDisable(false);
+      if (status != null) status.setText(rootMessage(task.getException()));
+      else logoutOfZPEOnline();
+      if (usernameField != null) {
+        usernameField.setDisable(false);
+        passwordField.setDisable(false);
+      }
     });
     Thread worker = new Thread(task, "zide-zpe-online-login");
     worker.setDaemon(true);
@@ -1857,8 +2060,9 @@ public class ZIDEEditor extends Application {
 
   /** Saves the active editor to the user's ZPE Online account using the established v10 API. */
   private void saveToZPEOnline() {
-    if (getCurrentTab() == null || !"yass".equals(getCurrentTab().getLanguageId())) {
-      showError("Save to ZPE Online", "Open a YASS file before saving it online.");
+    EditorTab tab = getCurrentTab();
+    if (tab == null || !"yass".equals(tab.getLanguageId())) {
+      showError("Save to ZPE Online", "Only YASS files can be saved online.");
       return;
     }
     if (!loggedIn || username == null || password == null) {
@@ -1866,13 +2070,15 @@ public class ZIDEEditor extends Application {
       if (!loggedIn) return;
     }
 
-    String code = getCurrentTab().getEditor().getText();
+    String code = tab.getEditor().getText();
     try {
-      if (!ZPEKit.validateCode(code)) {
-        showError("Save to ZPE Online", "Validate and fix the code before uploading it.");
+      if ("ywp".equals(tab.getLanguageId())
+              ? !ZPEKit.validateYWP(code)
+              : !ZPEKit.validateCode(code)) {
+        showError("Save to ZPE Online", "Validate and fix the YASS code before uploading it.");
         return;
       }
-    } catch (CompileException exception) {
+    } catch (Exception exception) {
       showError("Save to ZPE Online", "The code could not be validated: " + exception.getMessage());
       return;
     }
@@ -1933,6 +2139,17 @@ public class ZIDEEditor extends Application {
     body.setMaxWidth(540);
     body.getStyleClass().add("in-window-modal-message");
     showInWindowModal(title, "", body, "OK", () -> true, false);
+  }
+
+  private void requestApplicationClose() {
+    Label body = new Label("Are you sure you want to quit ZIDE?");
+    body.setWrapText(true);
+    body.getStyleClass().add("in-window-modal-message");
+    showInWindowModal("Quit ZIDE", "Close the application", body, "Quit", () -> {
+      Platform.runLater(_stage::close);
+      return true;
+    });
+    setActiveModalWidth(440);
   }
 
   /** Provides a synchronous answer for APIs such as tab-close handlers while keeping the UI in-window. */
@@ -2322,6 +2539,10 @@ public class ZIDEEditor extends Application {
       return;
     }
 
+    displayProblems(tab, diagnostics);
+  }
+
+  private void displayProblems(EditorTab tab, List<YASSDiagnostic> diagnostics) {
     problemsRows.clear();
     for (YASSDiagnostic diagnostic : diagnostics) {
       problemsRows.add(new ProblemRow(
@@ -2889,29 +3110,12 @@ public class ZIDEEditor extends Application {
     debugSeparator = new Separator(Orientation.VERTICAL);
     debugSeparator.setVisible(false);
 
-    editorSearchField = new TextField();
-    editorSearchField.setPromptText("Search");
-    editorSearchField.getStyleClass().add("search-field");
-    editorSearchField.setMaxWidth(280);
-    editorSearchField.textProperty().addListener((observable, oldText, newText) -> findInCurrentEditor(false, true));
-    editorSearchField.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
-      if (event.getCode() == KeyCode.ENTER) {
-        findInCurrentEditor(event.isShiftDown(), false);
-        event.consume();
-      } else if (event.getCode() == KeyCode.ESCAPE) {
-        editorSearchField.clear();
-        EditorTab tab = getCurrentTab();
-        if (tab != null) tab.getEditor().requestFocus();
-        event.consume();
-      }
-    });
-
     var spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
 
 
 
-    var toolbar = new ToolBar(runBtn, buildBtn, debugBtn, sep1, stopExecutionBtn, stepOverButton, continueButton, debugSeparator, new Label(" "), spacer, editorSearchField);
+    var toolbar = new ToolBar(runBtn, buildBtn, debugBtn, sep1, stopExecutionBtn, stepOverButton, continueButton, debugSeparator, new Label(" "), spacer);
     toolbar.getStyleClass().add("app-toolbar");
     return toolbar;
   }
@@ -3608,15 +3812,11 @@ public class ZIDEEditor extends Application {
         EditorTab selected = (EditorTab) newTab;
         if (isDarkThemeEnabled()) selected.switchOnDarkMode();
         else selected.switchOffDarkMode();
-        selected.scheduleAnalysis();
+        displayProblems(selected, selected.getDiagnostics());
       }
 
       if (newTab instanceof EditorTab) syncLanguageSelector((EditorTab) newTab);
-      if (editorSearchField != null && !editorSearchField.getText().isBlank()) {
-        findInCurrentEditor(false, true);
-      }
-      if (projectTree != null) projectTree.refresh();
-
+      updateZoomPercentage();
     });
 
     return editorTabs;
@@ -3814,6 +4014,7 @@ public class ZIDEEditor extends Application {
     tab.scheduleAnalysis();
     if (languageSelector != null) languageSelector.setText(language.label);
     updateLanguageCommands(language);
+    updateZPEOnlineSaveAvailability();
     statusLabel.setText(language.label + " language mode");
   }
 
@@ -3828,6 +4029,7 @@ public class ZIDEEditor extends Application {
     LanguageSupport language = languageSupports.get(id);
     languageSelector.setText(language == null ? "Text" : language.label);
     updateLanguageCommands(language);
+    updateZPEOnlineSaveAvailability();
   }
 
   private void updateLanguageCommands(LanguageSupport language) {
@@ -5814,19 +6016,17 @@ public class ZIDEEditor extends Application {
   private Node buildStatusBar() {
     var centre = new Label("ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion() + " build " + ZIDE.getBuildNumber() + " © Jamie Balfour 2024 - 2026.");
     registerLanguageSupports();
-    languageSelector = new MenuButton("Text");
+    languageMenuBar = new BalfGlassMenuBar();
+    languageMenuBar.getStyleClass().add("language-selector-menu");
+    languageMenuBar.setDarkMode(darkThemeEnabled);
+    languageSelector = languageMenuBar.menuAbove("Text");
     for (LanguageSupport language : languageSupports.values()) {
-      MenuItem item = new MenuItem(language.label);
-      item.setOnAction(event -> selectLanguage(getCurrentTab(), language));
-      languageSelector.getItems().add(item);
+      languageSelector.createItem(language.label, "", () -> selectLanguage(getCurrentTab(), language));
     }
-    languageSelector.getStyleClass().add("language-selector");
-    languageSelector.setAccessibleText("Editor language");
-    languageSelector.setTooltip(new Tooltip("Editor language"));
 
     centre.setStyle("-fx-font-size: 13px;");
 
-    var bar = new HBox(statusLabel, new Region(), centre, new Region(), languageSelector);
+    var bar = new HBox(statusLabel, new Region(), centre, new Region(), languageMenuBar);
     HBox.setHgrow(bar.getChildren().get(1), Priority.ALWAYS);
     HBox.setHgrow(bar.getChildren().get(3), Priority.ALWAYS);
 
