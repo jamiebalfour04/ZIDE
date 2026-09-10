@@ -10,6 +10,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
@@ -23,11 +25,14 @@ import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A JavaFX-native document tab.  The previous Swing editor remains available
@@ -37,6 +42,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class EditorTab extends Tab {
   private static final int ANALYSIS_DELAY_MS = 400;
   private static final int INFORMATION_DELAY_MS = 500;
+  private static final Pattern MARKDOWN_INLINE = Pattern.compile(
+          "(\\*\\*([^*]+)\\*\\*)|(`([^`]+)`)|(\\[([^]]+)]\\((https?://[^ )]+)\\))");
   private static final ExecutorService ANALYSER = Executors.newSingleThreadExecutor(r -> {
     Thread thread = new Thread(r, "zide-syntax-analyser");
     thread.setDaemon(true);
@@ -50,6 +57,7 @@ public class EditorTab extends Tab {
   private final PauseTransition symbolTimer = new PauseTransition(Duration.millis(250));
   private final PauseTransition infoTimer = new PauseTransition(Duration.millis(INFORMATION_DELAY_MS));
   private final PauseTransition infoHideTimer = new PauseTransition(Duration.millis(350));
+  private final PauseTransition markdownTimer = new PauseTransition(Duration.millis(180));
   private final Popup infoPopup = new Popup();
   private final AtomicInteger analysisVersion = new AtomicInteger();
   private final Set<Integer> breakpointLines = new HashSet<>();
@@ -58,17 +66,26 @@ public class EditorTab extends Tab {
   private final HBox warningIndicator = new HBox(4);
   private final Label warningCountLabel = new Label();
   private final HBox diagnosticOverlay = new HBox(7);
+  private final Node editorContent;
+  private final StackPane editorContainer;
+  private SplitPane markdownSplit;
+  private ScrollPane markdownPreview;
+  private VBox markdownPreviewContent;
   private Label tabTitleLabel;
   private boolean changes;
+  private String lastDiskContent;
   private String languageId;
   private String currentInfoToken;
   private boolean pointerOverInfoPopup;
+  private final List<DiagnosticHint> diagnosticHints = new ArrayList<>();
 
   public EditorTab(ZIDEEditor owner, String title, String path, CodeEditorViewFX editor, Node content) {
     super(title, content);
     this.owner = owner;
     this.path = path;
     this.editor = editor;
+    this.editorContent = content;
+    this.lastDiskContent = editor.getText();
     editor.setLineNumberClickListener(this::toggleSpecialLine);
     installInformationPopup();
 
@@ -97,17 +114,19 @@ public class EditorTab extends Tab {
     diagnosticOverlay.setAlignment(Pos.CENTER_RIGHT);
     diagnosticOverlay.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 
-    StackPane editorContainer = new StackPane(content, diagnosticOverlay);
+    editorContainer = new StackPane(content, diagnosticOverlay);
     StackPane.setAlignment(diagnosticOverlay, Pos.TOP_RIGHT);
     StackPane.setMargin(diagnosticOverlay, new Insets(10, 18, 0, 0));
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
+    markdownTimer.setOnFinished(e -> renderMarkdownPreview());
     symbolTimer.setOnFinished(e -> owner.refreshDocumentSymbols(this));
     editor.getEditor().textProperty().addListener((observable, oldText, newText) -> {
       changes = true;
       scheduleAnalysis();
       symbolTimer.playFromStart();
+      if (markdownPreview != null) markdownTimer.playFromStart();
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
@@ -127,22 +146,20 @@ public class EditorTab extends Tab {
 
     editor.getEditor().addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
       infoHideTimer.stop();
-      int offset = editor.getEditor().hit(event.getX(), event.getY()).getInsertionIndex();
-      String token = tokenAt(editor.getText(), offset);
-      ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, editor.getText(), token, offset);
+      HoverTarget target = hoverTargetAt(event.getScreenX(), event.getScreenY());
       infoTimer.stop();
-      if (information == null) {
+      if (target == null) {
         scheduleInformationHide();
         return;
       }
-      if (token.equals(currentInfoToken) && infoPopup.isShowing()) return;
+      if (target.key.equals(currentInfoToken) && infoPopup.isShowing()) return;
       double screenX = event.getScreenX();
       double screenY = event.getScreenY();
       infoTimer.setOnFinished(ignored -> {
-        if (!pointerStillOverToken(token)) return;
+        if (!pointerStillOverTarget(target.key)) return;
         if (infoPopup.isShowing()) infoPopup.hide();
-        currentInfoToken = token;
-        showInformation(information, screenX, screenY);
+        currentInfoToken = target.key;
+        showInformation(target.information, screenX, screenY);
       });
       infoTimer.playFromStart();
     });
@@ -150,6 +167,7 @@ public class EditorTab extends Tab {
       infoTimer.stop();
       scheduleInformationHide();
     });
+    editor.getEditor().addEventHandler(MouseEvent.MOUSE_PRESSED, event -> hideInformation());
     editor.getEditor().addEventHandler(KeyEvent.KEY_PRESSED, event -> hideInformation());
   }
 
@@ -211,19 +229,47 @@ public class EditorTab extends Tab {
     if (!pointerOverInfoPopup) infoHideTimer.playFromStart();
   }
 
-  private boolean pointerStillOverToken(String expectedToken) {
+  private boolean pointerStillOverTarget(String expectedKey) {
     javafx.geometry.Point2D screen = new javafx.scene.robot.Robot().getMousePosition();
     if (infoPopup.isShowing()
             && screen.getX() >= infoPopup.getX()
             && screen.getX() <= infoPopup.getX() + infoPopup.getWidth()
             && screen.getY() >= infoPopup.getY()
             && screen.getY() <= infoPopup.getY() + infoPopup.getHeight()) {
-      return false;
+      return true;
     }
-    javafx.geometry.Point2D local = editor.getEditor().screenToLocal(screen);
-    if (!editor.getEditor().getBoundsInLocal().contains(local)) return false;
-    int offset = editor.getEditor().hit(local.getX(), local.getY()).getInsertionIndex();
-    return expectedToken.equals(tokenAt(editor.getText(), offset));
+    HoverTarget target = hoverTargetAt(screen.getX(), screen.getY());
+    return target != null && expectedKey.equals(target.key);
+  }
+
+  /** Returns information only when the pointer is actually over a rendered character. */
+  private HoverTarget hoverTargetAt(double screenX, double screenY) {
+    javafx.geometry.Point2D local = editor.getEditor().screenToLocal(screenX, screenY);
+    if (!editor.getEditor().getBoundsInLocal().contains(local)) return null;
+    String source = editor.getText();
+    if (source == null || source.isEmpty()) return null;
+    int offset = Math.min(editor.getEditor().hit(local.getX(), local.getY()).getInsertionIndex(), source.length() - 1);
+    if (!characterContainsScreenPoint(offset, screenX, screenY) &&
+            (offset == 0 || !characterContainsScreenPoint(offset - 1, screenX, screenY))) return null;
+    if (!characterContainsScreenPoint(offset, screenX, screenY)) offset--;
+
+    for (DiagnosticHint diagnostic : diagnosticHints) {
+      if (offset >= diagnostic.lineStart && offset < diagnostic.lineEnd) {
+        return new HoverTarget("diagnostic:" + diagnostic.line + ":" + diagnostic.message,
+                new ZIDEEditor.EditorInfo(diagnostic.severity + " on line " + diagnostic.line,
+                        diagnostic.message));
+      }
+    }
+
+    String token = tokenAt(source, offset);
+    ZIDEEditor.EditorInfo information = owner.editorInfo(languageId, path, source, token, offset);
+    return information == null ? null : new HoverTarget("token:" + token, information);
+  }
+
+  private boolean characterContainsScreenPoint(int offset, double screenX, double screenY) {
+    if (offset < 0 || offset >= editor.getEditor().getLength()) return false;
+    return editor.getEditor().getCharacterBoundsOnScreen(offset, offset + 1)
+            .map(bounds -> bounds.contains(screenX, screenY)).orElse(false);
   }
 
   private TextFlow createSignature(String signature) {
@@ -335,6 +381,7 @@ public class EditorTab extends Tab {
   void showDiagnostics(List<YASSDiagnostic> diagnostics) {
     var area = editor.getEditor();
     int length = area.getLength();
+    diagnosticHints.clear();
     if (length == 0) return;
 
     int position = 0;
@@ -355,6 +402,37 @@ public class EditorTab extends Tab {
       start = Math.max(0, Math.min(start, length - 1));
       end = Math.max(start + 1, Math.min(end, length));
       addDiagnosticStyle(start, end, "ERROR".equals(diagnostic.getSeverity().toString()));
+      int lineStart = start;
+      int lineEnd = end;
+      String source = editor.getText();
+      while (lineStart > 0 && source.charAt(lineStart - 1) != '\n') lineStart--;
+      while (lineEnd < source.length() && source.charAt(lineEnd) != '\n') lineEnd++;
+      diagnosticHints.add(new DiagnosticHint(lineStart, Math.max(lineStart + 1, lineEnd),
+              diagnostic.getLine(), diagnostic.getSeverity().toString(), diagnostic.getMessage()));
+    }
+  }
+
+  private static final class HoverTarget {
+    final String key;
+    final ZIDEEditor.EditorInfo information;
+    HoverTarget(String key, ZIDEEditor.EditorInfo information) {
+      this.key = key;
+      this.information = information;
+    }
+  }
+
+  private static final class DiagnosticHint {
+    final int lineStart;
+    final int lineEnd;
+    final int line;
+    final String severity;
+    final String message;
+    DiagnosticHint(int lineStart, int lineEnd, int line, String severity, String message) {
+      this.lineStart = lineStart;
+      this.lineEnd = lineEnd;
+      this.line = line;
+      this.severity = severity;
+      this.message = message;
     }
   }
 
@@ -434,14 +512,147 @@ public class EditorTab extends Tab {
     owner.applyLanguageForPath(this);
   }
   String getLanguageId() { return languageId; }
-  void setLanguageId(String languageId) { this.languageId = languageId; }
+  void setLanguageId(String languageId) {
+    this.languageId = languageId;
+    setMarkdownPreviewEnabled("md".equals(languageId));
+  }
   public CodeEditorViewFX getEditor() { return editor; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
   public void toggleSpecialLine(int line) {
     if (!breakpointLines.add(line)) breakpointLines.remove(line);
   }
-  void switchOnDarkMode() { editor.setDarkMode(true); }
-  void switchOffDarkMode() { editor.setDarkMode(false); }
+  void switchOnDarkMode() { editor.setDarkMode(true); renderMarkdownPreview(); }
+  void switchOffDarkMode() { editor.setDarkMode(false); renderMarkdownPreview(); }
   void setHasChanges(boolean hasChanges) { changes = hasChanges; }
   boolean hasChanges() { return changes; }
+  String getLastDiskContent() { return lastDiskContent; }
+  void setLastDiskContent(String content) { lastDiskContent = content; }
+
+  private void setMarkdownPreviewEnabled(boolean enabled) {
+    if (enabled) {
+      if (markdownPreview == null) {
+        markdownPreviewContent = new VBox(8);
+        markdownPreviewContent.getStyleClass().add("markdown-preview-content");
+        markdownPreview = new ScrollPane(markdownPreviewContent);
+        markdownPreview.setFitToWidth(true);
+        markdownPreview.getStyleClass().add("markdown-preview");
+        markdownSplit = new SplitPane();
+        markdownSplit.setDividerPositions(0.52);
+      }
+      if (editorContainer.getChildren().get(0) != markdownSplit) {
+        editorContainer.getChildren().remove(editorContent);
+        markdownSplit.getItems().setAll(editorContent, markdownPreview);
+        editorContainer.getChildren().add(0, markdownSplit);
+        markdownSplit.setDividerPositions(0.52);
+      }
+      renderMarkdownPreview();
+    } else if (!editorContainer.getChildren().isEmpty()
+            && editorContainer.getChildren().get(0) != editorContent) {
+      editorContainer.getChildren().remove(markdownSplit);
+      markdownSplit.getItems().remove(editorContent);
+      editorContainer.getChildren().add(0, editorContent);
+    }
+  }
+
+  private void renderMarkdownPreview() {
+    if (markdownPreview == null || !"md".equals(languageId)) return;
+    markdownPreviewContent.getChildren().setAll(markdownNodes(editor.getText()));
+  }
+
+  /** Builds a lightweight preview without requiring the optional javafx.web module. */
+  private static List<Node> markdownNodes(String markdown) {
+    List<Node> nodes = new ArrayList<>();
+    boolean codeBlock = false;
+    StringBuilder code = new StringBuilder();
+    for (String raw : (markdown == null ? "" : markdown).split("\\R", -1)) {
+      if (raw.trim().startsWith("```")) {
+        if (codeBlock) {
+          nodes.add(markdownCodeBlock(code.toString()));
+          code.setLength(0);
+        }
+        codeBlock = !codeBlock;
+        continue;
+      }
+      if (codeBlock) { code.append(raw).append('\n'); continue; }
+      if (raw.matches("^\\s*[-*]\\s+.*")) {
+        String value = raw.replaceFirst("^\\s*[-*]\\s+", "");
+        Text bullet = new Text("\u2022  ");
+        bullet.getStyleClass().add("markdown-text");
+        TextFlow item = inlineMarkdownFlow(value);
+        HBox row = new HBox(bullet, item);
+        row.getStyleClass().add("markdown-list-item");
+        nodes.add(row);
+        continue;
+      }
+      int heading = 0;
+      while (heading < raw.length() && heading < 6 && raw.charAt(heading) == '#') heading++;
+      if (heading > 0 && heading < raw.length() && raw.charAt(heading) == ' ') {
+        TextFlow title = inlineMarkdownFlow(raw.substring(heading + 1));
+        title.getStyleClass().add("markdown-heading-" + heading);
+        nodes.add(title);
+      } else if (raw.startsWith("> ")) {
+        Region rule = new Region();
+        rule.getStyleClass().add("markdown-quote-rule");
+        HBox quote = new HBox(10, rule, inlineMarkdownFlow(raw.substring(2)));
+        quote.getStyleClass().add("markdown-quote");
+        nodes.add(quote);
+      } else if (raw.isBlank()) {
+        Region gap = new Region();
+        gap.setMinHeight(4);
+        nodes.add(gap);
+      } else {
+        TextFlow paragraph = inlineMarkdownFlow(raw);
+        paragraph.getStyleClass().add("markdown-paragraph");
+        nodes.add(paragraph);
+      }
+    }
+    if (codeBlock && !code.isEmpty()) nodes.add(markdownCodeBlock(code.toString()));
+    return nodes;
+  }
+
+  private static Label markdownCodeBlock(String value) {
+    Label label = new Label(value.stripTrailing());
+    label.setWrapText(true);
+    label.setMaxWidth(Double.MAX_VALUE);
+    label.getStyleClass().add("markdown-code-block");
+    return label;
+  }
+
+  private static TextFlow inlineMarkdownFlow(String value) {
+    TextFlow flow = new TextFlow();
+    flow.getStyleClass().add("markdown-flow");
+    Matcher matcher = MARKDOWN_INLINE.matcher(value);
+    int offset = 0;
+    while (matcher.find()) {
+      addMarkdownText(flow, value.substring(offset, matcher.start()), null);
+      if (matcher.group(2) != null) {
+        addMarkdownText(flow, matcher.group(2), "markdown-bold");
+      } else if (matcher.group(4) != null) {
+        addMarkdownText(flow, matcher.group(4), "markdown-inline-code");
+      } else {
+        Hyperlink link = new Hyperlink(matcher.group(6));
+        String url = matcher.group(7);
+        link.setOnAction(e -> {
+          try {
+            jamiebalfour.helpers.HelperFunctions.openWebsite(url);
+          } catch (Exception ignored) {
+            // A preview link must not interrupt editing when the desktop cannot open it.
+          }
+        });
+        link.getStyleClass().add("markdown-link");
+        flow.getChildren().add(link);
+      }
+      offset = matcher.end();
+    }
+    addMarkdownText(flow, value.substring(offset), null);
+    return flow;
+  }
+
+  private static void addMarkdownText(TextFlow flow, String value, String styleClass) {
+    if (value.isEmpty()) return;
+    Text text = new Text(value);
+    text.getStyleClass().add("markdown-text");
+    if (styleClass != null) text.getStyleClass().add(styleClass);
+    flow.getChildren().add(text);
+  }
 }
