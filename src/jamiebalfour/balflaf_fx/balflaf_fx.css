@@ -103,37 +103,25 @@
     -fx-stroke-line-join: round;
 }
 
-.jb-menu-button {
-    -fx-background-color: #ddd;
-    -fx-background-radius: 7;
-    -fx-padding: 3 8 3 8;
-    -fx-cursor: hand;
-}
-
-.jb-menu-button:hover {
-    -fx-background-color: #e6e6e6;
-}
-
-.jb-menu-button:pressed {
-    -fx-background-color: #cfcfcf;
-}
-
 .jb-menu-content {
     -fx-alignment: center;
+    -fx-background-color: #681984;
 }
 
 .jb-chevron {
-    -fx-text-fill: #000;
+    -fx-text-fill: #fff;
     -fx-font-size: 11px;
+    -fx-background-color: #681984;
 }
 
 .jb-menu-button {
-    -fx-background-color: #ddd;
+    -fx-background-color: #681984;
     -fx-background-radius: 7;
     -fx-background-insets: 0;   /* 👈 this kills the white border */
     -fx-padding: 3 8 3 8;
     -fx-border-color: transparent;
     -fx-border-width: 0;
+    -fx-cursor: hand;
 }
 
 .jb-menu-button:focused {
@@ -143,11 +131,11 @@
 }
 
 .jb-menu-button:hover {
-    -fx-background-color: #e6e6e6;
+    -fx-background-color: #681984;
 }
 
 .jb-menu-button:pressed {
-    -fx-background-color: #cfcfcf;
+    -fx-background-color: #681984;
 }
 
 .glass-menu-item {

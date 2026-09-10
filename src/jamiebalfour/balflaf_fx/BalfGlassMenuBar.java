@@ -155,6 +155,16 @@ public class BalfGlassMenuBar extends HBox {
       root.pseudoClassStateChanged(DARK, enabled);
     }
 
+    /** Shows or removes the complete top-level menu, including its hit target. */
+    public void setVisible(boolean visible) {
+      Node hitBox = owner.getParent();
+      if (hitBox != null) {
+        hitBox.setVisible(visible);
+        hitBox.setManaged(visible);
+      }
+      if (!visible && popup.isShowing()) popup.hide();
+    }
+
     public GlassCheckMenuItem checkItem(String text, boolean selected, Consumer<Boolean> action) {
       GlassCheckMenuItem item = new GlassCheckMenuItem(text, selected, action);
       box.getChildren().add(item.getNode());

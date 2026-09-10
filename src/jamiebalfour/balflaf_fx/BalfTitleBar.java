@@ -16,6 +16,7 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.Background;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
@@ -49,6 +50,7 @@ public class BalfTitleBar extends Region {
 
   private final Button jbMenu;
   private ContextMenu jbContextMenu;
+  private MenuItem settingsMenuItem;
   private final Canvas titleCanvas = new Canvas();
 
   private final Insets padding = new Insets(0, 10, 0, 10);
@@ -136,6 +138,11 @@ public class BalfTitleBar extends Region {
   public static void addWindowResizing(Stage stage, Node root){
     WindowResizer resizer = new WindowResizer();
     resizer.install(stage, root);
+  }
+
+  /** Connects the application's settings action to the title-bar application menu. */
+  public void setOnSettings(EventHandler<ActionEvent> handler) {
+    if (settingsMenuItem != null) settingsMenuItem.setOnAction(handler);
   }
 
   @Override
@@ -453,7 +460,6 @@ public class BalfTitleBar extends Region {
       dragOffsetY = e.getSceneY();
     });
     setOnMouseDragged(e -> {
-      System.out.println(stage.isMaximized());
       if (!((!HelperFunctions.isMac() && stage.isMaximized()) || (HelperFunctions.isMac() && !zoomed))) {
         if(isMac()){
           toggleMacZoom(stage);
@@ -524,7 +530,7 @@ public class BalfTitleBar extends Region {
 
     MenuItem about    = new MenuItem("About " + title);
     about.setOnAction(this.onAbout);
-    MenuItem settings = new MenuItem("Settings");
+    settingsMenuItem = new MenuItem("Settings");
     MenuItem quit     = new MenuItem("Quit");
 
     quit.setOnAction(e -> {
@@ -539,7 +545,7 @@ public class BalfTitleBar extends Region {
             github,
             new SeparatorMenuItem(),
             about,
-            settings,
+            settingsMenuItem,
             new SeparatorMenuItem(),
             quit
     );
