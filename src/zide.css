@@ -61,6 +61,18 @@
     -fx-border-color: rgba(255,255,255,0.12);
 }
 
+.context-menu .separator-menu-item {
+    -fx-padding: 1px 0;
+}
+
+.context-menu .separator:horizontal {
+    -fx-padding: 0;
+}
+
+.context-menu .separator:horizontal .line {
+    -fx-border-width: 1px 0 0 0;
+}
+
 .app-menubar {
     -fx-background-color: -fx-control-inner-background;
     -fx-border-color: rgba(0,0,0,0.08);
@@ -257,7 +269,8 @@
     -fx-control-inner-background: #1e1e1e;
 }
 
-.app-root.dark .code-area .caret {
+.app-root.dark .code-area .caret,
+.app-root.dark .zpe-code-area .caret {
     -fx-stroke: #ffffff;
 }
 
@@ -562,6 +575,23 @@
     -fx-padding: 0;
     -fx-max-width: 0;
     -fx-opacity: 0;
+}
+
+.language-selector-menu {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+    -fx-background-color: transparent;
+}
+
+.language-selector-menu .glass-menu-title-hitbox {
+    -fx-min-height: 24px;
+    -fx-pref-height: 24px;
+}
+
+.language-selector-menu .glass-menu-title {
+    -fx-min-height: 24px;
+    -fx-pref-height: 24px;
+    -fx-padding: 1px 8px;
 }
 .app-root.dark .status-bar {
     -fx-border-color: rgba(255,255,255,0.08);
@@ -1237,12 +1267,17 @@
 }
 
 .glass-menu-popup {
-    -fx-background-color: rgba(245, 245, 245, 0.88);
-    -fx-background-radius: 8px;
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10px;
     -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
-    -fx-border-color: rgba(220,220,220,0.55);
-    -fx-border-radius: 7px;
+    -fx-border-color: rgba(60,60,67,0.24);
+    -fx-border-radius: 10px;
     -fx-border-width: 1px;
+}
+
+.glass-menu-container:dark .glass-menu-popup {
+    -fx-background-color: #24262b;
+    -fx-border-color: rgba(235,235,245,0.18);
 }
 
 .glass-menu-item {
@@ -1270,6 +1305,9 @@
 
 .glass-menu-separator {
     -fx-background-color: rgba(0,0,0,0.18);
+    -fx-min-height: 1px;
+    -fx-pref-height: 1px;
+    -fx-max-height: 1px;
 }
 
 .glass-menu-title {
@@ -1421,60 +1459,106 @@
 }
 
 .zpe-online-browser {
-    -fx-background-color: -fx-background;
-}
-
-.zpe-online-title {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
+    -fx-background-color: transparent;
 }
 
 .zpe-online-search {
-    -fx-pref-height: 36px;
-    -fx-font-size: 14px;
+    -fx-pref-height: 34px;
 }
 
 .zpe-online-scroll {
     -fx-background-color: transparent;
     -fx-background: transparent;
+    -fx-border-color: #d4d8dd;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
 }
 
 .zpe-online-scroll > .viewport {
     -fx-background-color: transparent;
 }
 
-.zpe-online-file-card {
-    -fx-background-color: rgba(255,255,255,0.08);
-    -fx-background-radius: 14px;
-    -fx-border-radius: 14px;
-    -fx-border-color: rgba(255,255,255,0.14);
+.zpe-online-file-list {
+    -fx-background-color: #ffffff;
+    -fx-padding: 2px;
+}
+
+.zpe-online-file-row {
+    -fx-background-color: transparent;
+    -fx-padding: 6px 8px;
+    -fx-min-height: 38px;
     -fx-cursor: hand;
 }
 
-.zpe-online-file-card:hover {
-    -fx-background-color: rgba(255,255,255,0.14);
-}
-
-.zpe-online-file-icon {
-    -fx-font-size: 28px;
+.zpe-online-file-row:hover {
+    -fx-background-color: #e8f3fb;
 }
 
 .zpe-online-file-name {
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
-}
-
-.zpe-online-file-meta {
-    -fx-opacity: 0.65;
-    -fx-font-size: 11px;
+    -fx-font-size: 13px;
 }
 
 .zpe-online-open-button {
-    -fx-background-radius: 10px;
+    -fx-background-radius: 4px;
+    -fx-padding: 4px 12px;
+}
+
+.zpe-online-empty {
+    -fx-padding: 18px 10px;
+    -fx-opacity: 0.7;
+}
+
+.in-window-modal-dark .zpe-online-scroll {
+    -fx-border-color: #4b525c;
+}
+
+.in-window-modal-dark .zpe-online-file-list {
+    -fx-background-color: #20242a;
+}
+
+.in-window-modal-dark .zpe-online-file-row:hover {
+    -fx-background-color: #303944;
 }
 
 .editor-diagnostic-overlay {
     -fx-padding: 0;
+}
+
+.editor-find-replace {
+    -fx-padding: 7px;
+    -fx-background-color: rgba(255,255,255,0.98);
+    -fx-background-radius: 5px;
+    -fx-border-color: #c8cdd3;
+    -fx-border-radius: 5px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 8, 0.12, 0, 2);
+}
+
+.editor-find-replace .text-field {
+    -fx-pref-width: 180px;
+    -fx-padding: 4px 7px;
+}
+
+.editor-find-replace .button {
+    -fx-padding: 4px 8px;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+}
+
+.editor-find-result {
+    -fx-min-width: 62px;
+    -fx-text-fill: #555b63;
+    -fx-font-size: 11px;
+}
+
+.app-root.dark .editor-find-replace {
+    -fx-background-color: rgba(32,36,43,0.98);
+    -fx-border-color: #454c56;
+}
+
+.app-root.dark .editor-find-result {
+    -fx-text-fill: #aeb5bd;
 }
 
 .editor-error-indicator,
@@ -1942,6 +2026,28 @@
 .language-builder-hint {
     -fx-text-fill: #626a73;
 }
+.language-builder-palette {
+    -fx-padding: 2px 0 4px 0;
+}
+.language-builder-template-chip {
+    -fx-padding: 5px 9px;
+    -fx-background-color: #e3e7ec;
+    -fx-background-radius: 4px;
+    -fx-border-color: #c3c9d0;
+    -fx-border-radius: 4px;
+    -fx-cursor: hand;
+}
+.language-builder-template-chip:hover {
+    -fx-background-color: #d5eaf6;
+    -fx-border-color: #0788d1;
+}
+.language-builder-syntax-summary {
+    -fx-padding: 8px 10px;
+    -fx-background-color: #eef1f4;
+    -fx-background-radius: 3px;
+    -fx-border-color: #d3d7dc;
+    -fx-border-radius: 3px;
+}
 .language-builder-status {
     -fx-padding: 5px 10px;
     -fx-border-color: #c9cdd2 transparent transparent transparent;
@@ -1967,6 +2073,20 @@
 .app-root.dark .language-builder-hint {
     -fx-text-fill: #aeb5bd;
 }
+.app-root.dark .language-builder-template-chip {
+    -fx-background-color: #252d36;
+    -fx-border-color: #46515d;
+    -fx-text-fill: #edf0f2;
+}
+.app-root.dark .language-builder-template-chip:hover {
+    -fx-background-color: #123f55;
+    -fx-border-color: #159bdc;
+}
+.app-root.dark .language-builder-syntax-summary {
+    -fx-background-color: #20262e;
+    -fx-border-color: #3a444f;
+    -fx-text-fill: #edf0f2;
+}
 .app-root.dark .language-builder .text-field,
 .app-root.dark .language-builder .text-area,
 .app-root.dark .language-builder .text-area .content,
@@ -1981,6 +2101,27 @@
     -fx-background-color: #075a83;
 }
 
+/* Toolbar dividers stay as hairlines in both themes. JavaFX otherwise paints
+   the vertical line as a filled region when the dark base colour is active. */
+.app-toolbar .separator:vertical {
+    -fx-padding: 0 8px;
+    -fx-background-color: transparent;
+}
+
+.app-toolbar .separator:vertical .line {
+    -fx-pref-width: 1px;
+    -fx-min-width: 1px;
+    -fx-max-width: 1px;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent transparent rgba(0,0,0,0.18);
+    -fx-border-width: 0 0 0 1px;
+}
+
+.app-root.dark .app-toolbar .separator:vertical .line {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent transparent rgba(255,255,255,0.18);
+}
+
 /* Dark mode must win over the light palette above. */
 .app-root.dark,
 .app-root.dark .app-toolbar,
@@ -1991,4 +2132,37 @@
 .app-root.dark .console-pane,
 .app-root.dark .split-pane {
     -fx-background-color: #14171c;
+}
+
+.app-root.dark .balf-titlebar {
+    -fx-background-color: #20242b;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.app-root.dark .main-menu-bar {
+    -fx-background-color: #20242b;
+}
+
+.app-root.dark .balf-titlebar .jb-menu-button,
+.app-root.dark .balf-titlebar .jb-menu-content,
+.app-root.dark .balf-titlebar .jb-chevron {
+    -fx-background-color: #20242b;
+}
+
+.app-root .balf-titlebar .jb-menu-button {
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
+}
+
+.app-root.dark .balf-titlebar .jb-menu-content,
+.app-root.dark .balf-titlebar .jb-chevron {
+    -fx-background-color: transparent;
+}
+
+.app-root.dark .balf-titlebar .jb-menu-button:hover,
+.app-root.dark .balf-titlebar .jb-menu-button:pressed {
+    -fx-background-color: #363c46;
 }
