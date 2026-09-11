@@ -16,13 +16,19 @@ final class ZIDERuntimeManager {
 
   private static final String DOWNLOAD_ROOT = "https://www.jamiebalfour.scot/downloads/1-zpe/";
   private final Path installation;
+  private final Path sharedInstallation = Path.of(System.getProperty("user.home", ""), "jb", "zpe");
 
   ZIDERuntimeManager(Path installation) {
     this.installation = installation;
   }
 
   Path path(RuntimeKind kind) {
-    return installation.resolve(kind == RuntimeKind.ZPE ? "zpe.jar" : HelperFunctions.isWindows() ? "zpex.exe" : "zpex");
+    Path shared = sharedInstallation.resolve(runtimeFileName(kind));
+    return Files.isRegularFile(shared) ? shared : installation.resolve(runtimeFileName(kind));
+  }
+
+  private static String runtimeFileName(RuntimeKind kind) {
+    return kind == RuntimeKind.ZPE ? "zpe.jar" : HelperFunctions.isWindows() ? "zpex.exe" : "zpex";
   }
 
   boolean isInstalled(RuntimeKind kind) {
