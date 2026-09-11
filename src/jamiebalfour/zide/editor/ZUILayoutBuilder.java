@@ -176,9 +176,12 @@ public final class ZUILayoutBuilder {
     });
     Region spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
-    Button close = new Button("Close");
+    Button close = new Button("✕");
+    close.getStyleClass().add("layout-builder-close");
     close.setOnAction(e -> { if (closeAction != null) closeAction.run(); });
-    return new ToolBar(heading, new Separator(), insert, copy, spacer, close);
+    ToolBar toolbar = new ToolBar(heading, new Separator(), insert, copy, spacer, close);
+    toolbar.getStyleClass().add("layout-builder-toolbar");
+    return toolbar;
   }
 
   private void save() {
@@ -393,6 +396,20 @@ public final class ZUILayoutBuilder {
     if (script == null || !Files.isRegularFile(script)) return;
     try {
       String source = Files.readString(script, StandardCharsets.UTF_8);
+      Path manifest = file.getParent() == null ? null : file.getParent().resolve(".project.yas");
+      if (manifest != null && Files.isRegularFile(manifest)) {
+        StringBuilder projectSource = new StringBuilder();
+        for (String manifestLine : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
+          String trimmed = manifestLine.trim();
+          if (!trimmed.matches("(?i)^includes?\\s+.+")) continue;
+          String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
+          if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
+          Path included = manifest.getParent().resolve(value).normalize();
+          if (Files.isRegularFile(included) && included.getFileName().toString().toLowerCase().endsWith(".yas"))
+            projectSource.append(Files.readString(included, StandardCharsets.UTF_8)).append(System.lineSeparator());
+        }
+        source = projectSource.append(source).toString();
+      }
       Pattern moduleStart = Pattern.compile("^\\s*module\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", Pattern.CASE_INSENSITIVE);
       Pattern objectStart = Pattern.compile("^\\s*(?:(?:public|private|protected|static|abstract|final)\\s+)*(?:class|structure|interface)\\s+", Pattern.CASE_INSENSITIVE);
       Pattern functionStart = Pattern.compile("^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(", Pattern.CASE_INSENSITIVE);
