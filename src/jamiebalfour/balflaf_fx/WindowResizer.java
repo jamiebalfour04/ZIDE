@@ -7,7 +7,7 @@ import javafx.stage.Stage;
 
 final class WindowResizer {
 
-  private static final int RESIZE_MARGIN = 6; // px
+  private static final int RESIZE_MARGIN = 12; // px, easier to acquire on custom chrome
 
   private double startX, startY;
   private double startScreenX, startScreenY;
@@ -23,12 +23,14 @@ final class WindowResizer {
   }
 
   public void install(Stage stage, Node root) {
-    root.addEventFilter(MouseEvent.MOUSE_MOVED, e -> updateCursor(stage, root, e));
+    javafx.scene.Scene scene = root.getScene();
+    if (scene == null) { root.sceneProperty().addListener((obs, oldScene, newScene) -> { if (newScene != null) install(stage, root); }); return; }
+    scene.addEventFilter(MouseEvent.MOUSE_MOVED, e -> updateCursor(stage, root, e));
     root.addEventFilter(MouseEvent.MOUSE_EXITED, e -> {
       if (!e.isPrimaryButtonDown()) root.setCursor(Cursor.DEFAULT);
     });
 
-    root.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+    scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
       if (stage.isMaximized()) return;
 
       mode = getMode(root, e);
@@ -48,7 +50,7 @@ final class WindowResizer {
       e.consume();
     });
 
-    root.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
+    scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
       if (stage.isMaximized()) return;
       if (mode == ResizeMode.NONE) return;
 
@@ -126,7 +128,7 @@ final class WindowResizer {
       e.consume();
     });
 
-    root.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> mode = ResizeMode.NONE);
+    scene.addEventFilter(MouseEvent.MOUSE_RELEASED, e -> mode = ResizeMode.NONE);
   }
 
   private void updateCursor(Stage stage, Node root, MouseEvent e) {
@@ -139,10 +141,12 @@ final class WindowResizer {
   }
 
   private ResizeMode getMode(Node root, MouseEvent e) {
-    double x = e.getX();
-    double y = e.getY();
-    double w = root.getBoundsInLocal().getWidth();
-    double h = root.getBoundsInLocal().getHeight();
+    javafx.scene.Scene scene = root.getScene();
+    if (scene == null) return ResizeMode.NONE;
+    double x = e.getSceneX();
+    double y = e.getSceneY();
+    double w = scene.getWidth();
+    double h = scene.getHeight();
 
     boolean left = x <= RESIZE_MARGIN;
     boolean right = x >= w - RESIZE_MARGIN;
