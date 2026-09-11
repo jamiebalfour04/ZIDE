@@ -7,7 +7,6 @@ import javafx.css.PseudoClass;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.stage.Popup;
 
@@ -70,6 +69,15 @@ public class BalfGlassMenuBar extends HBox {
   /** Closes the currently displayed top-level menu, if any. */
   public void hideMenus() {
     hideActiveMenu();
+  }
+
+  /** Returns whether x lies beyond the outer edges of all menu titles. */
+  public boolean isOutsideMenuTitles(double x) {
+    if (getChildren().isEmpty()) return true;
+    Node first = getChildren().getFirst();
+    Node last = getChildren().getLast();
+    return x < first.getBoundsInParent().getMinX()
+            || x > last.getBoundsInParent().getMaxX();
   }
 
   private Label createMenuTitle(String text) {
@@ -163,13 +171,6 @@ public class BalfGlassMenuBar extends HBox {
 // Stack them
       root.getChildren().addAll(shadow, box);
       root.setOnMouseExited(e -> clearHoverState(root));
-      root.addEventFilter(MouseEvent.MOUSE_MOVED, e -> {
-        // Dismiss when the pointer leaves the item rows, even if it is still
-        // inside the popup's surrounding surface.
-        if (!isMenuItemTarget((Node) e.getTarget(), root)) {
-          hideActiveMenu();
-        }
-      });
 
 // Add to popup
       this.popup.getContent().add(root);
@@ -404,15 +405,6 @@ public class BalfGlassMenuBar extends HBox {
     if (node instanceof Parent parent) {
       for (Node child : parent.getChildrenUnmodifiable()) clearHoverState(child);
     }
-  }
-
-  private static boolean isMenuItemTarget(Node target, Parent root) {
-    Node current = target;
-    while (current != null && current != root) {
-      if (current.getStyleClass().contains("glass-menu-item")) return true;
-      current = current.getParent();
-    }
-    return false;
   }
 
   private static void rootCssAndLayout(Region root) {

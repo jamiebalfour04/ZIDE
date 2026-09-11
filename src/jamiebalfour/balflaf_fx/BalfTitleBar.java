@@ -19,8 +19,10 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -139,8 +141,7 @@ public class BalfTitleBar extends Region {
   }
 
   public static void addWindowResizing(Stage stage, Node root){
-    WindowResizer resizer = new WindowResizer();
-    resizer.install(stage, root);
+    // ZIDE installs dedicated edge handles on its scene surface.
   }
 
   /** Connects the application's settings action to the title-bar application menu. */
@@ -345,6 +346,8 @@ public class BalfTitleBar extends Region {
   }
 
   private boolean zoomed = false;
+  private Rectangle snapPreview;
+  private Rectangle2D pendingSnap;
 
   private double oldX;
   private double oldY;
@@ -481,19 +484,44 @@ public class BalfTitleBar extends Region {
       dragOffsetY = e.getSceneY();
     });
     setOnMouseDragged(e -> {
-      if (!((!HelperFunctions.isMac() && stage.isMaximized()) || (HelperFunctions.isMac() && !zoomed))) {
-        if(isMac()){
-          toggleMacZoom(stage);
-        } else {
-          stage.setMaximized(!stage.isMaximized());
-        }
-      }
-
       stage.setX(e.getScreenX() - dragOffsetX);
       stage.setY(e.getScreenY() - dragOffsetY);
+      updateSnapPreview(stage, e.getScreenX(), e.getScreenY());
 
     });
+    setOnMouseReleased(e -> commitSnap(stage));
   }
+
+  private void updateSnapPreview(Stage stage, double x, double y) {
+    Rectangle2D screen = Screen.getPrimary().getVisualBounds();
+    if (y > screen.getMinY() + 12) { pendingSnap = null; if (snapPreview != null) snapPreview.setVisible(false); return; }
+    pendingSnap = screen;
+    if (stage.getScene() == null || !(stage.getScene().getRoot() instanceof Pane pane)) return;
+    if (snapPreview == null) { snapPreview = new Rectangle(); snapPreview.setFill(Color.rgb(80,140,210,0.18)); snapPreview.setStroke(Color.rgb(100,170,240,0.8)); snapPreview.setMouseTransparent(true); pane.getChildren().add(snapPreview); }
+    snapPreview.setX(0); snapPreview.setY(0); snapPreview.setWidth(stage.getScene().getWidth()); snapPreview.setHeight(stage.getScene().getHeight()); snapPreview.setVisible(true);
+  }
+
+  private void commitSnap(Stage stage) {
+    if (pendingSnap != null) { stage.setX(pendingSnap.getMinX()); stage.setY(pendingSnap.getMinY()); stage.setWidth(pendingSnap.getWidth()); stage.setHeight(pendingSnap.getHeight()); }
+    pendingSnap = null; if (snapPreview != null) snapPreview.setVisible(false);
+  }
+
+  /* Snap preview will be reintroduced once the outline overlay is complete.
+  private void snapWindow(Stage stage, double screenX, double screenY) {
+    javafx.geometry.Rectangle2D bounds = javafx.stage.Screen.getScreensForRectangle(screenX, screenY, 1, 1)
+            .stream().findFirst().orElse(javafx.stage.Screen.getPrimary()).getVisualBounds();
+    double edge = 10;
+    if (screenY <= bounds.getMinY() + edge) {
+      if (isMac()) toggleMacZoom(stage); else stage.setMaximized(true);
+    } else if (screenX <= bounds.getMinX() + edge) {
+      stage.setX(bounds.getMinX()); stage.setY(bounds.getMinY());
+      stage.setWidth(bounds.getWidth() / 2.0); stage.setHeight(bounds.getHeight());
+    } else if (screenX >= bounds.getMaxX() - edge) {
+      stage.setX(bounds.getMinX() + bounds.getWidth() / 2.0); stage.setY(bounds.getMinY());
+      stage.setWidth(bounds.getWidth() / 2.0); stage.setHeight(bounds.getHeight());
+    }
+  }
+  */
 
   private void enableDoubleClickZoom(Stage stage) {
     setOnMouseClicked(e -> {
@@ -519,7 +547,7 @@ public class BalfTitleBar extends Region {
 
   private Button createJBMenu() {
 
-    Label jbChevron = new Label("⌄");
+    Label jbChevron = new Label("...");
     jbChevron.getStyleClass().add("jb-chevron");
 
     HBox content = new HBox(8, jbChevron);
