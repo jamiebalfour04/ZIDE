@@ -313,10 +313,12 @@ final class ZIDESystemTerminal extends BorderPane {
     }
   }
 
-  private void clear() {
+  void clearScreen() {
     transcript.clear();
     appendPrompt();
   }
+
+  private void clear() { clearScreen(); }
 
   private void showPreviousHistory() {
     if (history.isEmpty()) return;

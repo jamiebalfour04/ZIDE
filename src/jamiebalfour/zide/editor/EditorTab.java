@@ -14,13 +14,14 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
 import javafx.scene.text.Text;
@@ -36,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * A JavaFX-native document tab.  The previous Swing editor remains available
@@ -73,10 +75,14 @@ public class EditorTab extends Tab {
   private final VBox findReplacePanel = new VBox(6);
   private final TextField findField = new TextField();
   private final TextField replaceField = new TextField();
-  private final CheckBox matchCase = new CheckBox("Match case");
+  private final ToggleButton matchCase = new ToggleButton("Aa");
+  private final ToggleButton regularExpression = new ToggleButton(".*");
+  private final ToggleButton wholeWord = new ToggleButton("W");
+  private final ToggleButton onlySelection = new ToggleButton("[-]");
+  private final ToggleButton highlightAll = new ToggleButton("All");
   private final Label findResult = new Label();
   private final Node editorContent;
-  private final StackPane editorContainer;
+  private final VBox editorContainer;
   private SplitPane markdownSplit;
   private ScrollPane markdownPreview;
   private VBox markdownPreviewContent;
@@ -128,12 +134,13 @@ public class EditorTab extends Tab {
 
     buildFindReplacePanel();
     editorTopRight.getChildren().addAll(diagnosticOverlay, findReplacePanel);
-    editorTopRight.setAlignment(Pos.TOP_RIGHT);
-    editorTopRight.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+    editorTopRight.setAlignment(Pos.BOTTOM_CENTER);
+    editorTopRight.setMaxWidth(Double.MAX_VALUE);
+    editorTopRight.setPickOnBounds(false);
+    editorTopRight.setMouseTransparent(true);
 
-    editorContainer = new StackPane(content, editorTopRight);
-    StackPane.setAlignment(editorTopRight, Pos.TOP_RIGHT);
-    StackPane.setMargin(editorTopRight, new Insets(10, 18, 0, 0));
+    editorContainer = new VBox(content, editorTopRight);
+    VBox.setVgrow(content, Priority.ALWAYS);
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
@@ -155,10 +162,22 @@ public class EditorTab extends Tab {
     findField.setPrefColumnCount(18);
     replaceField.setPrefColumnCount(18);
     findResult.getStyleClass().add("editor-find-result");
+    matchCase.setTooltip(new Tooltip("Case sensitive"));
+    regularExpression.setTooltip(new Tooltip("Regular expression"));
+    wholeWord.setTooltip(new Tooltip("Whole word"));
+    onlySelection.setTooltip(new Tooltip("Only in selection"));
+    highlightAll.setTooltip(new Tooltip("Highlight all matches"));
+    matchCase.getStyleClass().add("editor-find-toggle");
+    regularExpression.getStyleClass().add("editor-find-toggle");
+    wholeWord.getStyleClass().add("editor-find-toggle");
+    onlySelection.getStyleClass().add("editor-find-toggle");
+    highlightAll.getStyleClass().add("editor-find-toggle");
 
     Button previous = new Button("Previous");
     Button next = new Button("Next");
-    Button close = new Button("Close");
+        Button close = new Button("✕");
+    close.getStyleClass().add("editor-find-close");
+    close.setTooltip(new Tooltip("Close find and replace"));
     Button replace = new Button("Replace");
     Button replaceAll = new Button("Replace all");
     previous.setOnAction(event -> find(false));
@@ -167,16 +186,25 @@ public class EditorTab extends Tab {
     replace.setOnAction(event -> replaceCurrent());
     replaceAll.setOnAction(event -> replaceAll());
 
-    HBox findRow = new HBox(5, findField, previous, next, findResult, close);
-    HBox replaceRow = new HBox(5, replaceField, replace, replaceAll, matchCase);
+    Label heading = new Label("Find in Current Buffer");
+    heading.getStyleClass().add("editor-find-heading");
+    HBox header = new HBox(8, heading, new Region(), findResult, matchCase, regularExpression, wholeWord, onlySelection, highlightAll, close);
+    HBox.setHgrow(header.getChildren().get(1), Priority.ALWAYS);
+
+    HBox findRow = new HBox(5, findField, previous, next);
+    HBox.setHgrow(findField, Priority.ALWAYS);
+    HBox replaceRow = new HBox(5, replaceField, replace, replaceAll);
+    HBox.setHgrow(replaceField, Priority.ALWAYS);
     findRow.setAlignment(Pos.CENTER_LEFT);
     replaceRow.setAlignment(Pos.CENTER_LEFT);
-    findReplacePanel.getChildren().addAll(findRow, replaceRow);
+    findReplacePanel.getChildren().addAll(header, findRow, replaceRow);
     findReplacePanel.getStyleClass().add("editor-find-replace");
     findReplacePanel.setVisible(false);
     findReplacePanel.setManaged(false);
     findField.textProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
     matchCase.selectedProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
+    regularExpression.selectedProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
+    highlightAll.selectedProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
     findField.setOnAction(event -> find(true));
     replaceField.setOnAction(event -> replaceCurrent());
     findReplacePanel.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -188,6 +216,7 @@ public class EditorTab extends Tab {
   }
 
   void showFindReplace(boolean focusReplacement) {
+    editorTopRight.setMouseTransparent(false);
     findReplacePanel.setVisible(true);
     findReplacePanel.setManaged(true);
     String selected = editor.getEditor().getSelectedText();
@@ -203,6 +232,7 @@ public class EditorTab extends Tab {
   private void hideFindReplace() {
     findReplacePanel.setVisible(false);
     findReplacePanel.setManaged(false);
+    if (!diagnosticOverlay.isManaged()) editorTopRight.setMouseTransparent(true);
     editor.requestFocus();
   }
 
@@ -210,9 +240,28 @@ public class EditorTab extends Tab {
     String query = findField.getText();
     if (query == null || query.isEmpty()) return;
     String source = editor.getText();
+    int caret = editor.getEditor().getCaretPosition();
+    if (regularExpression.isSelected()) {
+      try {
+        Pattern pattern = Pattern.compile(query, matchCase.isSelected() ? 0 : Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(source);
+        int index = -1, end = -1;
+        while (matcher.find()) {
+          if ((forwards && matcher.start() >= caret) || (!forwards && matcher.start() < caret)) {
+            index = matcher.start(); end = matcher.end();
+            if (!forwards) continue;
+            break;
+          }
+        }
+        if (index < 0 && matcher.find(0)) { index = matcher.start(); end = matcher.end(); }
+        if (index >= 0) editor.getEditor().selectRange(index, end);
+        else updateFindResult();
+      } catch (PatternSyntaxException ignored) { updateFindResult(); }
+      editor.getEditor().requestFollowCaret();
+      return;
+    }
     String haystack = matchCase.isSelected() ? source : source.toLowerCase(java.util.Locale.ROOT);
     String needle = matchCase.isSelected() ? query : query.toLowerCase(java.util.Locale.ROOT);
-    int caret = editor.getEditor().getCaretPosition();
     int index = forwards ? haystack.indexOf(needle, caret) : haystack.lastIndexOf(needle, Math.max(0, caret - query.length() - 1));
     if (index < 0) index = forwards ? haystack.indexOf(needle) : haystack.lastIndexOf(needle);
     if (index < 0) { updateFindResult(); return; }
@@ -249,6 +298,14 @@ public class EditorTab extends Tab {
   private void updateFindResult() {
     String query = findField.getText();
     if (query == null || query.isEmpty()) { findResult.setText(""); return; }
+    if (regularExpression.isSelected()) {
+      try {
+        Matcher matcher = Pattern.compile(query, matchCase.isSelected() ? 0 : Pattern.CASE_INSENSITIVE).matcher(editor.getText());
+        int count = 0; while (matcher.find()) count++;
+        findResult.setText(count + (count == 1 ? " match" : " matches"));
+      } catch (PatternSyntaxException ignored) { findResult.setText("Invalid regexp"); }
+      return;
+    }
     String source = matchCase.isSelected() ? editor.getText() : editor.getText().toLowerCase(java.util.Locale.ROOT);
     String needle = matchCase.isSelected() ? query : query.toLowerCase(java.util.Locale.ROOT);
     int count = 0;
@@ -512,7 +569,8 @@ public class EditorTab extends Tab {
     int position = 0;
     for (var span : area.getStyleSpans(0, length)) {
       int end = position + span.getLength();
-      area.setStyle(position, end, withoutDiagnosticStyle(span.getStyle()));
+      try { area.setStyle(position, end, withoutDiagnosticStyle(span.getStyle())); }
+      catch (IllegalArgumentException ignored) { return; }
       position = end;
     }
 
@@ -568,8 +626,9 @@ public class EditorTab extends Tab {
     for (var span : area.getStyleSpans(start, end)) {
       int spanEnd = position + span.getLength();
       String base = withoutDiagnosticStyle(span.getStyle());
-      area.setStyle(position, spanEnd, base + " -rtfx-underline-color: " + colour
+      try { area.setStyle(position, spanEnd, base + " -rtfx-underline-color: " + colour
               + "; -rtfx-underline-width: 1.4; -rtfx-underline-wave-radius: 1.5;");
+      } catch (IllegalArgumentException ignored) { return; }
       position = spanEnd;
     }
   }
@@ -578,6 +637,7 @@ public class EditorTab extends Tab {
     if (style == null) return "";
     return style.replaceAll("\\s*-rtfx-underline-(?:color|width|wave-radius)\\s*:[^;]+;?", "");
   }
+
 
   private int[] rangeAt(int line, int column) {
     String text = editor.getText();
