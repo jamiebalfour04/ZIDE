@@ -118,6 +118,7 @@ public class ZIDEEditor extends Application {
   private BalfGlassMenuBar applicationMenuBar;
   private BalfTitleBar titleBar;
   private BalfGlassMenuBar.GlassMenu scriptMenu;
+  private BalfGlassMenuBar.GlassMenu projectMenu;
   private BalfGlassMenuBar.GlassMenu zpeOnlineMenu;
   private TextField editorSearchField;
   private boolean darkThemeEnabled;
@@ -312,7 +313,10 @@ public class ZIDEEditor extends Application {
   public void start(Stage stage) {
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(HelperFunctions.isMac() ? "/files/zide_macos.png" : "/files/zide.png"))));
-    stage.initStyle(StageStyle.UNDECORATED);
+    stage.initStyle(StageStyle.TRANSPARENT);
+    stage.setResizable(true);
+    stage.setMinWidth(720);
+    stage.setMinHeight(480);
 
     _stage = stage;
 
@@ -381,8 +385,9 @@ public class ZIDEEditor extends Application {
     // Left: project tree
     Node projectTree = buildProjectTree(projectDir);
     currentProjectRoot = projectDir;
+    updateProjectMenuVisibility();
     startProjectDirectoryWatcher(projectDir);
-    Node leftPane = wrapTitled("Project", projectTree);
+    Node leftPane = projectTree;
     //leftPane.setMinWidth(260);
 
     // Center: editor tabs
@@ -461,8 +466,49 @@ public class ZIDEEditor extends Application {
     root.setCenter(workspaceStack);
 
     windowStack = new StackPane(root);
+    windowStack.getStyleClass().add("window-stack");
+    if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
+      windowStack.getStyleClass().add("mac-window");
+      var roundedClip = new javafx.scene.shape.Rectangle();
+      roundedClip.setArcWidth(20);
+      roundedClip.setArcHeight(20);
+      roundedClip.widthProperty().bind(root.widthProperty());
+      roundedClip.heightProperty().bind(root.heightProperty());
+      root.setClip(roundedClip);
+    }
+    Region resizeOverlay = new Region();
+    resizeOverlay.setMouseTransparent(true);
+    resizeOverlay.setPickOnBounds(false);
+    resizeOverlay.getStyleClass().add("window-resize-overlay");
+    windowStack.getChildren().add(resizeOverlay);
+    Region resizeHandle = new Region();
+    resizeHandle.setMinSize(18, 18);
+    resizeHandle.setPrefSize(18, 18);
+    resizeHandle.setMaxSize(18, 18);
+    resizeHandle.setCursor(javafx.scene.Cursor.SE_RESIZE);
+    final double[] resizeStart = new double[4];
+    resizeHandle.setOnMousePressed(e -> {
+      resizeStart[0] = e.getScreenX(); resizeStart[1] = e.getScreenY();
+      resizeStart[2] = stage.getWidth(); resizeStart[3] = stage.getHeight();
+      e.consume();
+    });
+    resizeHandle.setOnMouseDragged(e -> {
+      stage.setWidth(Math.max(stage.getMinWidth(), resizeStart[2] + e.getScreenX() - resizeStart[0]));
+      stage.setHeight(Math.max(stage.getMinHeight(), resizeStart[3] + e.getScreenY() - resizeStart[1]));
+      e.consume();
+    });
+    StackPane.setAlignment(resizeHandle, Pos.BOTTOM_RIGHT);
+    windowStack.getChildren().add(resizeHandle);
+    addResizeHandle(windowStack, stage, Pos.TOP_CENTER, javafx.scene.Cursor.N_RESIZE, 0, -1);
+    addResizeHandle(windowStack, stage, Pos.BOTTOM_CENTER, javafx.scene.Cursor.S_RESIZE, 0, 1);
+    addResizeHandle(windowStack, stage, Pos.CENTER_LEFT, javafx.scene.Cursor.W_RESIZE, -1, 0);
+    addResizeHandle(windowStack, stage, Pos.CENTER_RIGHT, javafx.scene.Cursor.E_RESIZE, 1, 0);
+    addResizeHandle(windowStack, stage, Pos.TOP_LEFT, javafx.scene.Cursor.NW_RESIZE, -1, -1);
+    addResizeHandle(windowStack, stage, Pos.TOP_RIGHT, javafx.scene.Cursor.NE_RESIZE, 1, -1);
+    addResizeHandle(windowStack, stage, Pos.BOTTOM_LEFT, javafx.scene.Cursor.SW_RESIZE, -1, 1);
     var scene = new Scene(windowStack, 1280, 800);
-    //scene.setFill(Color.TRANSPARENT);
+    // Leave the area outside the rounded frame genuinely transparent.
+    scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
     scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/zide.css")).toExternalForm());
     setDarkStyleClass(root, isDarkThemeEnabled());
 
@@ -490,6 +536,14 @@ public class ZIDEEditor extends Application {
     if (isMac) {
       root.getStyleClass().add("mac-window");
     }
+  }
+
+  private void addResizeHandle(StackPane host, Stage stage, Pos position, javafx.scene.Cursor cursor, int horizontal, int vertical) {
+    Region handle = new Region(); handle.setMinSize(14, 14); handle.setPrefSize(14, 14); handle.setMaxSize(14, 14); handle.setCursor(cursor);
+    final double[] start = new double[6];
+    handle.setOnMousePressed(e -> { start[0]=e.getScreenX(); start[1]=e.getScreenY(); start[2]=stage.getWidth(); start[3]=stage.getHeight(); start[4]=stage.getX(); start[5]=stage.getY(); e.consume(); });
+    handle.setOnMouseDragged(e -> { double dx=e.getScreenX()-start[0], dy=e.getScreenY()-start[1]; if(horizontal<0){stage.setX(start[4]+dx); stage.setWidth(Math.max(stage.getMinWidth(),start[2]-dx));} else if(horizontal>0) stage.setWidth(Math.max(stage.getMinWidth(),start[2]+dx)); if(vertical<0){stage.setY(start[5]+dy); stage.setHeight(Math.max(stage.getMinHeight(),start[3]-dy));} else if(vertical>0) stage.setHeight(Math.max(stage.getMinHeight(),start[3]+dy)); e.consume(); });
+    StackPane.setAlignment(handle, position); host.getChildren().add(handle);
   }
 
   /** Adds About and Settings to JavaFX's Cocoa-owned application menu. */
@@ -788,6 +842,11 @@ public class ZIDEEditor extends Application {
     BalfGlassMenuBar bar = new BalfGlassMenuBar();
     applicationMenuBar = bar;
     bar.getStyleClass().add("main-menu-bar");
+    bar.setOnMouseMoved(event -> {
+      if (event.getTarget() == bar && bar.isOutsideMenuTitles(event.getX())) {
+        bar.hideMenus();
+      }
+    });
     bar.setOnMouseClicked(event -> {
       if (event.getTarget() == bar
               && event.getButton() == javafx.scene.input.MouseButton.PRIMARY
@@ -853,6 +912,10 @@ public class ZIDEEditor extends Application {
     });
 
     formatDocumentMenuItem = edit.createItem("Format document", "", this::beautifyCurrentDocument);
+
+    projectMenu = bar.menu("Project");
+    projectMenu.createItem("Edit project settings", "", this::editCurrentProjectSettings);
+    projectMenu.setVisible(false);
 
     var viewMenu = bar.menu("View");
 
@@ -948,9 +1011,7 @@ public class ZIDEEditor extends Application {
     zpeOnlineMenu.createItem("Load from public repository", "", this::loadFromPublicCloudFX);
     zpeOnlineAuthSeparator = zpeOnlineMenu.separatorNode();
     recentOnlineFilesMenuItem = zpeOnlineMenu.createItem("Recent online files", "", this::showRecentZPEOnlineFiles);
-    loadFromOnline = zpeOnlineMenu.createItem("Load from ZPE Online", "", () -> {});
-
-    loadFromOnline.setOnMouseClicked(e -> loadFromUsersCloudFX());
+    loadFromOnline = zpeOnlineMenu.createItem("Load from ZPE Online", "", this::loadFromUsersCloudFX);
     saveToOnline = zpeOnlineMenu.createItem("Save to ZPE Online", "", this::saveToZPEOnline);
 
 
@@ -1086,6 +1147,7 @@ public class ZIDEEditor extends Application {
     if (chosen != null) {
       currentProjectRoot = chosen;
       projectDir = chosen;
+      updateProjectMenuVisibility();
       buildProjectTree(chosen);
       startProjectDirectoryWatcher(chosen);
       if (systemTerminal != null) {
@@ -1257,6 +1319,7 @@ public class ZIDEEditor extends Application {
   private void openGitProject(File directory) {
     currentProjectRoot = directory;
     projectDir = directory;
+    updateProjectMenuVisibility();
     buildProjectTree(directory);
     startProjectDirectoryWatcher(directory);
     if (systemTerminal != null) systemTerminal.setWorkingDirectory(directory.toPath());
@@ -1670,6 +1733,14 @@ public class ZIDEEditor extends Application {
 
       if (!newDir.mkdir()) {
         showModalValidation(validation, "Failed to create project folder.");
+        return false;
+      }
+      try {
+        Files.writeString(new File(newDir, ".zpe.project").toPath(),
+                "{\n  \"files\": []\n}\n", StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE_NEW);
+      } catch (IOException exception) {
+        showModalValidation(validation, "Project folder created, but .zpe.project could not be created.");
         return false;
       }
 
@@ -2139,6 +2210,7 @@ public class ZIDEEditor extends Application {
     body.setMaxWidth(540);
     body.getStyleClass().add("in-window-modal-message");
     showInWindowModal(title, "", body, "OK", () -> true, false);
+    setActiveModalWidth(520);
   }
 
   private void requestApplicationClose() {
@@ -2503,7 +2575,8 @@ public class ZIDEEditor extends Application {
   }
 
   private EditorTab getCurrentTab(){
-    return (EditorTab) editorTabs.getSelectionModel().getSelectedItem();
+    Tab selected = editorTabs.getSelectionModel().getSelectedItem();
+    return selected instanceof EditorTab ? (EditorTab) selected : null;
   }
 
   /**
@@ -2609,6 +2682,7 @@ public class ZIDEEditor extends Application {
       if(getCurrentTab() == null) return;
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".tmp");
       EditorTab tab = getCurrentTab();
+      if (!ensureProjectManifestHasScripts(tab)) return;
       runBtn.getStyleClass().add("running");
 
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), sourceWithLayout(tab, tab.getEditor().getText()), false);
@@ -2621,12 +2695,39 @@ public class ZIDEEditor extends Application {
       // ZPEX embeds its compiler at native-image build time. Layout companions
       // must use the current Java runtime until the native UI compiler is
       // rebuilt with the same feature set.
-      runZPEProcess(tempPath, resourceDirectoryFor(tab), false, !hasCompanionLayout(tab), "");
+      Path manifest = projectManifestFor(tab);
+      Path runSource = manifest == null ? tempPath : manifest;
+      runZPEProcess(runSource, resourceDirectoryFor(tab), false, manifest == null && !hasCompanionLayout(tab), "");
 
       //stopExecution.setDisable(false);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private Path projectManifestFor(EditorTab tab) {
+    if (tab == null || tab.getPath() == null) return null;
+    Path file = Path.of(tab.getPath()).toAbsolutePath().normalize();
+    Path folder = Files.isDirectory(file) ? file : file.getParent();
+    if (folder == null) return null;
+    Path manifest = folder.resolve(".project.yas");
+    return Files.isRegularFile(manifest) ? manifest : null;
+  }
+
+  private boolean ensureProjectManifestHasScripts(EditorTab tab) {
+    Path manifest = projectManifestFor(tab);
+    if (manifest == null) return true;
+    try {
+      boolean hasScripts = Files.readAllLines(manifest, StandardCharsets.UTF_8).stream()
+              .map(String::trim).anyMatch(line -> line.matches("(?i)^includes?\\s+.+"));
+      if (hasScripts) return true;
+      showMessage("Project has no scripts", "Add at least one YASS file to the project before running it.");
+      openProjectManifest(manifest);
+      return false;
+    } catch (IOException exception) {
+      showError("Project manifest", exception.getMessage());
+      return false;
     }
   }
 
@@ -2760,6 +2861,9 @@ public class ZIDEEditor extends Application {
   }
 
   private String sourceWithLayout(EditorTab tab, String source) {
+    // UI companions are explicit files now; never append an implicit include.
+    return source;
+    /*
     if (tab == null || tab.getPath() == null || tab.getPath().toLowerCase(Locale.ROOT).endsWith(".ui.yas")) return source;
     Path script = Path.of(tab.getPath()).toAbsolutePath().normalize();
     String fileName = script.getFileName().toString();
@@ -2769,7 +2873,7 @@ public class ZIDEEditor extends Application {
     String includePath = layoutFile.toString().replace('\\', '/').replace("\"", "\\\"");
     String separator = source.isEmpty() || source.endsWith("\n") ? "" : "\n";
     // Keep transient execution compatible with installed ZPEX builds that predate singular `include`.
-    return source + separator + "\nincludes \"" + includePath + "\"\n";
+    return source + separator + "\nincludes \"" + includePath + "\"\n"; */
   }
 
   private boolean hasCompanionLayout(EditorTab tab) {
@@ -2797,6 +2901,20 @@ public class ZIDEEditor extends Application {
     try {
       String source = Files.isRegularFile(layoutFile)
           ? Files.readString(layoutFile, StandardCharsets.UTF_8) : "";
+      Path manifest = layoutFile.getParent() == null ? null : layoutFile.getParent().resolve(".project.yas");
+      if (manifest != null && Files.isRegularFile(manifest)) {
+        StringBuilder projectSource = new StringBuilder();
+        for (String line : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
+          String trimmed = line.trim();
+          if (!trimmed.matches("(?i)^includes?\\s+.+")) continue;
+          String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
+          if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
+          Path included = manifest.getParent().resolve(value).normalize();
+          if (Files.isRegularFile(included) && included.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".yas"))
+            projectSource.append(Files.readString(included, StandardCharsets.UTF_8)).append(System.lineSeparator());
+        }
+        source = projectSource.append(source).toString();
+      }
       if (layoutBuilderOverlay != null) workspaceStack.getChildren().remove(layoutBuilderOverlay);
       ZUILayoutBuilder builder = new ZUILayoutBuilder(_stage, layoutFile, source,
           () -> statusLabel.setText("Saved " + layoutFile.getFileName()),
@@ -2917,6 +3035,7 @@ public class ZIDEEditor extends Application {
       if(tab == null){
         tab = (EditorTab) editorTabs.getTabs().get(0);
       }
+      if (!ensureProjectManifestHasScripts(tab)) return;
 
       debuggingSession = true;
       debugBtn.getStyleClass().add("running");
@@ -2930,7 +3049,9 @@ public class ZIDEEditor extends Application {
       String debugSource = prepareDebugSourceWithBreakpoints(tab, tab.getEditor().getText());
       FileHelperFunctions.writeFile(tempPath.toAbsolutePath().toString(), sourceWithLayout(tab, debugSource), false);
       beginProfilerSession();
-      if (!runZPEProcess(tempPath, resourceDirectoryFor(tab), true, true, "")) {
+      Path manifest = projectManifestFor(tab);
+      Path debugSourcePath = manifest == null ? tempPath : manifest;
+      if (!runZPEProcess(debugSourcePath, resourceDirectoryFor(tab), true, manifest == null, "")) {
         finishDebugSession();
       }
     } catch (IOException e) {
@@ -3191,6 +3312,7 @@ public class ZIDEEditor extends Application {
     if (projectTree == null) {
       projectTree = new TreeView<>();
       projectTree.setShowRoot(true);
+      projectTree.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
       projectTree.getStyleClass().add("project-tree");
 
       projectTree.setCellFactory(tv -> new TreeCell<>() {
@@ -3304,6 +3426,16 @@ public class ZIDEEditor extends Application {
     delete.setDisable(isProjectRoot(file));
 
     ContextMenu menu = new ContextMenu(open);
+    menu.getStyleClass().add("glass-context-menu");
+    MenuItem systemExplorer = new MenuItem("Open in system explorer");
+    systemExplorer.setOnAction(event -> {
+      try {
+        java.awt.Desktop.getDesktop().open(file.isDirectory() ? file : file.getParentFile());
+      } catch (Exception exception) {
+        showError("System explorer", exception.getMessage());
+      }
+    });
+    menu.getItems().add(systemExplorer);
     if (regularFile && (file.getName().toLowerCase(Locale.ROOT).endsWith(".ui.yas")
             || file.getName().toLowerCase(Locale.ROOT).endsWith(".zenlang"))) {
       menu.getItems().add(openAsText);
@@ -3319,6 +3451,23 @@ public class ZIDEEditor extends Application {
         newFile.getItems().add(item);
       }
       menu.getItems().addAll(new SeparatorMenuItem(), refreshFolder, newFile);
+      long yassCount = Arrays.stream(file.listFiles() == null ? new File[0] : file.listFiles())
+              .filter(f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".yas")
+                      && !f.getName().equalsIgnoreCase(".project.yas")).count();
+      File manifest = new File(file, ".project.yas");
+      if (manifest.isFile()) {
+        MenuItem editManifest = new MenuItem("Edit project settings");
+        editManifest.setOnAction(event -> openProjectManifest(manifest.toPath()));
+        menu.getItems().add(editManifest);
+      }
+      if (yassCount > 1 && !manifest.exists()) {
+        MenuItem createManifest = new MenuItem("Create .project.yas");
+        createManifest.setOnAction(event -> {
+          try { Files.writeString(manifest.toPath(), "// ZIDE project manifest\n", StandardCharsets.UTF_8); refreshProjectFolder(file); openProjectManifest(manifest.toPath()); }
+          catch (IOException exception) { showError("Project manifest", exception.getMessage()); }
+        });
+        menu.getItems().add(createManifest);
+      }
     }
     menu.getItems().addAll(new SeparatorMenuItem(), rename, delete);
     return menu;
@@ -3382,7 +3531,7 @@ public class ZIDEEditor extends Application {
             : "python".equals(language.id) ? "Py"
             : "zpeedy".equals(language.id) ? "ZPS"
             : "sqarl".equals(language.id) ? "SQ"
-            : "zenlang".equals(language.id) ? "ZL"
+            : "zenlang".equals(language.id) ? "ZEN"
             : "md".equals(language.id) ? "MD" : "TXT";
     Label icon = new Label(abbreviation);
     icon.getStyleClass().addAll("language-file-icon", language.iconStyleClass());
@@ -3532,6 +3681,7 @@ public class ZIDEEditor extends Application {
    */
   private void refreshTree() {
     if (currentProjectRoot == null) return;
+    updateProjectMenuVisibility();
 
     Set<Path> expandedDirectories = new HashSet<>();
     rememberExpandedDirectories(projectTree == null ? null : projectTree.getRoot(), expandedDirectories);
@@ -3553,6 +3703,10 @@ public class ZIDEEditor extends Application {
   /** Reloads one visible directory branch without disturbing the rest of the navigator. */
   private void refreshProjectFolder(File folder) {
     if (projectTree == null || projectTree.getRoot() == null || folder == null) return;
+    if (currentProjectRoot != null && folder.toPath().toAbsolutePath().normalize()
+            .equals(currentProjectRoot.toPath().toAbsolutePath().normalize())) {
+      updateProjectMenuVisibility();
+    }
     TreeItem<File> item = findProjectTreeItem(projectTree.getRoot(), normalisedProjectPath(folder));
     if (item == null) {
       refreshTree();
@@ -3859,6 +4013,10 @@ public class ZIDEEditor extends Application {
         openLanguageBuilderFile(Path.of(file));
         return;
       }
+      if (file.toLowerCase(Locale.ROOT).endsWith(".project.yas")) {
+        openProjectManifest(Path.of(file));
+        return;
+      }
     }
     // Ensure active-tab behaviour is installed once
     installActiveTabStyling();
@@ -3906,6 +4064,63 @@ public class ZIDEEditor extends Application {
 
 
   }
+
+  private void openProjectManifest(Path manifest) {
+    File folder = manifest.toFile().getParentFile();
+    if (folder == null) return;
+    List<String> all = new ArrayList<>();
+    File[] files = folder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yas") && !name.equalsIgnoreCase(".project.yas"));
+    if (files != null) for (File f : files) all.add(f.getName());
+    all.sort(String.CASE_INSENSITIVE_ORDER);
+    List<String> included = new ArrayList<>();
+    try {
+      for (String line : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
+        String trimmed = line.trim();
+        if (!trimmed.matches("(?i)^includes?\\s+.+")) continue;
+        String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
+        if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
+        String name = Path.of(value).getFileName().toString();
+        if (all.contains(name) && !included.contains(name)) included.add(name);
+      }
+    } catch (IOException e) { showError("Unable to open project manifest", e.getMessage()); return; }
+    all.removeAll(included);
+    ListView<String> available = new ListView<>(FXCollections.observableArrayList(all));
+    ListView<String> selected = new ListView<>(FXCollections.observableArrayList(included));
+    available.getStyleClass().add("project-manifest-list");
+    selected.getStyleClass().add("project-manifest-list");
+    Button add = new Button(">>"), remove = new Button("<<"), up = new Button("Up"), down = new Button("Down");
+    add.setOnAction(e -> moveItem(available, selected)); remove.setOnAction(e -> moveItem(selected, available));
+    up.setOnAction(e -> reorderItem(selected, -1)); down.setOnAction(e -> reorderItem(selected, 1));
+    VBox actions = new VBox(8, add, remove, up, down); actions.setAlignment(Pos.CENTER);
+    VBox left = new VBox(5, new Label("Not included"), available), right = new VBox(5, new Label("Included"), selected);
+    HBox lists = new HBox(10, left, actions, right); HBox.setHgrow(left, Priority.ALWAYS); HBox.setHgrow(right, Priority.ALWAYS);
+    Button save = new Button("Save");
+    save.setOnAction(e -> { try { StringBuilder out = new StringBuilder("// ZIDE project manifest\n"); for (String name : selected.getItems()) out.append("includes \"").append(name).append("\"\n"); Files.writeString(manifest, out.toString(), StandardCharsets.UTF_8); statusLabel.setText("Project manifest saved"); } catch (IOException ex) { showError("Unable to save project manifest", ex.getMessage()); } });
+    VBox content = new VBox(12, new Label("Project files"), lists, save); content.getStyleClass().add("project-manifest-view"); content.setPadding(new Insets(16)); VBox.setVgrow(lists, Priority.ALWAYS);
+    Tab tab = new Tab(); tab.setId(manifest.toString()); tab.setClosable(false);
+    Button close = new Button(); close.getStyleClass().add("tab-close-button"); close.setFocusTraversable(false); close.setOnAction(e -> closeTab(tab));
+    close.setMinSize(10, 10); close.setPrefSize(10, 10); close.setMaxSize(10, 10); tab.setGraphic(close);
+    Label manifestTitle = new Label(manifest.getFileName().toString()); manifestTitle.getStyleClass().add("tab-title");
+    tab.setGraphic(new HBox(6, manifestTitle, close));
+    tab.setContent(content);
+    editorTabs.getTabs().add(tab); editorTabs.getSelectionModel().select(tab);
+  }
+
+  private void editCurrentProjectSettings() {
+    if (currentProjectRoot == null) return;
+    Path manifest = currentProjectRoot.toPath().resolve(".project.yas");
+    if (Files.isRegularFile(manifest)) openProjectManifest(manifest);
+  }
+
+  private void updateProjectMenuVisibility() {
+    if (projectMenu == null) return;
+    boolean hasManifest = currentProjectRoot != null
+            && Files.isRegularFile(currentProjectRoot.toPath().resolve(".project.yas"));
+    projectMenu.setVisible(hasManifest);
+  }
+
+  private static void moveItem(ListView<String> from, ListView<String> to) { String value = from.getSelectionModel().getSelectedItem(); if (value != null) { from.getItems().remove(value); to.getItems().add(value); } }
+  private static void reorderItem(ListView<String> list, int delta) { int index = list.getSelectionModel().getSelectedIndex(), target = index + delta; if (index < 0 || target < 0 || target >= list.getItems().size()) return; String value = list.getItems().remove(index); list.getItems().add(target, value); list.getSelectionModel().select(target); }
 
   /** Resolves a file through the language registry used by editing, help and execution. */
   private String languageForFile(String file) {
@@ -4039,7 +4254,9 @@ public class ZIDEEditor extends Application {
     boolean debuggable = language != null && language.canDebug();
     boolean transpilable = language != null && language.canTranspile();
     if (scriptMenu != null) scriptMenu.setVisible(runnable || compilable || debuggable || transpilable);
-    if (zpeOnlineMenu != null) zpeOnlineMenu.setVisible(yass);
+    // Keep ZPE Online browsing and account actions available for every file
+    // type; only the save item is restricted to validated YASS documents.
+    if (zpeOnlineMenu != null) zpeOnlineMenu.setVisible(true);
     setMenuItemAvailable(runScriptMenuItem, runnable);
     setMenuItemAvailable(stopScriptMenuItem, runnable);
     setMenuItemAvailable(debugScriptMenuItem, debuggable);
@@ -4936,9 +5153,32 @@ public class ZIDEEditor extends Application {
     tab.setText("");          // IMPORTANT: text comes from our label now
     tab.setGraphic(header);   // Graphic is the whole header (so X can be right)
 
+    MenuItem closeOthers = new MenuItem("Close other tabs");
+    closeOthers.setOnAction(e -> closeTabsExcept(tab));
+    MenuItem closeLeft = new MenuItem("Close tabs to the left");
+    closeLeft.setOnAction(e -> closeTabsSide(tab, true));
+    MenuItem closeRight = new MenuItem("Close tabs to the right");
+    closeRight.setOnAction(e -> closeTabsSide(tab, false));
+    MenuItem closeSaved = new MenuItem("Close saved tabs");
+    closeSaved.setOnAction(e -> closeSavedTabs());
+    MenuItem rename = new MenuItem("Rename");
+    rename.setOnAction(e -> { if (tab.getPath() != null) renameProjectFile(new File(tab.getPath())); });
+    MenuItem reveal = new MenuItem(revealLabel());
+    reveal.setOnAction(e -> revealInFileManager(tab.getPath()));
+    ContextMenu tabMenu = new ContextMenu(closeOthers, closeLeft, closeRight, closeSaved, new SeparatorMenuItem(), rename, reveal);
+    tabMenu.getStyleClass().add("glass-context-menu");
+    header.setOnContextMenuRequested(e -> tabMenu.show(header, e.getScreenX(), e.getScreenY()));
+
 
     return tab;
   }
+
+  private void closeTabsExcept(Tab keep) { for (Tab t : new ArrayList<>(editorTabs.getTabs())) if (t != keep) closeTab(t); }
+  private void closeTabsSide(Tab anchor, boolean left) { int i=editorTabs.getTabs().indexOf(anchor); for (Tab t : new ArrayList<>(editorTabs.getTabs())) { int n=editorTabs.getTabs().indexOf(t); if ((left&&n<i)||(!left&&n>i)) closeTab(t); } }
+  private void closeSavedTabs() { for (Tab t : new ArrayList<>(editorTabs.getTabs())) if (t instanceof EditorTab et && !et.hasChanges()) closeTab(t); }
+  private void closeTab(Tab t) { if (t instanceof EditorTab et && et.hasChanges() && !confirmClose(et.getDisplayTitle())) return; if (t instanceof EditorTab et) et.dispose(); editorTabs.getTabs().remove(t); }
+  private String revealLabel() { return HelperFunctions.isMac() ? "Reveal in Finder" : HelperFunctions.isWindows() ? "Reveal in File Explorer" : "Reveal in File Manager"; }
+  private void revealInFileManager(String path) { if (path == null) return; try { File file = new File(path); if (HelperFunctions.isMac()) new ProcessBuilder("open", "-R", file.getAbsolutePath()).start(); else if (HelperFunctions.isWindows()) new ProcessBuilder("explorer", "/select,", file.getAbsolutePath()).start(); else new ProcessBuilder("xdg-open", file.getParent()).start(); } catch (IOException exception) { showError("File manager", exception.getMessage()); } }
 
   private ToggleButton consoleTab;
   private ToggleButton problemsTab;
@@ -4952,6 +5192,7 @@ public class ZIDEEditor extends Application {
   private Node variablesView;
   private Node profileView;
   private Node terminalView;
+  private final java.util.List<ImageView> panelIconImages = new java.util.ArrayList<>();
 
   private Node wrapWithHeader(String titleText, Node content, Node... actions) {
     Label title = new Label(titleText);
@@ -4974,6 +5215,19 @@ public class ZIDEEditor extends Application {
   }
 
   private Button panelIconButton(String iconPath, String tooltip, Runnable action) {
+    String symbol = tooltip.startsWith("Step over") ? "↱"
+            : tooltip.startsWith("Continue") ? "▶"
+            : tooltip.startsWith("Stop") ? "■" : "⌫";
+    Button symbolButton = new Button(symbol);
+    symbolButton.setTooltip(new Tooltip(tooltip));
+    symbolButton.setOnAction(e -> action.run());
+    symbolButton.getStyleClass().addAll("panel-icon-button", "panel-action-symbol");
+    symbolButton.setFocusTraversable(false);
+    symbolButton.setMinSize(28, 28);
+    symbolButton.setPrefSize(28, 28);
+    symbolButton.setMaxSize(28, 28);
+    return symbolButton;
+    /* Existing image assets retained below as backups.
     ImageView icon = new ImageView(new Image(
             Objects.requireNonNull(getClass().getResourceAsStream(iconPath))
     ));
@@ -4983,6 +5237,7 @@ public class ZIDEEditor extends Application {
     icon.setPreserveRatio(true);
     icon.setSmooth(true);
     icon.getStyleClass().add("panel-icon");
+    panelIconImages.add(icon);
 
     Button btn = new Button();
     btn.setGraphic(icon);
@@ -5001,7 +5256,7 @@ public class ZIDEEditor extends Application {
 
     btn.setOnAction(e -> action.run());
 
-    return btn;
+    return btn; */
   }
 
   private LineChart<Number, Number> profilerChart;
@@ -5270,6 +5525,7 @@ public class ZIDEEditor extends Application {
           cpuLoad = Math.min(1.0, (double) (currentCpu - previousCpu) / (now - previousWall));
         }
 
+        if (cpuLoad < 0.0) cpuLoad = readProcessCpuLoad(process.pid());
         long residentBytes = readResidentMemory(process.pid());
         pendingProfileSamples.offer(new ProfilerSample(
                 now - started, Math.max(0L, residentBytes), 0L,
@@ -5306,6 +5562,18 @@ public class ZIDEEditor extends Application {
     } catch (IOException | InterruptedException | NumberFormatException exception) {
       if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
       return 0L;
+    }
+  }
+
+  private double readProcessCpuLoad(long pid) {
+    try {
+      Process probe = new ProcessBuilder("ps", "-o", "%cpu=", "-p", Long.toString(pid)).start();
+      String value = new String(probe.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+      probe.waitFor(1, java.util.concurrent.TimeUnit.SECONDS);
+      return value.isEmpty() ? -1.0 : Math.max(0.0, Math.min(1.0, Double.parseDouble(value) / 100.0));
+    } catch (IOException | InterruptedException | NumberFormatException exception) {
+      if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
+      return -1.0;
     }
   }
 
@@ -5670,7 +5938,8 @@ public class ZIDEEditor extends Application {
     systemTerminal = new ZIDESystemTerminal(currentProjectRoot == null
             ? Path.of(System.getProperty("user.home"))
             : currentProjectRoot.toPath());
-    terminalView = wrapWithHeader("Terminal", systemTerminal);
+    terminalView = wrapWithHeader("Terminal", systemTerminal,
+            panelIconButton("/files/bin.png", "Clear screen", systemTerminal::clearScreen));
 
     // --- Problems view ---
     problemsView = wrapWithHeader("Problems", buildProblemsPane());
@@ -6027,11 +6296,25 @@ public class ZIDEEditor extends Application {
     centre.setStyle("-fx-font-size: 13px;");
 
     var bar = new HBox(statusLabel, new Region(), centre, new Region(), languageMenuBar);
+    bar.setAlignment(Pos.CENTER_LEFT);
+    statusLabel.setAlignment(Pos.CENTER_LEFT);
+    centre.setAlignment(Pos.CENTER);
+    languageMenuBar.setMinHeight(24);
+    languageMenuBar.setPrefHeight(24);
+    languageMenuBar.setMaxHeight(24);
     HBox.setHgrow(bar.getChildren().get(1), Priority.ALWAYS);
     HBox.setHgrow(bar.getChildren().get(3), Priority.ALWAYS);
 
     bar.setPadding(new Insets(2, 8, 2, 8));
     bar.getStyleClass().add("status-bar");
+    if (HelperFunctions.isMac()) {
+      var statusClip = new javafx.scene.shape.Rectangle();
+      statusClip.setArcWidth(28);
+      statusClip.setArcHeight(28);
+      statusClip.widthProperty().bind(bar.widthProperty());
+      statusClip.heightProperty().bind(bar.heightProperty());
+      bar.setClip(statusClip);
+    }
     return bar;
   }
 
@@ -6336,6 +6619,7 @@ public class ZIDEEditor extends Application {
     invertImageView(getToggleButtonIcon(problemsTab));
     invertImageView(getToggleButtonIcon(profileTab));
     invertImageView(getToggleButtonIcon(terminalTab));
+    panelIconImages.forEach(this::invertImageView);
   }
 
   private void invertImageView(ImageView imageView) {
