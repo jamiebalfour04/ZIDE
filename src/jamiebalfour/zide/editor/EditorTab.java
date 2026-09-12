@@ -2,10 +2,8 @@ package jamiebalfour.zide.editor;
 
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.zpe.core.YASSDiagnostic;
-import jamiebalfour.zpe.core.ZPEKit;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
@@ -353,25 +351,25 @@ public class EditorTab extends Tab {
   }
 
   private void showInformation(ZIDEEditor.EditorInfo information, double screenX, double screenY) {
-    TextFlow title = createSignature(information.title);
-    TextFlow body = createDescription(information.body);
+    TextFlow title = createSignature(information.title());
+    TextFlow body = createDescription(information.body());
     VBox card = new VBox(9, title, body);
-    if (information.version != null) {
-      Label version = new Label(information.version);
+    if (information.version() != null) {
+      Label version = new Label(information.version());
       version.getStyleClass().add("editor-info-meta");
       card.getChildren().add(version);
     }
-    if (information.category != null) {
-      Label category = new Label(information.category);
+    if (information.category() != null) {
+      Label category = new Label(information.category());
       category.getStyleClass().add("editor-info-meta");
       card.getChildren().add(category);
     }
-    if (information.url != null) {
+    if (information.url() != null) {
       Hyperlink more = new Hyperlink("More information online");
       more.getStyleClass().add("editor-info-link");
       more.setOnAction(event -> {
         try {
-          jamiebalfour.helpers.HelperFunctions.openWebsite(information.url);
+          jamiebalfour.helpers.HelperFunctions.openWebsite(information.url());
         } catch (Exception ignored) {
           // A documentation link should never interrupt editing.
         }
@@ -673,6 +671,10 @@ public class EditorTab extends Tab {
   }
 
   void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); hideInformation(); }
+  void markLoadedContentClean() {
+    changes = false;
+    lastDiskContent = editor.getText();
+  }
   void setDiagnosticCounts(int errors, int warnings) {
     errorCountLabel.setText(String.valueOf(errors));
     errorIndicator.setVisible(errors > 0);

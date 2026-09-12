@@ -189,7 +189,16 @@ public class BalfGlassMenuBar extends HBox {
     }
 
     public void setText(String text) {
+      owner.setGraphic(null);
+      owner.setContentDisplay(javafx.scene.control.ContentDisplay.TEXT_ONLY);
       owner.setText(text);
+    }
+
+    public void setGraphic(Node graphic) {
+      owner.setText("");
+      owner.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+      owner.setGraphic(graphic);
+      owner.setAccessibleText(graphic instanceof Label label ? label.getText() : "Language");
     }
 
     /** Shows or removes the complete top-level menu, including its hit target. */

@@ -1,0 +1,6 @@
+12.09.2026
+Persisted the editor workspace, including open files, active panels, panel sizes and expanded project folders, and restored it on launch.
+Opened files asynchronously so tabs appear promptly while language highlighting is prepared in the background.
+Added dockable Scratch Pad, Unfold and AI Assist panels, with .pad files routed to the scratch-pad editor and AI code explanations and prompts.
+Added language and file-type icons, ZEX export support and Python debugging controls.
+Updated the language and layout builders with the shared glass menus, consistent tabs and improved dark-mode styling.

@@ -107,10 +107,22 @@
     -fx-border-width: 1;
 }
 .glass-context-menu {
+    -fx-background-color: rgba(248, 249, 251, 0.97);
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
+    -fx-border-color: rgba(82, 91, 102, 0.35);
     -fx-border-width: 1px;
     -fx-padding: 5px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 14, 0.12, 0, 4);
+}
+.glass-context-menu .menu-item {
+    -fx-background-radius: 5px;
+    -fx-padding: 7px 10px;
+}
+.glass-context-menu .menu-item .label { -fx-text-fill: #292d33; }
+.glass-context-menu .menu-item:focused,
+.glass-context-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 122, 204, 0.14);
 }
 .layout-builder-close {
     -fx-min-width: 32px;
@@ -133,8 +145,13 @@
     -fx-background-color: #4a525d;
 }
 .app-root.dark .glass-context-menu {
-    -fx-background-color: #23272e;
+    -fx-background-color: rgba(35, 39, 46, 0.98);
     -fx-border-color: #59616c;
+}
+.app-root.dark .glass-context-menu .menu-item .label { -fx-text-fill: #e6e9ee; }
+.app-root.dark .glass-context-menu .menu-item:focused,
+.app-root.dark .glass-context-menu .menu-item:hover {
+    -fx-background-color: rgba(0, 122, 204, 0.34);
 }
 .app-root.dark .button {
     -fx-background-color: rgba(255,255,255,0.06);
@@ -286,6 +303,39 @@
 
 .app-root.dark .editor-tabs .tab-content-area {
     -fx-background-color: #1b1f26;
+}
+
+.right-side-panels {
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 0 0 0 1px;
+}
+.right-side-panels .tab-content-area {
+    -fx-border-width: 0;
+}
+.ai-assist-panel {
+    -fx-background-color: #ffffff;
+}
+.ai-assist-panel .text-area,
+.ai-assist-panel .text-area .content {
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-text-fill: #202020;
+}
+.ai-assist-panel .text-area {
+    -fx-prompt-text-fill: #707780;
+}
+.app-root.dark .right-side-panels {
+    -fx-border-color: #30343b;
+}
+.app-root.dark .ai-assist-panel,
+.app-root.dark .ai-assist-panel .text-area,
+.app-root.dark .ai-assist-panel .text-area .content {
+    -fx-background-color: #1b1f26;
+    -fx-control-inner-background: #1b1f26;
+    -fx-text-fill: #e6e9ee;
+}
+.app-root.dark .ai-assist-panel .text-area {
+    -fx-prompt-text-fill: #929aa6;
 }
 
 .code-area, .console-output {
@@ -1210,9 +1260,38 @@
 }
 
 /* ZUI builder previews approximate the platform-native controls used at run time. */
+.layout-builder {
+    -fx-background-color: #f3f3f3;
+}
+
+.layout-builder .glass-menubar,
+.language-builder .glass-menubar {
+    -fx-background-color: #517;
+}
+.layout-builder .glass-menubar .glass-menu-title,
+.language-builder .glass-menubar .glass-menu-title {
+    -fx-text-fill: white;
+}
+.layout-builder .glass-menubar .glass-menu-title:hover,
+.language-builder .glass-menubar .glass-menu-title:hover,
+.layout-builder .glass-menubar .glass-menu-title.active,
+.language-builder .glass-menubar .glass-menu-title.active {
+    -fx-background-color: rgba(255,255,255,0.16);
+}
+
+.layout-builder-toolbar {
+    -fx-background-color: #f3f3f3;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent transparent #d4d4d4 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
 .layout-builder-canvas {
     -fx-background-color: #f7f8fa;
     -fx-border-color: #bec2c8;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-effect: none;
 }
 
 .layout-builder-canvas-surround {
@@ -1280,6 +1359,34 @@
 .app-root.dark .layout-builder-canvas {
     -fx-background-color: #1b2028;
     -fx-border-color: #59616d;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-effect: none;
+}
+
+.app-root.dark .layout-builder {
+    -fx-background-color: #14171c;
+}
+
+.app-root.dark .layout-builder .text-area,
+.app-root.dark .layout-builder .text-area .content {
+    -fx-background-color: #1b2028;
+    -fx-control-inner-background: #1b2028;
+    -fx-text-fill: #e6e9ee;
+    -fx-prompt-text-fill: #8f9aa8;
+}
+
+.app-root.dark .layout-builder .text-area {
+    -fx-border-color: #59616d;
+    -fx-highlight-fill: #264f78;
+    -fx-highlight-text-fill: #ffffff;
+    -fx-caret-color: #e6e9ee;
+}
+
+.app-root.dark .layout-builder .glass-menubar,
+.app-root.dark .layout-builder-toolbar {
+    -fx-background-color: #20242b;
+    -fx-border-color: transparent transparent #30343b transparent;
 }
 
 .app-root.dark .layout-builder-canvas-surround {
@@ -1293,22 +1400,6 @@
 
 .app-root.dark .layout-builder-tool-button:pressed {
     -fx-background-color: #465568;
-}
-
-.app-root.dark .layout-builder-inspector .tab {
-    -fx-background-color: #3a414d;
-}
-
-.app-root.dark .layout-builder-inspector .tab:selected {
-    -fx-background-color: #111318;
-}
-
-.app-root.dark .layout-builder-inspector .tab .tab-label {
-    -fx-text-fill: #d8dde5;
-}
-
-.app-root.dark .layout-builder-inspector .tab:selected .tab-label {
-    -fx-text-fill: #ffffff;
 }
 
 .app-root.dark .zui-native-preview {
@@ -1427,8 +1518,50 @@
     -fx-effect: none;
 }
 
+.app-root .app-toolbar .button {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #d0d0d0;
+    -fx-text-fill: #222222;
+}
+
+.app-root .app-toolbar .toolbar-symbol {
+    -fx-text-fill: #222222;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.app-root .app-toolbar .button:hover {
+    -fx-background-color: #e8e8e8;
+}
+
+.app-root .app-toolbar .button:disabled {
+    -fx-background-color: #ededed;
+    -fx-border-color: #d8d8d8;
+    -fx-opacity: 0.78;
+}
+
 .app-root.dark .app-toolbar {
     -fx-border-color: transparent transparent #30343b transparent;
+}
+
+.app-root.dark .app-toolbar .button {
+    -fx-background-color: #252b35;
+    -fx-border-color: #3b424d;
+    -fx-text-fill: #e3e7ec;
+}
+
+.app-root.dark .app-toolbar .toolbar-symbol {
+    -fx-text-fill: #f5f7fa;
+}
+
+.app-root.dark .app-toolbar .button:hover {
+    -fx-background-color: #303844;
+}
+
+.app-root.dark .app-toolbar .button:disabled {
+    -fx-background-color: #20252d;
+    -fx-border-color: #343b45;
+    -fx-opacity: 0.72;
 }
 
 .project-tree .tree-cell.active-project-root {
@@ -1865,11 +1998,19 @@
 
 .side-pane,
 .pane-header,
-.project-tree,
-.project-tree .tree-cell,
 .editor-tabs .tab-header-area,
 .editor-tabs .tab-header-background {
     -fx-background-color: #f3f3f3;
+}
+
+.project-tree {
+    -fx-background-color: #f8f8f8;
+}
+
+.project-tree .tree-cell {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent;
+    -fx-border-width: 0 0 0 3px;
 }
 
 .pane-header {
@@ -1936,6 +2077,7 @@
 .language-icon-yass,
 .language-icon-ywp { -fx-background-color: #7a118c; -fx-text-fill: white; }
 .language-icon-md { -fx-background-color: #356a9a; -fx-text-fill: white; }
+.language-icon-pad { -fx-background-color: #8a6d3b; -fx-text-fill: white; }
 .language-icon-txt { -fx-background-color: #6b7280; -fx-text-fill: white; }
 
 .new-file-types {
@@ -2203,11 +2345,14 @@
 .language-builder {
     -fx-background-color: #f4f5f7;
 }
-.language-builder .tool-bar {
-    -fx-padding: 8px 10px;
-    -fx-border-color: transparent transparent #c9cdd2 transparent;
+.language-builder-toolbar {
+    -fx-padding: 6px 10px;
+    -fx-background-color: #f3f3f3;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent transparent #d4d4d4 transparent;
     -fx-border-width: 0 0 1px 0;
 }
+.language-builder-toolbar .label { -fx-text-fill: #292d33; }
 .language-builder-heading,
 .language-builder-section-title {
     -fx-font-weight: bold;
@@ -2262,14 +2407,26 @@
     -fx-background-color: #0788d1;
     -fx-text-fill: white;
 }
+.language-builder-advanced-pattern > .title {
+    -fx-background-color: #e8eaed;
+    -fx-background-insets: 0;
+}
+.language-builder-advanced-pattern > .title > .text { -fx-fill: #292d33; }
 .app-root.dark .language-builder,
-.app-root.dark .language-builder .tool-bar,
 .app-root.dark .language-builder-rule-list,
 .app-root.dark .language-builder-rule-editor,
 .app-root.dark .language-builder-preview-pane,
 .app-root.dark .language-builder-status {
     -fx-background-color: #14191f;
 }
+.app-root.dark .layout-builder .glass-menubar,
+.app-root.dark .language-builder .glass-menubar,
+.app-root.dark .language-builder-toolbar {
+    -fx-background-color: #20242b;
+    -fx-border-color: transparent transparent #30343b transparent;
+}
+.app-root.dark .layout-builder .glass-menubar .glass-menu-title,
+.app-root.dark .language-builder .glass-menubar .glass-menu-title { -fx-text-fill: #e3e7ec; }
 .app-root.dark .language-builder .label,
 .app-root.dark .language-builder-heading,
 .app-root.dark .language-builder-section-title {
@@ -2292,6 +2449,11 @@
     -fx-border-color: #3a444f;
     -fx-text-fill: #edf0f2;
 }
+.app-root.dark .language-builder-advanced-pattern > .title {
+    -fx-background-color: #252b35;
+    -fx-border-color: #3a444f;
+}
+.app-root.dark .language-builder-advanced-pattern > .title > .text { -fx-fill: #e3e7ec; }
 .app-root.dark .language-builder .text-field,
 .app-root.dark .language-builder .text-area,
 .app-root.dark .language-builder .text-area .content,
@@ -2372,8 +2534,6 @@
     -fx-background-color: #363c46;
 }
 
-.jb-menu-content,
-.jb-menu-content.dark,
 .jb-glass-menu-dark {
     -fx-background-color: #23272e;
     -fx-border-color: #59616c;
@@ -2397,3 +2557,136 @@
     -fx-border-radius: 12px;
 }
 .jb-menu-button:focused { -fx-border-color: transparent; -fx-effect: none; }
+.unfold-panel {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 0 0 0 1px;
+}
+.unfold-panel .scroll-pane, .unfold-panel .viewport {
+    -fx-background-color: transparent;
+}
+.unfold-full-description-content { -fx-background-color: #ffffff; }
+.unfold-full-description-scroll,
+.unfold-full-description-scroll .viewport,
+.unfold-full-description-scroll .content {
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
+}
+.unfold-full-description-content .label { -fx-text-fill: #292d33; }
+.unfold-description:hover { -fx-background-color: #dceef8; }
+.unfold-children {
+    -fx-border-color: transparent transparent transparent #8c969e;
+    -fx-border-width: 0 0 0 1px;
+    -fx-border-style: dotted;
+    -fx-padding: 0 0 0 3px;
+}
+.app-root.dark .unfold-children {
+    -fx-border-color: transparent transparent transparent #78858f;
+}
+.app-root.dark .unfold-panel { -fx-background-color: #1b1f26; -fx-border-color: #30343b; }
+.app-root.dark .unfold-description:hover { -fx-background-color: #253c48; }
+.app-root.dark .unfold-full-description-content,
+.app-root.dark .unfold-full-description-scroll,
+.app-root.dark .unfold-full-description-scroll .viewport,
+.app-root.dark .unfold-full-description-scroll .content {
+    -fx-background-color: #1b1f26;
+    -fx-control-inner-background: #1b1f26;
+}
+.app-root.dark .unfold-full-description-content .label { -fx-text-fill: #e3e7ec; }
+.in-window-modal-dark .unfold-full-description-content,
+.in-window-modal-dark .unfold-full-description-scroll,
+.in-window-modal-dark .unfold-full-description-scroll .viewport,
+.in-window-modal-dark .unfold-full-description-scroll .content {
+    -fx-background-color: #1b1f26;
+    -fx-control-inner-background: #1b1f26;
+}
+.in-window-modal-dark .unfold-full-description-content .label { -fx-text-fill: #e3e7ec; }
+.in-window-modal-dark .unfold-full-description-scroll .scroll-bar:vertical,
+.in-window-modal-dark .unfold-full-description-scroll .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+.in-window-modal-dark .unfold-full-description-scroll .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.scratch-pad-panel {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 0 0 0 1px;
+    -fx-pref-width: 340px;
+}
+.scratch-pad-panel .label { -fx-text-fill: #292d33; }
+.scratch-pad-panel .scratch-pad-editor {
+    -fx-background-color: #ffffff;
+    -fx-text-fill: #292d33;
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 1px 0 0 0;
+    -fx-font-family: "Inter", "Segoe UI", "Arial", sans-serif;
+    -fx-font-size: 14px;
+    -fx-line-spacing: 3px;
+    -fx-padding: 10px 12px;
+}
+.scratch-pad-panel .scratch-pad-editor .paragraph-box { -fx-background-color: #ffffff; }
+.scratch-pad-panel .scratch-pad-editor .text { -fx-fill: #292d33; }
+.scratch-pad-formatting { -fx-background-color: #f3f3f3; }
+.scratch-pad-format-button {
+    -fx-min-width: 34px;
+    -fx-pref-height: 30px;
+    -fx-background-color: #e8e8e8;
+    -fx-text-fill: #292d33;
+    -fx-border-color: #d0d0d0;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+    -fx-font-weight: bold;
+}
+.scratch-pad-format-button:hover { -fx-background-color: #dceef8; }
+.scratch-pad-format-button.format-active { -fx-background-color: #cfeafa; -fx-border-color: #1685c5; }
+.scratch-pad-scroll-pane,
+.scratch-pad-scroll-pane .viewport,
+.scratch-pad-scroll-pane .content { -fx-background-color: #ffffff; }
+.app-root.dark .scratch-pad-panel {
+    -fx-background-color: #1b1f26;
+    -fx-border-color: #30343b;
+}
+.app-root.dark .scratch-pad-panel .label { -fx-text-fill: #e3e7ec; }
+.app-root.dark .scratch-pad-panel .scratch-pad-editor {
+    -fx-background-color: #171a20;
+    -fx-text-fill: #e3e7ec;
+    -fx-border-color: #30343b;
+}
+.app-root.dark .scratch-pad-panel .scratch-pad-editor .paragraph-box { -fx-background-color: #171a20; }
+.app-root.dark .scratch-pad-panel .scratch-pad-editor .text { -fx-fill: #e3e7ec; }
+.app-root.dark .scratch-pad-scroll-pane,
+.app-root.dark .scratch-pad-scroll-pane .viewport,
+.app-root.dark .scratch-pad-scroll-pane .content { -fx-background-color: #171a20; }
+.app-root.dark .scratch-pad-formatting { -fx-background-color: #1b1f26; }
+.app-root.dark .scratch-pad-format-button {
+    -fx-background-color: #252b35;
+    -fx-text-fill: #e3e7ec;
+    -fx-border-color: #3b424d;
+}
+.app-root.dark .scratch-pad-format-button:hover { -fx-background-color: #303844; }
+.app-root.dark .scratch-pad-format-button.format-active { -fx-background-color: #164766; -fx-border-color: #2696d2; }
+.file-loading-overlay {
+    -fx-background-color: rgba(243, 243, 243, 0.94);
+}
+.file-loading-overlay .label { -fx-text-fill: #4b5158; }
+.app-root.dark .file-loading-overlay {
+    -fx-background-color: rgba(27, 31, 38, 0.96);
+}
+.app-root.dark .file-loading-overlay .label { -fx-text-fill: #e3e7ec; }
+
+/* Terminal output stays intentionally dark, even when the rest of the app is light. */
+.terminal-output .scroll-bar:vertical,
+.terminal-output .scroll-bar:horizontal {
+    -fx-background-color: #111318;
+}
+.terminal-output .scroll-bar .track,
+.terminal-output .scroll-bar .track-background {
+    -fx-background-color: #111318;
+}
+.terminal-output .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.terminal-output .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
