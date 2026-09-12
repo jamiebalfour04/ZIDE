@@ -1,5 +1,6 @@
 package jamiebalfour.zide.editor;
 
+import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -39,6 +40,7 @@ public final class ZIDELanguageBuilder {
   private final Consumer<Path> trainAction;
   private final BiConsumer<Path, Path> testAction;
   private final Runnable closeAction;
+  private BalfGlassMenuBar glassMenuBar;
   private final TextField languageName = new TextField();
   private final ObservableList<Rule> rules = FXCollections.observableArrayList();
   private final ListView<Rule> ruleList = new ListView<>(rules);
@@ -62,7 +64,7 @@ public final class ZIDELanguageBuilder {
     this.testAction = testAction;
     this.closeAction = closeAction;
     root.getStyleClass().add("language-builder");
-    root.setTop(buildToolbar());
+    root.setTop(new VBox(buildMenuBar(), buildToolbar()));
     root.setCenter(buildWorkspace());
     root.setBottom(status);
     status.getStyleClass().add("language-builder-status");
@@ -89,32 +91,44 @@ public final class ZIDELanguageBuilder {
 
   public Node getView() { return root; }
 
-  private ToolBar buildToolbar() {
+  public void setDarkMode(boolean enabled) {
+    if (glassMenuBar != null) glassMenuBar.setDarkMode(enabled);
+  }
+
+  private Node buildMenuBar() {
+    glassMenuBar = new BalfGlassMenuBar();
+    BalfGlassMenuBar.GlassMenu fileMenu = glassMenuBar.menu("File");
+    fileMenu.createItem("New", "", this::newDefinition);
+    fileMenu.createItem("Open...", "", this::open);
+    fileMenu.separator();
+    fileMenu.createItem("Save", "", () -> save(false));
+
+    BalfGlassMenuBar.GlassMenu languageMenu = glassMenuBar.menu("Language");
+    languageMenu.createItem("Test Script...", "", this::testScript);
+    languageMenu.createItem("Train...", "", this::train);
+    return glassMenuBar;
+  }
+
+  private Node buildToolbar() {
     Label heading = new Label("ZenLang Builder");
     heading.getStyleClass().add("language-builder-heading");
     languageName.setPromptText("Language name");
     languageName.setPrefWidth(190);
     languageName.textProperty().addListener((observable, oldValue, newValue) -> refreshPreview());
-    Button fresh = new Button("New");
-    fresh.setOnAction(event -> newDefinition());
-    Button open = new Button("Open");
-    open.setOnAction(event -> open());
-    Button save = new Button("Save");
-    save.setOnAction(event -> save(false));
-    Button train = new Button("Train");
-    train.getStyleClass().add("language-builder-primary");
-    train.setOnAction(event -> {
-      Path saved = save(true);
-      if (saved != null && trainAction != null) trainAction.accept(saved);
-    });
-    Button test = new Button("Test Script");
-    test.setOnAction(event -> testScript());
     Region spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
-    Button close = new Button("Close");
+    Button close = new Button("✕");
+    close.getStyleClass().add("layout-builder-close");
     close.setOnAction(event -> { if (closeAction != null) closeAction.run(); });
-    return new ToolBar(heading, new Separator(), new Label("Name"), languageName,
-            new Separator(), fresh, open, save, test, train, spacer, close);
+    HBox toolbar = new HBox(10, heading, new Label("Name"), languageName, spacer, close);
+    toolbar.setAlignment(Pos.CENTER_LEFT);
+    toolbar.getStyleClass().add("language-builder-toolbar");
+    return toolbar;
+  }
+
+  private void train() {
+    Path saved = save(true);
+    if (saved != null && trainAction != null) trainAction.accept(saved);
   }
 
   private Node buildWorkspace() {
@@ -252,7 +266,8 @@ public final class ZIDELanguageBuilder {
     advancedForm.addRow(1, new Label("Parameters"), parameters);
     GridPane.setHgrow(pattern, Priority.ALWAYS);
     GridPane.setHgrow(parameters, Priority.ALWAYS);
-    TitledPane advanced = new TitledPane("Advanced pattern", advancedForm);
+    TitledPane advanced = new TitledPane("Advanced Pattern", advancedForm);
+    advanced.getStyleClass().add("language-builder-advanced-pattern");
     advanced.setExpanded(false);
     VBox box = new VBox(12, title, orderHint, form, syntaxHint, advanced);
     box.getStyleClass().add("language-builder-rule-editor");

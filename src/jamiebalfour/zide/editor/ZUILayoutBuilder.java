@@ -1,15 +1,13 @@
 package jamiebalfour.zide.editor;
 
+import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
@@ -80,12 +78,16 @@ public final class ZUILayoutBuilder {
   private final ComboBox<HandlerOption> handlerField = new ComboBox<>();
   private final List<HandlerOption> handlers = new ArrayList<>();
   private final List<Item> items = new ArrayList<>();
+  private final List<Button> paletteButtons = new ArrayList<>();
   private final Path file;
   private final Runnable savedAction;
   private final Runnable closeAction;
   private Item selected;
   private boolean updating;
+  private boolean loadingSource;
   private int nextId = 1;
+  private BalfGlassMenuBar glassMenuBar;
+  private boolean darkMode;
 
   public ZUILayoutBuilder(Window owner, Path file, String source, Runnable savedAction, Runnable closeAction) {
     this.owner = owner;
@@ -102,6 +104,7 @@ public final class ZUILayoutBuilder {
         event.consume();
       }
     });
+    root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleEditShortcut);
     root.setMinSize(760, 520);
     discoverHandlers();
     bindProperties();
@@ -111,17 +114,20 @@ public final class ZUILayoutBuilder {
 
   public Node getView() { return root; }
 
-  private MenuBar buildMenuBar() {
-    Menu edit = new Menu("Edit");
-    MenuItem undo = editItem("Undo", KeyCode.Z, false, control -> control.undo());
-    MenuItem redo = editItem("Redo", KeyCode.Z, true, control -> control.redo());
-    MenuItem cut = editItem("Cut", KeyCode.X, false, TextInputControl::cut);
-    MenuItem copy = editItem("Copy", KeyCode.C, false, TextInputControl::copy);
-    MenuItem paste = editItem("Paste", KeyCode.V, false, TextInputControl::paste);
-    MenuItem selectAll = editItem("Select All", KeyCode.A, false, TextInputControl::selectAll);
-    edit.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste,
-        new SeparatorMenuItem(), selectAll);
-    edit.setOnShowing(e -> {
+  private Node buildMenuBar() {
+    glassMenuBar = new BalfGlassMenuBar();
+    BalfGlassMenuBar.GlassMenu edit = glassMenuBar.menu("Edit");
+    boolean mac = System.getProperty("os.name", "").toLowerCase().contains("mac");
+    String shortcut = mac ? "⌘" : "Ctrl+";
+    Node undo = edit.createItem("Undo", shortcut + "Z", () -> editFocused(TextInputControl::undo));
+    Node redo = edit.createItem("Redo", shortcut + (mac ? "⇧Z" : "Shift+Z"), () -> editFocused(TextInputControl::redo));
+    edit.separator();
+    Node cut = edit.createItem("Cut", shortcut + "X", () -> editFocused(TextInputControl::cut));
+    Node copy = edit.createItem("Copy", shortcut + "C", () -> editFocused(TextInputControl::copy));
+    Node paste = edit.createItem("Paste", shortcut + "V", () -> editFocused(TextInputControl::paste));
+    edit.separator();
+    Node selectAll = edit.createItem("Select All", shortcut + "A", () -> editFocused(TextInputControl::selectAll));
+    edit.onShowing(() -> {
       TextInputControl control = focusedTextInput();
       boolean absent = control == null;
       undo.setDisable(absent || !control.isUndoable());
@@ -131,20 +137,37 @@ public final class ZUILayoutBuilder {
       paste.setDisable(absent || !control.isEditable() || !Clipboard.getSystemClipboard().hasString());
       selectAll.setDisable(absent || control.getLength() == 0);
     });
-    return new MenuBar(edit);
+    return glassMenuBar;
   }
 
-  private MenuItem editItem(String title, KeyCode key, boolean shift,
-                            java.util.function.Consumer<TextInputControl> action) {
-    MenuItem item = new MenuItem(title);
-    item.setAccelerator(shift
-        ? new KeyCodeCombination(key, KeyCombination.SHORTCUT_DOWN, KeyCombination.SHIFT_DOWN)
-        : new KeyCodeCombination(key, KeyCombination.SHORTCUT_DOWN));
-    item.setOnAction(e -> {
-      TextInputControl control = focusedTextInput();
-      if (control != null) action.accept(control);
-    });
-    return item;
+  private void editFocused(java.util.function.Consumer<TextInputControl> action) {
+    TextInputControl control = focusedTextInput();
+    if (control != null) action.accept(control);
+  }
+
+  private void handleEditShortcut(KeyEvent event) {
+    if (!event.isShortcutDown()) return;
+    TextInputControl control = focusedTextInput();
+    if (control == null) return;
+    switch (event.getCode()) {
+      case Z -> {
+        if (event.isShiftDown()) control.redo(); else control.undo();
+      }
+      case X -> control.cut();
+      case C -> control.copy();
+      case V -> control.paste();
+      case A -> control.selectAll();
+      default -> { return; }
+    }
+    event.consume();
+  }
+
+  public void setDarkMode(boolean enabled) {
+    darkMode = enabled;
+    if (glassMenuBar != null) glassMenuBar.setDarkMode(enabled);
+    for (int i = 0; i < paletteButtons.size(); i++) {
+      paletteButtons.get(i).setGraphic(paletteIcon(Kind.values()[i]));
+    }
   }
 
   private TextInputControl focusedTextInput() {
@@ -166,33 +189,29 @@ public final class ZUILayoutBuilder {
   private ToolBar buildToolbar() {
     Label heading = new Label("ZUI Layout Builder");
     heading.setStyle("-fx-font-weight: bold;");
-    Button insert = new Button("Save layout");
-    insert.setOnAction(e -> save());
-    Button copy = new Button("Copy code");
-    copy.setOnAction(e -> {
-      ClipboardContent content = new ClipboardContent();
-      content.putString(generatedCode.getText());
-      Clipboard.getSystemClipboard().setContent(content);
-    });
     Region spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
     Button close = new Button("✕");
     close.getStyleClass().add("layout-builder-close");
-    close.setOnAction(e -> { if (closeAction != null) closeAction.run(); });
-    ToolBar toolbar = new ToolBar(heading, new Separator(), insert, copy, spacer, close);
+    close.setOnAction(e -> {
+      if (save() && closeAction != null) closeAction.run();
+    });
+    ToolBar toolbar = new ToolBar(heading, spacer, close);
     toolbar.getStyleClass().add("layout-builder-toolbar");
     return toolbar;
   }
 
-  private void save() {
+  private boolean save() {
     try {
       Files.writeString(file, generatedCode.getText(), StandardCharsets.UTF_8);
       if (savedAction != null) savedAction.run();
+      return true;
     } catch (IOException exception) {
       Alert alert = new Alert(Alert.AlertType.ERROR, exception.getMessage(), ButtonType.OK);
       alert.initOwner(owner);
       alert.setHeaderText("The layout could not be saved.");
       alert.showAndWait();
+      return false;
     }
   }
 
@@ -202,7 +221,7 @@ public final class ZUILayoutBuilder {
     design.setCenter(buildCanvas());
     TabPane inspector = new TabPane();
     inspector.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-    inspector.getStyleClass().add("layout-builder-inspector");
+    inspector.getStyleClass().addAll("layout-builder-inspector", "editor-tabs");
     inspector.getTabs().add(new Tab("Properties", buildProperties()));
     generatedCode.setEditable(false);
     generatedCode.setStyle("-fx-font-family: 'JetBrains Mono', monospace;");
@@ -227,6 +246,7 @@ public final class ZUILayoutBuilder {
       button.setMinSize(42, 38);
       button.setMaxSize(42, 38);
       button.setOnAction(e -> addItem(kind));
+      paletteButtons.add(button);
       palette.getChildren().add(button);
     }
     ScrollPane scroll = new ScrollPane(palette);
@@ -238,15 +258,15 @@ public final class ZUILayoutBuilder {
     return scroll;
   }
 
-  private static Node paletteIcon(Kind kind) {
+  private Node paletteIcon(Kind kind) {
     Pane icon = new Pane();
     icon.setMinSize(28, 28);
     icon.setPrefSize(28, 28);
-    Color ink = Color.web("#52606D");
+    Color ink = Color.web(darkMode ? "#b5c4d2" : "#52606D");
     switch (kind) {
       case LABEL: {
         Label glyph = new Label("T");
-        glyph.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #52606D;");
+        glyph.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: " + (darkMode ? "#b5c4d2" : "#52606D") + ";");
         glyph.relocate(8, 1);
         icon.getChildren().add(glyph);
         break;
@@ -530,42 +550,47 @@ public final class ZUILayoutBuilder {
     items.add(item);
     canvas.getChildren().add(shell);
     select(item);
-    updateCode();
+    if (!loadingSource) updateCode();
   }
 
   private void loadSource(String source) {
+    loadingSource = true;
     Pattern itemPattern = Pattern.compile(
         "\\$(\\w+)\\s*=\\s*\\$layout->add\\((.*?),\\s*\\[\\s*\\\"left\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"top\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"width\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"height\\\"\\s*=>\\s*(\\d+)\\s*\\]\\)",
         Pattern.DOTALL);
     Matcher matcher = itemPattern.matcher(source);
-    while (matcher.find()) {
-      Kind kind = kindForFactory(matcher.group(2));
-      if (kind == null) continue;
-      addItem(kind);
-      Item item = items.get(items.size() - 1);
-      item.name = matcher.group(1);
-      item.text = textForFactory(kind, matcher.group(2));
-      item.shell.relocate(Integer.parseInt(matcher.group(3)), Integer.parseInt(matcher.group(4)));
-      item.shell.setPrefSize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
-      item.shell.resize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
-      updatePreviewText(item);
-    }
-    Pattern bindingPattern = Pattern.compile("\\$(\\w+)\\s*->\\s*on\\((UI::[A-Za-z0-9_:]+),\\s*&([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)\\s*\\)");
-    Matcher binding = bindingPattern.matcher(source);
-    while (binding.find()) {
-      Item item = items.stream().filter(candidate -> candidate.name.equals(binding.group(1))).findFirst().orElse(null);
-      if (item == null) continue;
-      item.event = binding.group(2);
-      String reference = "&" + binding.group(3);
-      item.handler = handlers.stream().filter(option -> Objects.equals(option.reference, reference)).findFirst().orElse(null);
-      if (item.handler == null && !binding.group(3).contains("::")) {
-        List<HandlerOption> moduleMatches = handlers.stream()
-            .filter(option -> option.reference != null && option.reference.endsWith("::" + binding.group(3)))
-            .toList();
-        if (moduleMatches.size() == 1) item.handler = moduleMatches.get(0);
+    try {
+      while (matcher.find()) {
+        Kind kind = kindForFactory(matcher.group(2));
+        if (kind == null) continue;
+        addItem(kind);
+        Item item = items.get(items.size() - 1);
+        item.name = matcher.group(1);
+        item.text = textForFactory(kind, matcher.group(2));
+        item.shell.relocate(Integer.parseInt(matcher.group(3)), Integer.parseInt(matcher.group(4)));
+        item.shell.setPrefSize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
+        item.shell.resize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
+        updatePreviewText(item);
       }
-      if (item.handler == null) item.handler = new HandlerOption(binding.group(3), reference);
-      if (!handlerField.getItems().contains(item.handler)) handlerField.getItems().add(item.handler);
+      Pattern bindingPattern = Pattern.compile("\\$(\\w+)\\s*->\\s*on\\((UI::[A-Za-z0-9_:]+),\\s*&([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)\\s*\\)");
+      Matcher binding = bindingPattern.matcher(source);
+      while (binding.find()) {
+        Item item = items.stream().filter(candidate -> candidate.name.equals(binding.group(1))).findFirst().orElse(null);
+        if (item == null) continue;
+        item.event = binding.group(2);
+        String reference = "&" + binding.group(3);
+        item.handler = handlers.stream().filter(option -> Objects.equals(option.reference, reference)).findFirst().orElse(null);
+        if (item.handler == null && !binding.group(3).contains("::")) {
+          List<HandlerOption> moduleMatches = handlers.stream()
+              .filter(option -> option.reference != null && option.reference.endsWith("::" + binding.group(3)))
+              .toList();
+          if (moduleMatches.size() == 1) item.handler = moduleMatches.get(0);
+        }
+        if (item.handler == null) item.handler = new HandlerOption(binding.group(3), reference);
+        if (!handlerField.getItems().contains(item.handler)) handlerField.getItems().add(item.handler);
+      }
+    } finally {
+      loadingSource = false;
     }
     if (items.isEmpty()) updateCode(); else { select(items.get(items.size() - 1)); updateCode(); }
   }
