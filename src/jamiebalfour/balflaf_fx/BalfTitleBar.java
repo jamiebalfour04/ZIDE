@@ -149,6 +149,39 @@ public class BalfTitleBar extends Region {
     if (settingsMenuItem != null) settingsMenuItem.setOnAction(handler);
   }
 
+  /** Places application actions immediately before the title-bar menu and window controls. */
+  public void setLeadingRightContent(Node content) {
+    if (content == null || rightNode == null) return;
+    getChildren().remove(rightNode);
+    HBox rightGroup = new HBox(8, content, rightNode);
+    rightGroup.setAlignment(Pos.CENTER_RIGHT);
+    rightGroup.setPickOnBounds(false);
+    rightNode = rightGroup;
+    getChildren().add(rightNode);
+    requestLayout();
+  }
+
+  /** Moves the existing application menu button to the owning application's status bar. */
+  public Button detachJBMenu() {
+    if (rightNode == jbMenu) {
+      getChildren().remove(jbMenu);
+      rightNode = null;
+    } else {
+      removeDescendant(rightNode, jbMenu);
+    }
+    requestLayout();
+    return jbMenu;
+  }
+
+  private boolean removeDescendant(Node parent, Node target) {
+    if (!(parent instanceof Pane pane)) return false;
+    if (pane.getChildren().remove(target)) return true;
+    for (Node child : pane.getChildren()) {
+      if (removeDescendant(child, target)) return true;
+    }
+    return false;
+  }
+
   /** Lets the owning application present its own close confirmation surface. */
   public void setOnCloseRequest(Runnable handler) {
     onCloseRequest = handler;
@@ -168,11 +201,11 @@ public class BalfTitleBar extends Region {
     if (jbContextMenu != null) {
       jbContextMenu.pseudoClassStateChanged(PseudoClass.getPseudoClass("dark"), enabled);
       if (enabled) {
-        if (!jbContextMenu.getStyleClass().contains("jb-glass-menu-dark")) {
-          jbContextMenu.getStyleClass().add("jb-glass-menu-dark");
+        if (!jbContextMenu.getStyleClass().contains("glass-context-menu-dark")) {
+          jbContextMenu.getStyleClass().add("glass-context-menu-dark");
         }
       } else {
-        jbContextMenu.getStyleClass().remove("jb-glass-menu-dark");
+        jbContextMenu.getStyleClass().remove("glass-context-menu-dark");
       }
     }
   }
@@ -598,9 +631,9 @@ public class BalfTitleBar extends Region {
             new SeparatorMenuItem(),
             quit
     );
-    jbContextMenu.getStyleClass().add("jb-glass-menu");
+    jbContextMenu.getStyleClass().add("glass-context-menu");
     jbContextMenu.pseudoClassStateChanged(PseudoClass.getPseudoClass("dark"), darkMode);
-    if (darkMode) jbContextMenu.getStyleClass().add("jb-glass-menu-dark");
+    if (darkMode) jbContextMenu.getStyleClass().add("glass-context-menu-dark");
 
     // Show/hide on click
     jb.setOnAction(e -> {

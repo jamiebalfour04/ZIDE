@@ -1,6 +1,7 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
+import jamiebalfour.balflaf_fx.BalfComboBox;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -74,8 +75,8 @@ public final class ZUILayoutBuilder {
   private final Spinner<Integer> yField = spinner(0, 2000, 0);
   private final Spinner<Integer> widthField = spinner(20, 2000, 120);
   private final Spinner<Integer> heightField = spinner(20, 2000, 30);
-  private final ComboBox<String> eventField = new ComboBox<>();
-  private final ComboBox<HandlerOption> handlerField = new ComboBox<>();
+  private final BalfComboBox<String> eventField = new BalfComboBox<>();
+  private final BalfComboBox<HandlerOption> handlerField = new BalfComboBox<>();
   private final List<HandlerOption> handlers = new ArrayList<>();
   private final List<Item> items = new ArrayList<>();
   private final List<Button> paletteButtons = new ArrayList<>();
@@ -165,6 +166,8 @@ public final class ZUILayoutBuilder {
   public void setDarkMode(boolean enabled) {
     darkMode = enabled;
     if (glassMenuBar != null) glassMenuBar.setDarkMode(enabled);
+    eventField.setDarkMode(enabled);
+    handlerField.setDarkMode(enabled);
     for (int i = 0; i < paletteButtons.size(); i++) {
       paletteButtons.get(i).setGraphic(paletteIcon(Kind.values()[i]));
     }
@@ -425,7 +428,9 @@ public final class ZUILayoutBuilder {
           String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
           if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
           Path included = manifest.getParent().resolve(value).normalize();
-          if (Files.isRegularFile(included) && included.getFileName().toString().toLowerCase().endsWith(".yas"))
+          if (Files.isRegularFile(included)
+              && !included.toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize())
+              && included.getFileName().toString().toLowerCase().endsWith(".yas"))
             projectSource.append(Files.readString(included, StandardCharsets.UTF_8)).append(System.lineSeparator());
         }
         source = projectSource.append(source).toString();
@@ -537,6 +542,7 @@ public final class ZUILayoutBuilder {
     shell.relocate(offset, offset);
     Item item = new Item(kind, shell, resizeHandle, variableBase(kind) + nextId++);
     ContextMenu menu = new ContextMenu();
+    menu.getStyleClass().add("glass-context-menu");
     MenuItem delete = new MenuItem("Delete");
     delete.setOnAction(e -> { select(item); deleteSelected(); });
     menu.getItems().add(delete);

@@ -4,9 +4,14 @@ import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.css.PseudoClass;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.*;
 import javafx.stage.Popup;
 
@@ -17,7 +22,12 @@ import java.util.function.Consumer;
 public class BalfGlassMenuBar extends HBox {
 
   private Popup activeMenu;
+  private Popup activeSubmenu;
   private Label activeMenuOwner;
+  private Scene submenuDismissScene;
+  private final EventHandler<MouseEvent> dismissSubmenuOnMouse = event -> hideActiveMenu();
+  private final EventHandler<ScrollEvent> dismissSubmenuOnScroll = event -> hideActiveMenu();
+  private final EventHandler<KeyEvent> dismissSubmenuOnKey = event -> hideActiveMenu();
   private final List<GlassMenu> menus = new ArrayList<>();
   private boolean darkMode;
   private static final PseudoClass DARK = PseudoClass.getPseudoClass("dark");
@@ -129,12 +139,17 @@ public class BalfGlassMenuBar extends HBox {
     double popupHeight = menu.root.prefHeight(popupWidth);
     Point2D p = menu.opensAbove
             ? owner.localToScreen(owner.getBoundsInLocal().getWidth(), 0)
-            : owner.localToScreen(-20, owner.getBoundsInLocal().getHeight() - 10);
+            : owner.localToScreen(0, owner.getBoundsInLocal().getHeight() - 10);
     double x = menu.opensAbove ? p.getX() - popupWidth : p.getX();
     double y = menu.opensAbove ? p.getY() - popupHeight + 2 : p.getY();
     popup.show(owner.getScene().getWindow(), x, y);
 
     activeMenu = popup;
+  }
+
+  private Insets menuItemPadding() {
+    return getStyleClass().contains("language-selector-menu")
+            ? new Insets(3, 8, 3, 6) : new Insets(8, 11, 8, 11);
   }
 
   public class GlassMenu {
@@ -143,6 +158,8 @@ public class BalfGlassMenuBar extends HBox {
     private final VBox box;
     private final StackPane root;
     private final boolean opensAbove;
+    private final List<GlassMenu> submenus = new ArrayList<>();
+    private GlassMenu parentMenu;
 
     private GlassMenu(Label owner, boolean opensAbove) {
       this.owner = owner;
@@ -153,6 +170,9 @@ public class BalfGlassMenuBar extends HBox {
 
       root = new StackPane();
       root.getStyleClass().add("glass-menu-container");
+      if (BalfGlassMenuBar.this.getStyleClass().contains("language-selector-menu")) {
+        root.getStyleClass().add("language-selector-popup");
+      }
       root.getStylesheets().add(
               getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
       );
@@ -178,14 +198,23 @@ public class BalfGlassMenuBar extends HBox {
       this.popup.setOnHidden(e -> {
         clearHoverState(root);
         if (activeMenu == this.popup) {
+          if (activeSubmenu != null) {
+            activeSubmenu.hide();
+            activeSubmenu = null;
+          }
           activeMenu = null;
           setActiveOwner(null);
+        }
+        if (activeSubmenu == this.popup) {
+          activeSubmenu = null;
+          if (parentMenu != null && parentMenu.popup.isShowing()) parentMenu.popup.setAutoHide(true);
         }
       });
     }
 
     private void setDarkMode(boolean enabled) {
       root.pseudoClassStateChanged(DARK, enabled);
+      for (GlassMenu submenu : submenus) submenu.setDarkMode(enabled);
     }
 
     public void setText(String text) {
@@ -217,6 +246,57 @@ public class BalfGlassMenuBar extends HBox {
       return item;
     }
 
+    public GlassSubmenu submenu(String title) {
+      GlassMenu submenu = new GlassMenu(new Label(title), false);
+      submenu.parentMenu = this;
+      submenus.add(submenu);
+
+      HBox row = new HBox();
+      row.getStyleClass().addAll("glass-menu-item", "glass-menu-submenu-item");
+      row.setAlignment(Pos.CENTER_LEFT);
+      row.setMinWidth(200);
+      row.setPadding(menuItemPadding());
+
+      Label label = new Label(title);
+      label.getStyleClass().add("glass-menu-item-text");
+      Region spacer = new Region();
+      HBox.setHgrow(spacer, Priority.ALWAYS);
+      Label arrow = new Label("›");
+      arrow.getStyleClass().add("glass-menu-submenu-arrow");
+      row.getChildren().addAll(label, spacer, arrow);
+
+      row.setOnMouseEntered(event -> showSubmenu(row, submenu));
+      row.setOnMouseClicked(event -> {
+        if (!row.isDisabled()) showSubmenu(row, submenu);
+        event.consume();
+      });
+      box.getChildren().add(row);
+      return new GlassSubmenu(row, submenu);
+    }
+
+    public class GlassSubmenu {
+      private final Node row;
+      private final GlassMenu menu;
+
+      private GlassSubmenu(Node row, GlassMenu menu) {
+        this.row = row;
+        this.menu = menu;
+      }
+
+      public Node getNode() {
+        return row;
+      }
+
+      public Node createItem(String title, String shortcut, Runnable action) {
+        return menu.createItem(title, shortcut, action);
+      }
+
+      public void setVisible(boolean visible) {
+        row.setVisible(visible);
+        row.setManaged(visible);
+      }
+    }
+
     public class GlassMenuItem {
 
       private final HBox row;
@@ -233,7 +313,7 @@ public class BalfGlassMenuBar extends HBox {
         row.getStyleClass().add("glass-menu-item");
         row.setAlignment(Pos.CENTER_LEFT);
         row.setMinWidth(200);
-        row.setPadding(new Insets(3, 8, 3, 6));
+        row.setPadding(menuItemPadding());
 
         title = new Label(text);
         title.getStyleClass().add("glass-menu-item-text");
@@ -336,7 +416,7 @@ public class BalfGlassMenuBar extends HBox {
       row.getStyleClass().add("glass-menu-item");
       row.setAlignment(Pos.CENTER_LEFT);
       row.setMinWidth(200);
-      row.setPadding(new Insets(3, 8, 3, 6));
+      row.setPadding(menuItemPadding());
 
       Label title = new Label(text);
       title.getStyleClass().add("glass-menu-item-text");
@@ -371,22 +451,25 @@ public class BalfGlassMenuBar extends HBox {
       row.getStyleClass().add("glass-menu-item");
       row.setAlignment(Pos.CENTER_LEFT);
       row.setMinWidth(200);
-      row.setPadding(new Insets(3, 8, 3, 6));
+      row.setPadding(menuItemPadding());
 
       Label tick = new Label(selected ? "✓" : "");
       tick.setMinWidth(22);
+      tick.setAlignment(Pos.CENTER_RIGHT);
       tick.getStyleClass().add("glass-menu-check");
 
       Label title = new Label(text);
       title.getStyleClass().add("glass-menu-item-text");
 
-      row.getChildren().addAll(tick, title);
+      Region spacer = new Region();
+      HBox.setHgrow(spacer, Priority.ALWAYS);
+      row.getChildren().addAll(title, spacer, tick);
 
       final boolean[] state = { selected };
 
       row.setOnMouseClicked(e -> {
         state[0] = !state[0];
-        tick.setText(state[0] ? "✓" : "");
+        tick.setText(state[0] ? "✓" : "×");
         hideActiveMenu();
         action.accept(state[0]);
         e.consume();
@@ -397,8 +480,29 @@ public class BalfGlassMenuBar extends HBox {
   }
 
 
+  private void showSubmenu(Node owner, GlassMenu menu) {
+    if (activeMenu == null || !activeMenu.isShowing()) return;
+    if (activeSubmenu == menu.popup && menu.popup.isShowing()) return;
+    if (activeSubmenu != null) activeSubmenu.hide();
+
+    rootCssAndLayout(menu.root);
+    Point2D point = owner.localToScreen(owner.getBoundsInLocal().getMaxX() - 28,
+            owner.getBoundsInLocal().getMinY());
+    if (point == null) return;
+    activeMenu.setAutoHide(false);
+    menu.popup.show(owner.getScene().getWindow(), point.getX(), point.getY());
+    activeSubmenu = menu.popup;
+    installSubmenuDismissFilters(owner.getScene());
+  }
+
+
 
   private void hideActiveMenu() {
+    removeSubmenuDismissFilters();
+    if (activeSubmenu != null) {
+      activeSubmenu.hide();
+      activeSubmenu = null;
+    }
     if (activeMenu != null) {
       for (Node content : activeMenu.getContent()) clearHoverState(content);
       activeMenu.hide();
@@ -406,6 +510,23 @@ public class BalfGlassMenuBar extends HBox {
     }
 
     setActiveOwner(null);
+  }
+
+  private void installSubmenuDismissFilters(Scene scene) {
+    if (scene == null) return;
+    if (submenuDismissScene != null && submenuDismissScene != scene) removeSubmenuDismissFilters();
+    submenuDismissScene = scene;
+    scene.addEventFilter(MouseEvent.MOUSE_PRESSED, dismissSubmenuOnMouse);
+    scene.addEventFilter(ScrollEvent.SCROLL, dismissSubmenuOnScroll);
+    scene.addEventFilter(KeyEvent.KEY_PRESSED, dismissSubmenuOnKey);
+  }
+
+  private void removeSubmenuDismissFilters() {
+    if (submenuDismissScene == null) return;
+    submenuDismissScene.removeEventFilter(MouseEvent.MOUSE_PRESSED, dismissSubmenuOnMouse);
+    submenuDismissScene.removeEventFilter(ScrollEvent.SCROLL, dismissSubmenuOnScroll);
+    submenuDismissScene.removeEventFilter(KeyEvent.KEY_PRESSED, dismissSubmenuOnKey);
+    submenuDismissScene = null;
   }
 
   /** Clears JavaFX's latched hover state when a popup disappears under the pointer. */
@@ -450,16 +571,19 @@ public class BalfGlassMenuBar extends HBox {
       row.getStyleClass().add("glass-menu-item");
       row.setAlignment(Pos.CENTER_LEFT);
       row.setMinWidth(200);
-      row.setPadding(new Insets(3, 8, 3, 6));
+      row.setPadding(menuItemPadding());
 
       tick = new Label(selected ? "✓" : "");
       tick.setMinWidth(22);
+      tick.setAlignment(Pos.CENTER_RIGHT);
       tick.getStyleClass().add("glass-menu-check");
 
       title = new Label(text);
       title.getStyleClass().add("glass-menu-item-text");
 
-      row.getChildren().addAll(tick, title);
+      Region spacer = new Region();
+      HBox.setHgrow(spacer, Priority.ALWAYS);
+      row.getChildren().addAll(title, spacer, tick);
 
       row.setOnMouseClicked(e -> {
         setSelected(!this.selected);
@@ -525,7 +649,7 @@ public class BalfGlassMenuBar extends HBox {
       row.getStyleClass().add("glass-menu-item");
       row.setAlignment(Pos.CENTER_LEFT);
       row.setMinWidth(200);
-      row.setPadding(new Insets(3, 8, 3, 6));
+      row.setPadding(menuItemPadding());
 
       title = new Label(text);
       title.getStyleClass().add("glass-menu-item-text");

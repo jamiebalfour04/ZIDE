@@ -1,6 +1,7 @@
 package jamiebalfour.zide.editor;
 
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
+import jamiebalfour.balflaf_fx.BalfComboBox;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -48,7 +49,7 @@ public final class ZIDELanguageBuilder {
   private final TextField friendlySyntax = new TextField();
   private final TextArea pattern = new TextArea();
   private final Label syntaxSummary = new Label();
-  private final ComboBox<String> action = new ComboBox<>();
+  private final BalfComboBox<String> action = new BalfComboBox<>();
   private final TextField parameters = new TextField();
   private final Label parameterHint = new Label();
   private final Label status = new Label("Ready");
@@ -93,6 +94,7 @@ public final class ZIDELanguageBuilder {
 
   public void setDarkMode(boolean enabled) {
     if (glassMenuBar != null) glassMenuBar.setDarkMode(enabled);
+    action.setDarkMode(enabled);
   }
 
   private Node buildMenuBar() {
