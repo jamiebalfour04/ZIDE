@@ -19,6 +19,9 @@ import java.util.concurrent.*;
 final class ZIDEUnfoldPanel extends VBox {
   private final VBox rows = new VBox(4);
   private final VBox staleOverlay = new VBox(12);
+  private final ScrollPane contentScroll = new ScrollPane(rows);
+  private final Button unfoldButton = new Button("Unfold");
+  private final Label availabilityMessage = new Label();
   private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
     Thread t = new Thread(r, "zide-unfold"); t.setDaemon(true); return t;
   });
@@ -40,10 +43,16 @@ final class ZIDEUnfoldPanel extends VBox {
     clip.heightProperty().bind(heightProperty());
     setClip(clip);
     getStyleClass().add("unfold-panel");
-    ScrollPane scroll = new ScrollPane(rows);
-    scroll.getStyleClass().add("code-editor-scroll-pane");
-    scroll.setFitToWidth(true);
-    scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    contentScroll.getStyleClass().add("code-editor-scroll-pane");
+    contentScroll.setFitToWidth(true);
+    contentScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    unfoldButton.getStyleClass().add("unfold-action-button");
+    unfoldButton.setOnAction(event -> refresh());
+    availabilityMessage.setWrapText(true);
+    availabilityMessage.getStyleClass().add("unfold-availability-message");
+    HBox toolbar = new HBox(10, unfoldButton, availabilityMessage);
+    toolbar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+    toolbar.getStyleClass().add("unfold-panel-toolbar");
     Label changed = new Label("The code has changed. Unfold needs to be regenerated.");
     changed.setWrapText(true);
     changed.setStyle("-fx-text-fill: white;");
@@ -57,12 +66,15 @@ final class ZIDEUnfoldPanel extends VBox {
     staleOverlay.setStyle("-fx-background-color: black;");
     staleOverlay.setVisible(false);
     staleOverlay.setManaged(false);
-    StackPane body = new StackPane(scroll, staleOverlay);
+    StackPane body = new StackPane(contentScroll, staleOverlay);
     VBox.setVgrow(body, Priority.ALWAYS);
     rows.setPadding(new Insets(8));
-    getChildren().add(body);
+    getChildren().addAll(toolbar, body);
     setMinWidth(0); setPrefWidth(340); setMaxWidth(Double.MAX_VALUE);
     setVisible(false); setManaged(false);
+    contentScroll.setVisible(false);
+    contentScroll.setManaged(false);
+    updateAvailabilityMessage();
     setOnMouseExited(e -> clearHighlight());
   }
 
@@ -72,7 +84,7 @@ final class ZIDEUnfoldPanel extends VBox {
 
   void toggle(EditorTab selected) {
     if (opened) close();
-    else if (supports(selected)) {
+    else {
       opened = true; setVisible(true); setManaged(true);
       follow(selected);
     }
@@ -82,13 +94,34 @@ final class ZIDEUnfoldPanel extends VBox {
 
   void follow(EditorTab selected) {
     if (!opened) return;
-    if (tab == selected) return;
+    if (tab == selected) {
+      updateAvailabilityMessage();
+      return;
+    }
     clearHighlight();
     if (tab != null) tab.getEditor().getEditor().textProperty().removeListener(edits);
+    version++;
     tab = selected;
-    if (!supports(tab)) { close(); return; }
+    rows.setDisable(false);
+    rows.getChildren().clear();
+    staleOverlay.setVisible(false);
+    staleOverlay.setManaged(false);
+    contentScroll.setVisible(false);
+    contentScroll.setManaged(false);
+    updateAvailabilityMessage();
+    if (!supports(tab)) return;
     tab.getEditor().getEditor().textProperty().addListener(edits);
-    refresh();
+  }
+
+  private void updateAvailabilityMessage() {
+    boolean supported = supports(tab);
+    unfoldButton.setVisible(supported);
+    unfoldButton.setManaged(supported);
+    availabilityMessage.setText(supported
+            ? "Click Unfold to view this file's structure."
+            : tab == null
+            ? "Open a File that supports Unfold to Unfold it."
+            : "Unfold is available for YASS and Zpeedy files only.");
   }
 
   void close() {
@@ -103,6 +136,8 @@ final class ZIDEUnfoldPanel extends VBox {
   private void invalidate() {
     version++; clearHighlight();
     rows.setDisable(true);
+    contentScroll.setVisible(true);
+    contentScroll.setManaged(true);
     staleOverlay.setManaged(true);
     staleOverlay.setVisible(true);
   }
@@ -111,6 +146,9 @@ final class ZIDEUnfoldPanel extends VBox {
     if (!supports(tab)) return;
     version++; clearHighlight();
     rows.setDisable(false);
+    availabilityMessage.setText("Unfolding file structure…");
+    contentScroll.setVisible(true);
+    contentScroll.setManaged(true);
     staleOverlay.setVisible(false);
     staleOverlay.setManaged(false);
     rows.getChildren().setAll(new Label("Updating..."));
@@ -127,12 +165,14 @@ final class ZIDEUnfoldPanel extends VBox {
           rows.getChildren().clear();
           addRows(rows, chunks, source);
           if (rows.getChildren().isEmpty()) rows.getChildren().add(new Label("No executable code."));
+          availabilityMessage.setText(target.getDisplayTitle());
         });
       } catch (Exception | LinkageError failure) {
         Platform.runLater(() -> {
           if (request != version || target != tab || !opened) return;
           Label error = new Label("Unable to unfold: " + failure.getMessage());
           error.setWrapText(true); rows.getChildren().setAll(error);
+          availabilityMessage.setText("Unfold failed");
         });
       }
     });
