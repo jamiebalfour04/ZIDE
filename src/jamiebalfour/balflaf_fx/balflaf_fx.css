@@ -440,6 +440,11 @@
 .glass-menu-container:dark.language-selector-popup .glass-menu-item:hover .glass-menu-shortcut { -fx-text-fill: #ffffff; }
 .language-selector-popup .glass-menu-separator { -fx-background-color: rgba(60,60,67,0.22); }
 .language-selector-popup:dark .glass-menu-separator { -fx-background-color: rgba(235,235,245,0.18); }
+.language-selector-group {
+    -fx-background-color: #f2f3f5;
+    -fx-background-radius: 9px;
+}
+.glass-menu-container:dark .language-selector-group { -fx-background-color: #1d2025; }
 
 .glass-menu-container:dark .glass-menu-item-text,
 .glass-menu-container:dark .glass-menu-check {

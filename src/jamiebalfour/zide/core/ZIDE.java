@@ -17,17 +17,53 @@ public class ZIDE {
 
     if(args.length > 0) {
       if(args[0].equals("-h")){
-        System.out.println("ZIDE Help coming soon...");
+        printHelp();
+      } else if (args[0].equals("-s")) {
+        if (args.length < 2) {
+          System.err.println("Missing port number. Usage: zide.jar -s <port>");
+          System.exit(2);
+          return;
+        }
+        try {
+          int port = Integer.parseInt(args[1]);
+          if (port < 1 || port > 65535) throw new NumberFormatException();
+          ZIDECollaborationServer server = new ZIDECollaborationServer(port);
+          Runtime.getRuntime().addShutdownHook(new Thread(server::close, "zide-collaboration-shutdown"));
+          server.start();
+        } catch (NumberFormatException exception) {
+          System.err.println("Invalid port number. Usage: zide.jar -s <port>");
+          System.exit(2);
+        } catch (Exception exception) {
+          System.err.println("Could not start the collaboration server: " + exception.getMessage());
+          System.exit(1);
+        }
       } else if (args[0].equals("-g")) {
-        ZIDEEditor.begin(args);
+        try{
+          ZIDEEditor.begin(args);
+        } catch (java.lang.NoClassDefFoundError e){
+          System.err.println("ZIDE requires JavaFX libraries. Please install JavaFX and try again.");
+        }
 
       } else if (args[0].equals("--version")) {
         System.out.println("ZIDE version " + getMajorVersion() + "." + getMinorVersion() + "." + getBuildNumber());
       }
     } else{
-      ZIDEEditor.begin(args);
+      try {
+        ZIDEEditor.begin(args);
+      } catch (java.lang.NoClassDefFoundError e){
+        System.err.println("ZIDE requires JavaFX libraries. Please install JavaFX and try again.");
+      }
     }
 
+  }
+
+  private static void printHelp() {
+    System.out.println("ZIDE " + getVersion());
+    System.out.println("Usage:");
+    System.out.println("  zide.jar                 Start the ZIDE editor");
+    System.out.println("  zide.jar -s <port>       Start the collaboration server");
+    System.out.println("  zide.jar --version       Show the version");
+    System.out.println("  zide.jar -h              Show this help");
   }
 
   public static String getVersion(){

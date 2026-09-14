@@ -1,5 +1,6 @@
 package jamiebalfour.balflaf_fx;
 
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
@@ -137,12 +138,16 @@ public class BalfGlassMenuBar extends HBox {
     rootCssAndLayout(menu.root);
     double popupWidth = menu.root.prefWidth(-1);
     double popupHeight = menu.root.prefHeight(popupWidth);
-    Point2D p = menu.opensAbove
-            ? owner.localToScreen(owner.getBoundsInLocal().getWidth(), 0)
-            : owner.localToScreen(0, owner.getBoundsInLocal().getHeight() - 10);
-    double x = menu.opensAbove ? p.getX() - popupWidth : p.getX();
-    double y = menu.opensAbove ? p.getY() - popupHeight + 2 : p.getY();
-    popup.show(owner.getScene().getWindow(), x, y);
+    Bounds titleBounds = menu.owner.getBoundsInLocal();
+    Point2D titleTopLeft = menu.owner.localToScreen(titleBounds.getMinX(), titleBounds.getMinY());
+    Point2D titleTopRight = menu.owner.localToScreen(titleBounds.getMaxX(), titleBounds.getMinY());
+    Point2D titleBottomLeft = menu.owner.localToScreen(titleBounds.getMinX(), titleBounds.getMaxY());
+    if (titleTopLeft == null || titleTopRight == null || titleBottomLeft == null) return;
+
+    double x = menu.opensAbove ? titleTopRight.getX() - popupWidth : titleTopLeft.getX();
+    double y = menu.opensAbove ? titleTopLeft.getY() - popupHeight + 2 : titleBottomLeft.getY() + 3;
+    popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
+    popup.show(menu.owner, x, y);
 
     activeMenu = popup;
   }
@@ -255,7 +260,7 @@ public class BalfGlassMenuBar extends HBox {
       row.getStyleClass().addAll("glass-menu-item", "glass-menu-submenu-item");
       row.setAlignment(Pos.CENTER_LEFT);
       row.setMinWidth(200);
-      row.setPadding(menuItemPadding());
+      row.setPadding(new Insets(4, 11, 4, 11));
 
       Label label = new Label(title);
       label.getStyleClass().add("glass-menu-item-text");
@@ -387,6 +392,21 @@ public class BalfGlassMenuBar extends HBox {
     public Node customItem(Node node) {
       box.getChildren().add(node);
       return node;
+    }
+
+    /** Wraps existing menu rows in a styled group while preserving their actions. */
+    public Node groupItems(List<? extends Node> items, String styleClass) {
+      if (items == null || items.isEmpty()) return null;
+      int insertionIndex = box.getChildren().indexOf(items.getFirst());
+      if (insertionIndex < 0 || !box.getChildren().containsAll(items)) return null;
+      VBox group = new VBox(1);
+      group.getStyleClass().add(styleClass);
+      group.setPadding(new Insets(2));
+      VBox.setMargin(group, new Insets(3, 2, 3, 2));
+      box.getChildren().removeAll(items);
+      box.getChildren().add(insertionIndex, group);
+      group.getChildren().addAll(items);
+      return group;
     }
 
     /** Runs just before this menu is displayed. */

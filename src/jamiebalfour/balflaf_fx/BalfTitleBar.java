@@ -1,7 +1,12 @@
 package jamiebalfour.balflaf_fx;
 
 import jamiebalfour.helpers.HelperFunctions;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -32,6 +37,7 @@ import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.Duration;
 
 import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
@@ -361,13 +367,15 @@ public class BalfTitleBar extends Region {
 
       var zoom = trafficLight("balf-zoom", Color.web("#28c840"));
       zoom.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
-        boolean ctrlDown = e.isControlDown();
-        boolean metaDown = e.isMetaDown();
-
-        if (ctrlDown && metaDown) {
-          enterMacFullScreen();
+        if (e.isAltDown()) {
+          if (stage.isFullScreen()) {
+            stage.setFullScreen(false);
+            Platform.runLater(() -> Platform.runLater(() -> toggleMacZoom(stage)));
+          } else {
+            toggleMacZoom(stage);
+          }
         } else {
-          toggleMacZoom(stage);
+          enterMacFullScreen();
         }
 
         e.consume();
@@ -386,35 +394,63 @@ public class BalfTitleBar extends Region {
   private double oldY;
   private double oldW;
   private double oldH;
+  private Timeline macZoomAnimation;
+  private boolean hasSavedNormalBounds;
 
 
   private void toggleMacZoom(Stage stage) {
-    if (!zoomed) {
-      oldX = stage.getX();
-      oldY = stage.getY();
-      oldW = stage.getWidth();
-      oldH = stage.getHeight();
+    if (macZoomAnimation != null) macZoomAnimation.stop();
+
+    boolean zoomIn = !zoomed;
+    double targetX;
+    double targetY;
+    double targetW;
+    double targetH;
+
+    if (zoomIn) {
+      if (!hasSavedNormalBounds) {
+        oldX = stage.getX();
+        oldY = stage.getY();
+        oldW = stage.getWidth();
+        oldH = stage.getHeight();
+        hasSavedNormalBounds = true;
+      }
 
       Screen screen = Screen.getScreensForRectangle(
               stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight()
       ).get(0);
 
       Rectangle2D bounds = screen.getVisualBounds();
-
-      stage.setX(bounds.getMinX());
-      stage.setY(bounds.getMinY());
-      stage.setWidth(bounds.getWidth());
-      stage.setHeight(bounds.getHeight());
-
-      zoomed = true;
+      targetX = bounds.getMinX();
+      targetY = bounds.getMinY();
+      targetW = bounds.getWidth();
+      targetH = bounds.getHeight();
     } else {
-      stage.setX(oldX);
-      stage.setY(oldY);
-      stage.setWidth(oldW);
-      stage.setHeight(oldH);
-
-      zoomed = false;
+      targetX = oldX;
+      targetY = oldY;
+      targetW = oldW;
+      targetH = oldH;
     }
+
+    zoomed = zoomIn;
+    double startX = stage.getX();
+    double startY = stage.getY();
+    double startW = stage.getWidth();
+    double startH = stage.getHeight();
+    SimpleDoubleProperty progress = new SimpleDoubleProperty(0);
+    progress.addListener((obs, oldValue, newValue) -> {
+      double amount = newValue.doubleValue();
+      stage.setX(startX + (targetX - startX) * amount);
+      stage.setY(startY + (targetY - startY) * amount);
+      stage.setWidth(startW + (targetW - startW) * amount);
+      stage.setHeight(startH + (targetH - startH) * amount);
+    });
+    macZoomAnimation = new Timeline(new KeyFrame(Duration.millis(220),
+            new KeyValue(progress, 1, Interpolator.EASE_BOTH)));
+    macZoomAnimation.setOnFinished(event -> {
+      if (!zoomed) hasSavedNormalBounds = false;
+    });
+    macZoomAnimation.play();
   }
 
   private void enterMacFullScreen() {

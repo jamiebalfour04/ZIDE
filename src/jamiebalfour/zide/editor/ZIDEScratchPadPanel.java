@@ -92,9 +92,14 @@ final class ZIDEScratchPadPanel extends VBox {
   }
 
   private Button formatButton(String text, String tooltip, Runnable action) {
-    Button button = new Button(text);
+    Label glyph = new Label(text);
+    glyph.getStyleClass().add("scratch-pad-format-glyph");
+    glyph.setMouseTransparent(true);
+    Button button = new Button();
+    button.setGraphic(glyph);
     button.getStyleClass().add("scratch-pad-format-button");
     button.setTooltip(new Tooltip(tooltip));
+    button.setAccessibleText(tooltip);
     button.setFocusTraversable(false);
     button.setOnAction(event -> action.run());
     return button;

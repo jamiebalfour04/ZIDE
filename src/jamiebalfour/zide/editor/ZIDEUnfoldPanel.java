@@ -47,10 +47,13 @@ final class ZIDEUnfoldPanel extends VBox {
     contentScroll.setFitToWidth(true);
     contentScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
     unfoldButton.getStyleClass().add("unfold-action-button");
+    unfoldButton.setMinWidth(Region.USE_PREF_SIZE);
     unfoldButton.setOnAction(event -> refresh());
     availabilityMessage.setWrapText(true);
+    availabilityMessage.setMinWidth(0);
+    availabilityMessage.setMaxWidth(Double.MAX_VALUE);
     availabilityMessage.getStyleClass().add("unfold-availability-message");
-    HBox toolbar = new HBox(10, unfoldButton, availabilityMessage);
+    VBox toolbar = new VBox(7, unfoldButton, availabilityMessage);
     toolbar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
     toolbar.getStyleClass().add("unfold-panel-toolbar");
     Label changed = new Label("The code has changed. Unfold needs to be regenerated.");

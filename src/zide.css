@@ -191,6 +191,24 @@
 .glass-context-menu .menu-item:disabled .label {
     -fx-text-fill: #9098a2;
 }
+.code-autocomplete-popup {
+    -fx-background-color: #ffffff;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6px;
+    -fx-border-color: #c8cdd4;
+    -fx-border-radius: 6px;
+    -fx-border-width: 1px;
+    -fx-padding: 1px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0.12, 0, 3);
+}
+.code-autocomplete-popup .custom-menu-item {
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+.code-autocomplete-popup.glass-context-menu-dark {
+    -fx-background-color: #252a33;
+    -fx-border-color: #454d58;
+}
 .layout-builder-close {
     -fx-min-width: 32px;
     -fx-pref-width: 32px;
@@ -395,18 +413,13 @@
 }
 
 .right-side-panels {
+    -fx-tab-min-width: 92px;
+    -fx-tab-max-width: 160px;
     -fx-border-color: #d4d4d4;
     -fx-border-width: 0 0 0 1px;
 }
 .right-side-panels .tab-content-area {
     -fx-border-width: 0;
-}
-.right-side-panels .tab-header-area .tab-label {
-    -fx-min-width: 0;
-    -fx-pref-width: 0;
-    -fx-max-width: 0;
-    -fx-padding: 0;
-    -fx-text-fill: transparent;
 }
 .ai-assist-panel {
     -fx-background-color: #ffffff;
@@ -1584,6 +1597,7 @@
 
 .app-root .balf-titlebar {
     -fx-background-color: #517;
+    -fx-background-radius: 16px 16px 0 0;
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-effect: none;
@@ -1627,6 +1641,25 @@
 }
 .app-root .balf-titlebar .focus-mode-exit-button:hover {
     -fx-background-color: #119b55;
+}
+.app-root .balf-titlebar .collaboration-mode-button {
+    -fx-background-color: #6d28a8;
+    -fx-background-radius: 9px;
+    -fx-border-color: rgba(255,255,255,0.22);
+    -fx-border-radius: 9px;
+    -fx-border-width: 1px;
+    -fx-padding: 4px 10px;
+    -fx-min-height: 25px;
+    -fx-pref-height: 25px;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-opacity: 1;
+    -fx-effect: none;
+    -fx-cursor: hand;
+}
+.app-root .balf-titlebar .collaboration-mode-button:hover {
+    -fx-background-color: #7e35bc;
 }
 .app-root .balf-titlebar .titlebar-action-symbol {
     -fx-text-fill: #ffffff;
@@ -2153,6 +2186,10 @@
     -fx-border-color: transparent;
     -fx-border-width: 0 0 0 3px;
 }
+.project-tree .project-file-name { -fx-text-fill: #202020; }
+.project-tree .tree-cell:selected .project-file-name { -fx-text-fill: #ffffff; }
+.app-root.dark .project-tree .project-file-name { -fx-text-fill: #e6e9ee; }
+.app-root.dark .project-tree .tree-cell:selected .project-file-name { -fx-text-fill: #e6e9ee; }
 
 .pane-header {
     -fx-background-color: #f3f3f3;
@@ -2213,6 +2250,8 @@
 
 .language-icon-python { -fx-background-color: #3776ab; -fx-text-fill: white; }
 .language-icon-php { -fx-background-color: #777bb4; -fx-text-fill: white; }
+.language-icon-lua { -fx-background-color: #00007D; -fx-text-fill: white; }
+.language-icon-js { -fx-background-color: #c3b21e; -fx-text-fill: white; }
 .language-icon-zpeedy { -fx-background-color: #7a118c; -fx-text-fill: white; }
 .language-icon-sqarl { -fx-background-color: #16825d; -fx-text-fill: white; }
 .language-icon-zenlang { -fx-background-color: #087f8c; -fx-text-fill: white; }
@@ -2309,6 +2348,58 @@
 .in-window-modal-dark .in-window-modal-panel {
     -fx-background-color: #1e1e1e;
     -fx-border-color: #454545;
+}
+
+.breakpoints-list {
+    -fx-background-color: #f7f8fa;
+    -fx-control-inner-background: #f7f8fa;
+    -fx-background-insets: 0;
+    -fx-border-color: #c7ced7;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+.breakpoints-list .virtual-flow,
+.breakpoints-list .clipped-container,
+.breakpoints-list .viewport {
+    -fx-background-color: #f7f8fa;
+}
+.breakpoints-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #26313b;
+    -fx-padding: 7px 9px;
+}
+.breakpoints-list .list-cell:filled:hover {
+    -fx-background-color: #e8edf4;
+}
+.breakpoints-list .list-cell:filled:selected {
+    -fx-background-color: #dceafa;
+    -fx-text-fill: #17354d;
+}
+.breakpoints-empty-state {
+    -fx-text-fill: #687482;
+}
+.in-window-modal-dark .breakpoints-list {
+    -fx-background-color: #20252e;
+    -fx-control-inner-background: #20252e;
+    -fx-border-color: #4a535f;
+}
+.in-window-modal-dark .breakpoints-list .virtual-flow,
+.in-window-modal-dark .breakpoints-list .clipped-container,
+.in-window-modal-dark .breakpoints-list .viewport {
+    -fx-background-color: #20252e;
+}
+.in-window-modal-dark .breakpoints-list .list-cell {
+    -fx-text-fill: #e6e9ee;
+}
+.in-window-modal-dark .breakpoints-list .list-cell:filled:hover {
+    -fx-background-color: #2a313c;
+}
+.in-window-modal-dark .breakpoints-list .list-cell:filled:selected {
+    -fx-background-color: #174c68;
+    -fx-text-fill: #ffffff;
+}
+.in-window-modal-dark .breakpoints-empty-state {
+    -fx-text-fill: #aeb8c4;
 }
 
 .in-window-modal-title { -fx-font-size: 18px; -fx-font-weight: bold; }
@@ -2624,30 +2715,39 @@
 }
 
 .markdown-flow,
-.markdown-paragraph { -fx-line-spacing: 3px; }
-.markdown-text { -fx-fill: #242424; -fx-font-size: 14px; }
+.markdown-paragraph { -fx-line-spacing: 6px; }
+.markdown-text {
+    -fx-font-family: "Inter", "Segoe UI", "Arial", sans-serif;
+    -fx-fill: #1f2328;
+    -fx-font-size: 16px;
+}
 .markdown-bold { -fx-font-weight: bold; }
 .markdown-inline-code {
     -fx-font-family: monospace;
     -fx-fill: #a31515;
 }
-.markdown-link { -fx-padding: 0; -fx-font-size: 14px; }
+.markdown-link {
+    -fx-padding: 0;
+    -fx-font-size: 16px;
+    -fx-text-fill: #0969da;
+}
 .markdown-heading-1,
-.markdown-heading-2,
-.markdown-heading-3,
-.markdown-heading-4,
-.markdown-heading-5,
-.markdown-heading-6 {
-    -fx-padding: 7px 0 5px 0;
+.markdown-heading-2 {
     -fx-border-color: transparent transparent #dedede transparent;
     -fx-border-width: 0 0 1px 0;
 }
-.markdown-heading-1 .text { -fx-font-size: 26px; -fx-font-weight: bold; }
-.markdown-heading-2 .text { -fx-font-size: 22px; -fx-font-weight: bold; }
-.markdown-heading-3 .text { -fx-font-size: 18px; -fx-font-weight: bold; }
-.markdown-heading-4 .text,
-.markdown-heading-5 .text,
-.markdown-heading-6 .text { -fx-font-size: 15px; -fx-font-weight: bold; }
+.markdown-heading-1 { -fx-padding: 0 0 8px 0; }
+.markdown-heading-2 { -fx-padding: 20px 0 8px 0; }
+.markdown-heading-3,
+.markdown-heading-4,
+.markdown-heading-5,
+.markdown-heading-6 { -fx-padding: 16px 0 8px 0; }
+.markdown-heading-1 .markdown-text { -fx-font-size: 32px; -fx-font-weight: bold; }
+.markdown-heading-2 .markdown-text { -fx-font-size: 24px; -fx-font-weight: bold; }
+.markdown-heading-3 .markdown-text { -fx-font-size: 20px; -fx-font-weight: bold; }
+.markdown-heading-4 .markdown-text { -fx-font-size: 16px; -fx-font-weight: bold; }
+.markdown-heading-5 .markdown-text { -fx-font-size: 14px; -fx-font-weight: bold; }
+.markdown-heading-6 .markdown-text { -fx-font-size: 14px; -fx-font-weight: bold; -fx-fill: #59636e; }
 .markdown-list-item { -fx-padding: 0 0 0 12px; }
 .markdown-quote { -fx-padding: 2px 0; }
 .markdown-quote-rule { -fx-min-width: 3px; -fx-max-width: 3px; -fx-background-color: #9b9b9b; }
@@ -2663,14 +2763,12 @@
 .app-root.dark .markdown-preview,
 .app-root.dark .markdown-preview > .viewport,
 .app-root.dark .markdown-preview-content { -fx-background-color: #1e1e1e; }
-.app-root.dark .markdown-text { -fx-fill: #e7e7e7; }
+.app-root.dark .markdown-text { -fx-fill: #e6edf3; }
 .app-root.dark .markdown-inline-code { -fx-fill: #ce9178; }
 .app-root.dark .markdown-heading-1,
-.app-root.dark .markdown-heading-2,
-.app-root.dark .markdown-heading-3,
-.app-root.dark .markdown-heading-4,
-.app-root.dark .markdown-heading-5,
-.app-root.dark .markdown-heading-6 { -fx-border-color: transparent transparent #484848 transparent; }
+.app-root.dark .markdown-heading-2 { -fx-border-color: transparent transparent #3d444d transparent; }
+.app-root.dark .markdown-heading-6 .markdown-text { -fx-fill: #9198a1; }
+.app-root.dark .markdown-link { -fx-text-fill: #4493f8; }
 .app-root.dark .markdown-code-block {
     -fx-background-color: #252526;
     -fx-text-fill: #e7e7e7;
@@ -2978,6 +3076,23 @@
 .app-root.dark .unfold-panel { -fx-background-color: #1b1f26; -fx-border-color: #30343b; }
 .app-root.dark .unfold-panel-toolbar { -fx-border-color: transparent transparent #30343b transparent; }
 .app-root.dark .unfold-availability-message { -fx-text-fill: #aeb8c5; }
+.bytecode-panel {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #d4d4d4;
+    -fx-border-width: 0 0 0 1px;
+}
+.bytecode-panel .text-area,
+.bytecode-panel .text-area .content {
+    -fx-font-family: "Menlo", "Consolas", monospace;
+    -fx-font-size: 12px;
+}
+.app-root.dark .bytecode-panel { -fx-background-color: #1b1f26; -fx-border-color: #30343b; }
+.app-root.dark .bytecode-panel .text-area,
+.app-root.dark .bytecode-panel .text-area .content {
+    -fx-control-inner-background: #20252e;
+    -fx-background-color: #20252e;
+    -fx-text-fill: #dce2e9;
+}
 .app-root.dark .unfold-description:hover { -fx-background-color: #253c48; }
 .app-root.dark .unfold-full-description-content,
 .app-root.dark .unfold-full-description-scroll,
@@ -3013,7 +3128,9 @@
     -fx-background-color: #ffffff;
     -fx-text-fill: #292d33;
     -fx-border-color: #d4d4d4;
-    -fx-border-width: 1px 0 0 0;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
     -fx-font-family: "Inter", "Segoe UI", "Arial", sans-serif;
     -fx-font-size: 14px;
     -fx-line-spacing: 3px;
@@ -3030,6 +3147,10 @@
     -fx-border-color: #d0d0d0;
     -fx-border-radius: 4px;
     -fx-background-radius: 4px;
+    -fx-font-weight: bold;
+}
+.scratch-pad-format-glyph {
+    -fx-text-fill: #292d33;
     -fx-font-weight: bold;
 }
 .scratch-pad-format-button:hover { -fx-background-color: #dceef8; }
@@ -3058,6 +3179,7 @@
     -fx-text-fill: #e3e7ec;
     -fx-border-color: #3b424d;
 }
+.app-root.dark .scratch-pad-format-glyph { -fx-text-fill: #e3e7ec; }
 .app-root.dark .scratch-pad-format-button:hover { -fx-background-color: #303844; }
 .app-root.dark .scratch-pad-format-button.format-active { -fx-background-color: #164766; -fx-border-color: #2696d2; }
 .file-loading-overlay {

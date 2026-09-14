@@ -29,13 +29,17 @@ final class ZIDESettingsPanel extends HBox {
   private final TextField url;
   private final PasswordField key;
   private final BalfComboBox<String> model;
+  private final TextField collaborationServer;
+  private final TextField collaborationPort;
+  private final TextField collaborationName;
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
                     String fontName, int fontSizeValue, boolean wrapLines, boolean preferZpex,
-                    String chatGPTUrl, String chatGPTKey, String chatGPTModel) {
+                    String chatGPTUrl, String chatGPTKey, String chatGPTModel,
+                    String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName) {
     super(18);
 
-    ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "ChatGPT"));
+    ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "ChatGPT", "Collaboration"));
     sections.getStyleClass().add("settings-section-list");
     sections.setPrefWidth(190);
     sections.setMinWidth(190);
@@ -98,11 +102,25 @@ final class ZIDESettingsPanel extends HBox {
     GridPane.setHgrow(model, Priority.ALWAYS);
     VBox chatGPT = section("ChatGPT", chatFields);
 
+    collaborationServer = new TextField(collaborationServerName);
+    collaborationPort = new TextField(collaborationPortNumber);
+    collaborationName = new TextField(collaborationDisplayName);
+    GridPane collaborationFields = fields();
+    collaborationServer.setPromptText("Hostname or https:// address");
+    collaborationFields.addRow(0, new Label("Server address"), collaborationServer);
+    collaborationFields.addRow(1, new Label("Port"), collaborationPort);
+    collaborationFields.addRow(2, new Label("Your name"), collaborationName);
+    GridPane.setHgrow(collaborationServer, Priority.ALWAYS);
+    GridPane.setHgrow(collaborationPort, Priority.ALWAYS);
+    GridPane.setHgrow(collaborationName, Priority.ALWAYS);
+    VBox collaboration = section("Collaboration", collaborationFields);
+
     StackPane page = new StackPane(gui);
     page.setMinWidth(590);
     HBox.setHgrow(page, Priority.ALWAYS);
     sections.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, selected) -> {
       Node selectedPage = "ChatGPT".equals(selected) ? chatGPT
+              : "Collaboration".equals(selected) ? collaboration
               : "Execution".equals(selected) ? execution
               : "Editor".equals(selected) ? editor : gui;
       page.getChildren().setAll(selectedPage);
@@ -117,6 +135,16 @@ final class ZIDESettingsPanel extends HBox {
     return getChatGPTKey().isEmpty() || (!getChatGPTUrl().isEmpty() && !selectedModel.isEmpty());
   }
 
+  boolean hasValidCollaborationSettings() {
+    if (getCollaborationServer().isEmpty() || getCollaborationName().isEmpty()) return false;
+    try {
+      int port = Integer.parseInt(getCollaborationPort());
+      return port >= 1 && port <= 65535;
+    } catch (NumberFormatException exception) {
+      return false;
+    }
+  }
+
   String getTheme() { return theme.getValue(); }
   String getLightEditorTheme() { return lightEditorTheme.getValue(); }
   String getDarkEditorTheme() { return darkEditorTheme.getValue(); }
@@ -127,6 +155,9 @@ final class ZIDESettingsPanel extends HBox {
   String getChatGPTUrl() { return url.getText().trim(); }
   String getChatGPTKey() { return key.getText().trim(); }
   String getChatGPTModel() { return model.getEditor().getText().trim(); }
+  String getCollaborationServer() { return collaborationServer.getText().trim(); }
+  String getCollaborationPort() { return collaborationPort.getText().trim(); }
+  String getCollaborationName() { return collaborationName.getText().trim(); }
 
   private static BalfComboBox<String> combo(List<String> choices, boolean darkMode) {
     BalfComboBox<String> result = new BalfComboBox<>(FXCollections.observableArrayList(choices));

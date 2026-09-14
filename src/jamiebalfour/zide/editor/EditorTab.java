@@ -708,6 +708,7 @@ public class EditorTab extends Tab {
   public CodeEditorViewFX getEditor() { return editor; }
   List<YASSDiagnostic> getDiagnostics() { return diagnostics; }
   public boolean hasSpecialLine(int line) { return breakpointLines.contains(line); }
+  public Set<Integer> getSpecialLines() { return Set.copyOf(breakpointLines); }
   public void toggleSpecialLine(int line) {
     if (!breakpointLines.add(line)) breakpointLines.remove(line);
   }
@@ -733,9 +734,10 @@ public class EditorTab extends Tab {
         markdownPreviewContent.getStyleClass().add("markdown-preview-content");
         markdownPreview = new ScrollPane(markdownPreviewContent);
         markdownPreview.setFitToWidth(true);
-        markdownPreview.getStyleClass().add("markdown-preview");
+        markdownPreview.getStyleClass().addAll("markdown-preview", "code-editor-scroll-pane");
         markdownSplit = new SplitPane();
         markdownSplit.setDividerPositions(0.52);
+        VBox.setVgrow(markdownSplit, Priority.ALWAYS);
       }
       if (editorContainer.getChildren().get(0) != markdownSplit) {
         editorContainer.getChildren().remove(editorContent);

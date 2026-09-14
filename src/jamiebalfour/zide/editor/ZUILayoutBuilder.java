@@ -21,6 +21,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.stage.Window;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.nio.charset.StandardCharsets;
@@ -415,13 +416,12 @@ public final class ZUILayoutBuilder {
   private void discoverHandlers() {
     handlers.add(new HandlerOption("None", null));
     handlerField.getItems().setAll(handlers);
-    Path script = companionScript();
-    if (script == null || !Files.isRegularFile(script)) return;
     try {
-      String source = Files.readString(script, StandardCharsets.UTF_8);
       Path manifest = file.getParent() == null ? null : file.getParent().resolve(".project.yas");
+      LinkedHashSet<Path> scripts = new LinkedHashSet<>();
+      Path script = companionScript();
+      if (script != null && Files.isRegularFile(script)) scripts.add(script.toAbsolutePath().normalize());
       if (manifest != null && Files.isRegularFile(manifest)) {
-        StringBuilder projectSource = new StringBuilder();
         for (String manifestLine : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
           String trimmed = manifestLine.trim();
           if (!trimmed.matches("(?i)^includes?\\s+.+")) continue;
@@ -430,11 +430,17 @@ public final class ZUILayoutBuilder {
           Path included = manifest.getParent().resolve(value).normalize();
           if (Files.isRegularFile(included)
               && !included.toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize())
-              && included.getFileName().toString().toLowerCase().endsWith(".yas"))
-            projectSource.append(Files.readString(included, StandardCharsets.UTF_8)).append(System.lineSeparator());
+              && included.getFileName().toString().toLowerCase().endsWith(".yas")) {
+            scripts.add(included.toAbsolutePath().normalize());
+          }
         }
-        source = projectSource.append(source).toString();
       }
+      if (scripts.isEmpty()) return;
+      StringBuilder projectSource = new StringBuilder();
+      for (Path sourceFile : scripts) {
+        projectSource.append(Files.readString(sourceFile, StandardCharsets.UTF_8)).append(System.lineSeparator());
+      }
+      String source = projectSource.toString();
       Pattern moduleStart = Pattern.compile("^\\s*module\\s+([A-Za-z_][A-Za-z0-9_]*)\\b", Pattern.CASE_INSENSITIVE);
       Pattern objectStart = Pattern.compile("^\\s*(?:(?:public|private|protected|static|abstract|final)\\s+)*(?:class|structure|interface)\\s+", Pattern.CASE_INSENSITIVE);
       Pattern functionStart = Pattern.compile("^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(", Pattern.CASE_INSENSITIVE);
