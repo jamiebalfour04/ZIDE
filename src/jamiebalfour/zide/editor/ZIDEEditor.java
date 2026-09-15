@@ -742,7 +742,7 @@ public class ZIDEEditor extends Application {
     normalWindowWidth = width;
     normalWindowHeight = height;
     String maximised = MAIN_PROPERTIES.getProperty("MAXIMISE", MAIN_PROPERTIES.getProperty("MAXIMISED", MAIN_PROPERTIES.getProperty("MAXIMIZED", "false")));
-    stage.setMaximized(Boolean.parseBoolean(maximised));
+    if (!isMacPlatform()) stage.setMaximized(Boolean.parseBoolean(maximised));
   }
 
   private double propertyDouble(String name, double fallback) {
@@ -1183,6 +1183,9 @@ public class ZIDEEditor extends Application {
       if (collaboration != null) leaveCollaboration(collaboration);
     });
     stage.show();
+    if (isMacPlatform() && Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("MAXIMISE", MAIN_PROPERTIES.getProperty("MAXIMISED", "false")))) {
+      Platform.runLater(() -> Platform.runLater(titleBar::toggleMaximise));
+    }
     Platform.runLater(this::installTabHeaderScrolling);
     restoreGitHubSession();
     Platform.runLater(this::restoreEditorLayout);
