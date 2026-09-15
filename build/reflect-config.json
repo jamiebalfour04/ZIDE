@@ -5,6 +5,17 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "jamiebalfour.helpers.MacApplicationMenuJNA",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "jamiebalfour.helpers.MacApplicationMenuJNA$ObjCActionCallback",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.sun.javafx.tk.quantum.QuantumToolkit",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true

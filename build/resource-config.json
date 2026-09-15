@@ -2,7 +2,7 @@
   "resources": {
     "includes": [
       {
-        "pattern": "^(jamiebalfour/balflaf_fx/.*|files/balflaf_fx/.*|files/zide\\.png|files/zide_macos\\.png|zide\\.css)$"
+        "pattern": "^(jamiebalfour/balflaf_fx/.*|files/balflaf_fx/.*|files/zide\\.png|files/zide_macos\\.png|com/sun/jna/darwin-aarch64/libjnidispatch\\.jnilib|zide\\.css)$"
       }
     ]
   }
