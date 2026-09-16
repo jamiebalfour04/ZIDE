@@ -8,9 +8,6 @@
     <!-- Main target -->
     <target name="package_up">
         <copy file="${src.jar}" todir="${dest1.dir}" overwrite="true"/>
-        <exec executable="sh" failonerror="true" dir="${basedir}">
-            <arg value="scripts/package.sh"/>
-        </exec>
     </target>
 
 </project>
