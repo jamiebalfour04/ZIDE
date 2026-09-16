@@ -84,7 +84,9 @@ public class BalfGlassMenuBar extends HBox {
 
   /** Returns whether x lies beyond the outer edges of all menu titles. */
   public boolean isOutsideMenuTitles(double x) {
-    if (getChildren().isEmpty()) return true;
+    if (getChildren().isEmpty()) {
+      return true;
+    }
     Node first = getChildren().getFirst();
     Node last = getChildren().getLast();
     return x < first.getBoundsInParent().getMinX()
@@ -275,6 +277,14 @@ public class BalfGlassMenuBar extends HBox {
         if (!row.isDisabled()) showSubmenu(row, submenu);
         event.consume();
       });
+      box.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
+        if (activeSubmenu == submenu.popup
+                && !row.contains(row.screenToLocal(event.getScreenX(), event.getScreenY()))) {
+          activeSubmenu.hide();
+          activeSubmenu = null;
+          removeSubmenuDismissFilters();
+        }
+      });
       box.getChildren().add(row);
       return new GlassSubmenu(row, submenu);
     }
@@ -396,9 +406,13 @@ public class BalfGlassMenuBar extends HBox {
 
     /** Wraps existing menu rows in a styled group while preserving their actions. */
     public Node groupItems(List<? extends Node> items, String styleClass) {
-      if (items == null || items.isEmpty()) return null;
+      if (items == null || items.isEmpty()) {
+        return null;
+      }
       int insertionIndex = box.getChildren().indexOf(items.getFirst());
-      if (insertionIndex < 0 || !box.getChildren().containsAll(items)) return null;
+      if (insertionIndex < 0 || !box.getChildren().containsAll(items)) {
+        return null;
+      }
       VBox group = new VBox(1);
       group.getStyleClass().add(styleClass);
       group.setPadding(new Insets(2));

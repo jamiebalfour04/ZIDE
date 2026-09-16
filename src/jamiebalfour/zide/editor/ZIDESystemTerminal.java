@@ -110,7 +110,9 @@ final class ZIDESystemTerminal extends BorderPane {
   private static Font loadTerminalFont() {
     try (var stream = ZIDESystemTerminal.class.getResourceAsStream("/files/JetBrainsMono-Medium.ttf")) {
       Font bundled = stream == null ? null : Font.loadFont(stream, 12);
-      if (bundled != null) return bundled;
+      if (bundled != null) {
+        return bundled;
+      }
     } catch (IOException ignored) { }
     return Font.font("Monospaced", FontWeight.MEDIUM, 12);
   }
@@ -215,7 +217,9 @@ final class ZIDESystemTerminal extends BorderPane {
           char[] buffer = new char[512];
           int count;
           while ((count = reader.read(buffer)) >= 0) {
-            if (count == 0) continue;
+            if (count == 0) {
+              continue;
+            }
             String output = new String(buffer, 0, count);
             Platform.runLater(() -> insertProcessOutput(output));
           }
@@ -372,7 +376,9 @@ final class ZIDESystemTerminal extends BorderPane {
   }
 
   private Path normaliseDirectory(Path path) {
-    if (path != null && Files.isDirectory(path)) return path.toAbsolutePath().normalize();
+    if (path != null && Files.isDirectory(path)) {
+      return path.toAbsolutePath().normalize();
+    }
     return Path.of(System.getProperty("user.home")).toAbsolutePath().normalize();
   }
 

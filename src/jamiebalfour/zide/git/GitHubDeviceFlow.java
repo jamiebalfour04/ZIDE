@@ -30,7 +30,9 @@ public final class GitHubDeviceFlow {
   }
 
   public DeviceCode requestCode() throws IOException, InterruptedException {
-    if (clientId.isEmpty()) throw new IOException("ZIDE's GitHub client ID has not been configured.");
+    if (clientId.isEmpty()) {
+      throw new IOException("ZIDE's GitHub client ID has not been configured.");
+    }
     String body = "client_id=" + encode(clientId) + "&scope=" + encode("repo read:user user:email");
     ZPEMap json = post(DEVICE_CODE, body);
     return new DeviceCode(value(json, "device_code"), value(json, "user_code"),
@@ -50,11 +52,17 @@ public final class GitHubDeviceFlow {
                   + "&grant_type=" + encode("urn:ietf:params:oauth:grant-type:device_code");
           ZPEMap json = post(ACCESS_TOKEN, body);
           String token = optionalValue(json, "access_token");
-          if (token != null && !token.isBlank()) return tokenFrom(json);
+          if (token != null && !token.isBlank()) {
+            return tokenFrom(json);
+          }
           String error = optionalValue(json, "error");
-          if ("authorization_pending".equals(error)) continue;
+          if ("authorization_pending".equals(error)) {
+            continue;
+          }
           if ("slow_down".equals(error)) { interval += 5; continue; }
-          if (error != null) throw new IOException(optionalValue(json, "error_description"));
+          if (error != null) {
+            throw new IOException(optionalValue(json, "error_description"));
+          }
         } catch (IOException | InterruptedException exception) {
           if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
           throw new CompletionException(exception);
@@ -69,7 +77,9 @@ public final class GitHubDeviceFlow {
             + "&refresh_token=" + encode(refreshToken);
     ZPEMap json = post(ACCESS_TOKEN, body);
     String error = optionalValue(json, "error");
-    if (error != null) throw new IOException(optionalValue(json, "error_description"));
+    if (error != null) {
+      throw new IOException(optionalValue(json, "error_description"));
+    }
     return tokenFrom(json);
   }
 
@@ -98,7 +108,9 @@ public final class GitHubDeviceFlow {
 
   private static String value(ZPEMap map, String key) throws IOException {
     String value = optionalValue(map, key);
-    if (value == null || value.isBlank()) throw new IOException("GitHub did not return " + key + ".");
+    if (value == null || value.isBlank()) {
+      throw new IOException("GitHub did not return " + key + ".");
+    }
     return value;
   }
 

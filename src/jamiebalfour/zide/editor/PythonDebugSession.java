@@ -47,7 +47,9 @@ final class PythonDebugSession implements AutoCloseable {
 
   int port() { return server.getLocalPort(); }
   synchronized boolean resume(boolean step) {
-    if (!paused || commands == null || closed) return false;
+    if (!paused || commands == null || closed) {
+      return false;
+    }
     paused = false;
     commands.println(step ? "next" : "continue");
     return true;

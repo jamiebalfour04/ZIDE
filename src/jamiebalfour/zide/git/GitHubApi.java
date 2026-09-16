@@ -48,7 +48,9 @@ public final class GitHubApi {
       ZPEMap result = (ZPEMap) new ZenithJSONParser().jsonDecode(response.body(), false);
       String cloneUrl = Objects.toString(result.get("clone_url"), "");
       String htmlUrl = Objects.toString(result.get("html_url"), "");
-      if (cloneUrl.isBlank() || htmlUrl.isBlank()) throw new IOException("GitHub omitted the repository URLs.");
+      if (cloneUrl.isBlank() || htmlUrl.isBlank()) {
+        throw new IOException("GitHub omitted the repository URLs.");
+      }
       return new Repository(cloneUrl, htmlUrl);
     } catch (Exception exception) {
       throw new IOException("GitHub created the repository but returned an unreadable response.", exception);

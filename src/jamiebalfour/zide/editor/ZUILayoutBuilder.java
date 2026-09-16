@@ -175,16 +175,22 @@ public final class ZUILayoutBuilder {
   }
 
   private TextInputControl focusedTextInput() {
-    if (root.getScene() == null) return null;
+    if (root.getScene() == null) {
+      return null;
+    }
     Node focus = root.getScene().getFocusOwner();
     return focus instanceof TextInputControl ? (TextInputControl) focus : null;
   }
 
   private boolean isFocusInsideCanvas() {
-    if (root.getScene() == null) return false;
+    if (root.getScene() == null) {
+      return false;
+    }
     Node focus = root.getScene().getFocusOwner();
     while (focus != null) {
-      if (focus == canvas) return true;
+      if (focus == canvas) {
+        return true;
+      }
       focus = focus.getParent();
     }
     return false;
@@ -424,7 +430,9 @@ public final class ZUILayoutBuilder {
       if (manifest != null && Files.isRegularFile(manifest)) {
         for (String manifestLine : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
           String trimmed = manifestLine.trim();
-          if (!trimmed.matches("(?i)^includes?\\s+.+")) continue;
+          if (!trimmed.matches("(?i)^includes?\\s+.+")) {
+            continue;
+          }
           String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
           if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
           Path included = manifest.getParent().resolve(value).normalize();
@@ -452,7 +460,9 @@ public final class ZUILayoutBuilder {
         String line = rawLine;
         if (inBlockComment) {
           int end = line.indexOf("*/");
-          if (end < 0) continue;
+          if (end < 0) {
+            continue;
+          }
           line = line.substring(end + 2);
           inBlockComment = false;
         }
@@ -505,7 +515,9 @@ public final class ZUILayoutBuilder {
 
   private Path companionScript() {
     String name = file.getFileName().toString();
-    if (!name.toLowerCase().endsWith(".ui.yas")) return null;
+    if (!name.toLowerCase().endsWith(".ui.yas")) {
+      return null;
+    }
     return file.resolveSibling(name.substring(0, name.length() - 7) + ".yas");
   }
 
@@ -574,7 +586,9 @@ public final class ZUILayoutBuilder {
     try {
       while (matcher.find()) {
         Kind kind = kindForFactory(matcher.group(2));
-        if (kind == null) continue;
+        if (kind == null) {
+          continue;
+        }
         addItem(kind);
         Item item = items.get(items.size() - 1);
         item.name = matcher.group(1);
@@ -588,7 +602,9 @@ public final class ZUILayoutBuilder {
       Matcher binding = bindingPattern.matcher(source);
       while (binding.find()) {
         Item item = items.stream().filter(candidate -> candidate.name.equals(binding.group(1))).findFirst().orElse(null);
-        if (item == null) continue;
+        if (item == null) {
+          continue;
+        }
         item.event = binding.group(2);
         String reference = "&" + binding.group(3);
         item.handler = handlers.stream().filter(option -> Objects.equals(option.reference, reference)).findFirst().orElse(null);
@@ -608,24 +624,50 @@ public final class ZUILayoutBuilder {
   }
 
   private static Kind kindForFactory(String factory) {
-    if (factory.contains("->label(")) return Kind.LABEL;
-    if (factory.contains("->button(")) return Kind.BUTTON;
-    if (factory.contains("->image(")) return Kind.IMAGE;
-    if (factory.contains("->textField(")) return Kind.TEXT_FIELD;
-    if (factory.contains("->textArea(")) return Kind.TEXT_AREA;
-    if (factory.contains("->checkbox(")) return Kind.CHECKBOX;
-    if (factory.contains("->listView(")) return Kind.LIST;
-    if (factory.contains("->toggle(")) return Kind.TOGGLE;
-    if (factory.contains("->tabContainer(")) return Kind.TABS;
-    if (factory.contains("Chart::Type.pie")) return Kind.PIE_CHART;
-    if (factory.contains("Chart::Type.bar")) return Kind.BAR_CHART;
+    if (factory.contains("->label(")) {
+      return Kind.LABEL;
+    }
+    if (factory.contains("->button(")) {
+      return Kind.BUTTON;
+    }
+    if (factory.contains("->image(")) {
+      return Kind.IMAGE;
+    }
+    if (factory.contains("->textField(")) {
+      return Kind.TEXT_FIELD;
+    }
+    if (factory.contains("->textArea(")) {
+      return Kind.TEXT_AREA;
+    }
+    if (factory.contains("->checkbox(")) {
+      return Kind.CHECKBOX;
+    }
+    if (factory.contains("->listView(")) {
+      return Kind.LIST;
+    }
+    if (factory.contains("->toggle(")) {
+      return Kind.TOGGLE;
+    }
+    if (factory.contains("->tabContainer(")) {
+      return Kind.TABS;
+    }
+    if (factory.contains("Chart::Type.pie")) {
+      return Kind.PIE_CHART;
+    }
+    if (factory.contains("Chart::Type.bar")) {
+      return Kind.BAR_CHART;
+    }
     return null;
   }
 
   private static String textForFactory(Kind kind, String factory) {
-    if (kind != Kind.LABEL && kind != Kind.BUTTON && kind != Kind.IMAGE && kind != Kind.CHECKBOX) return kind.title;
+    if (kind != Kind.LABEL && kind != Kind.BUTTON && kind != Kind.IMAGE && kind != Kind.CHECKBOX) {
+      return kind.title;
+    }
     Matcher quoted = Pattern.compile("\\(\\\"((?:\\\\.|[^\\\"])*)\\\"").matcher(factory);
-    if (!quoted.find()) return kind.title;
+    if (!quoted.find()) {
+      return kind.title;
+    }
     return quoted.group(1).replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\");
   }
 

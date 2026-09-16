@@ -136,7 +136,9 @@ final class ZIDESettingsPanel extends HBox {
   }
 
   boolean hasValidCollaborationSettings() {
-    if (getCollaborationServer().isEmpty() || getCollaborationName().isEmpty()) return false;
+    if (getCollaborationServer().isEmpty() || getCollaborationName().isEmpty()) {
+      return false;
+    }
     try {
       int port = Integer.parseInt(getCollaborationPort());
       return port >= 1 && port <= 65535;

@@ -247,7 +247,9 @@ public class EditorTab extends Tab {
         while (matcher.find()) {
           if ((forwards && matcher.start() >= caret) || (!forwards && matcher.start() < caret)) {
             index = matcher.start(); end = matcher.end();
-            if (!forwards) continue;
+            if (!forwards) {
+              continue;
+            }
             break;
           }
         }
@@ -424,9 +426,13 @@ public class EditorTab extends Tab {
   /** Returns information only when the pointer is actually over a rendered character. */
   private HoverTarget hoverTargetAt(double screenX, double screenY) {
     javafx.geometry.Point2D local = editor.getEditor().screenToLocal(screenX, screenY);
-    if (!editor.getEditor().getBoundsInLocal().contains(local)) return null;
+    if (!editor.getEditor().getBoundsInLocal().contains(local)) {
+      return null;
+    }
     String source = editor.getText();
-    if (source == null || source.isEmpty()) return null;
+    if (source == null || source.isEmpty()) {
+      return null;
+    }
     int offset = Math.min(editor.getEditor().hit(local.getX(), local.getY()).getInsertionIndex(), source.length() - 1);
     if (!characterContainsScreenPoint(offset, screenX, screenY) &&
             (offset == 0 || !characterContainsScreenPoint(offset - 1, screenX, screenY))) return null;
@@ -446,7 +452,9 @@ public class EditorTab extends Tab {
   }
 
   private boolean characterContainsScreenPoint(int offset, double screenX, double screenY) {
-    if (offset < 0 || offset >= editor.getEditor().getLength()) return false;
+    if (offset < 0 || offset >= editor.getEditor().getLength()) {
+      return false;
+    }
     return editor.getEditor().getCharacterBoundsOnScreen(offset, offset + 1)
             .map(bounds -> bounds.contains(screenX, screenY)).orElse(false);
   }
@@ -517,10 +525,14 @@ public class EditorTab extends Tab {
   }
 
   private static String tokenAt(String text, int offset) {
-    if (text == null || text.isEmpty()) return "";
+    if (text == null || text.isEmpty()) {
+      return "";
+    }
     int position = Math.max(0, Math.min(offset, text.length() - 1));
     if (!isTokenCharacter(text.charAt(position)) && position > 0) position--;
-    if (!isTokenCharacter(text.charAt(position))) return "";
+    if (!isTokenCharacter(text.charAt(position))) {
+      return "";
+    }
     int start = position;
     int end = position + 1;
     while (start > 0 && isTokenCharacter(text.charAt(start - 1))) start--;
@@ -632,7 +644,9 @@ public class EditorTab extends Tab {
   }
 
   private static String withoutDiagnosticStyle(String style) {
-    if (style == null) return "";
+    if (style == null) {
+      return "";
+    }
     return style.replaceAll("\\s*-rtfx-underline-(?:color|width|wave-radius)\\s*:[^;]+;?", "");
   }
 

@@ -333,7 +333,9 @@ public final class ZIDELanguageBuilder {
   }
 
   private boolean handleRuleDrop(String value, int destination) {
-    if (value == null) return false;
+    if (value == null) {
+      return false;
+    }
     try {
       if (value.startsWith(TEMPLATE_DRAG)) {
         addTemplate(Integer.parseInt(value.substring(TEMPLATE_DRAG.length())), destination);
@@ -341,7 +343,9 @@ public final class ZIDELanguageBuilder {
       }
       if (value.startsWith(RULE_DRAG)) {
         int source = Integer.parseInt(value.substring(RULE_DRAG.length()));
-        if (source < 0 || source >= rules.size()) return false;
+        if (source < 0 || source >= rules.size()) {
+          return false;
+        }
         Rule rule = rules.remove(source);
         if (source < destination) destination--;
         rules.add(Math.max(0, Math.min(destination, rules.size())), rule);
@@ -448,7 +452,9 @@ public final class ZIDELanguageBuilder {
   }
 
   private static String behaviourName(String action) {
-    if (action == null) return "";
+    if (action == null) {
+      return "";
+    }
     return switch (action) {
       case "ignore" -> "Ignore / comment";
       case "function" -> "Define a function";
@@ -506,14 +512,20 @@ public final class ZIDELanguageBuilder {
 
   private void load(Path source) throws Exception {
     Object decoded = new ZenithJSONParser().jsonDecode(Files.readString(source), false);
-    if (!(decoded instanceof ZPEMap rootMap)) throw new IllegalArgumentException("Definition must be a JSON object.");
+    if (!(decoded instanceof ZPEMap rootMap)) {
+      throw new IllegalArgumentException("Definition must be a JSON object.");
+    }
     Object name = rootMap.get("name");
     Object ruleValue = rootMap.get("rules");
-    if (name == null || !(ruleValue instanceof ZPEList list)) throw new IllegalArgumentException("Definition needs name and rules.");
+    if (name == null || !(ruleValue instanceof ZPEList list)) {
+      throw new IllegalArgumentException("Definition needs name and rules.");
+    }
     languageName.setText(decode(name.toString()));
     rules.clear();
     for (Object value : list) {
-      if (!(value instanceof ZPEMap map)) continue;
+      if (!(value instanceof ZPEMap map)) {
+        continue;
+      }
       String patternText = value(map, "pattern");
       String actionName = value(map, "action");
       String syntaxText = value(map, "syntax");
@@ -535,7 +547,9 @@ public final class ZIDELanguageBuilder {
       FileChooser chooser = chooser(training ? "Save definition before training" : "Save ZenLang definition");
       chooser.setInitialFileName(languageName.getText() + ".zenlang");
       File chosen = chooser.showSaveDialog(owner);
-      if (chosen == null) return null;
+      if (chosen == null) {
+        return null;
+      }
       file = ensureExtension(chosen.toPath());
     }
     try {
@@ -552,11 +566,19 @@ public final class ZIDELanguageBuilder {
     if (!languageName.getText().matches("[A-Za-z][A-Za-z0-9_-]*")) {
       return "Language name must begin with a letter and contain only letters, numbers, '-' or '_'.";
     }
-    if (rules.isEmpty()) return "Add at least one syntax rule.";
+    if (rules.isEmpty()) {
+      return "Add at least one syntax rule.";
+    }
     for (Rule rule : rules) {
-      if (rule.name == null || rule.name.isBlank()) return "Every rule needs a name.";
-      if (rule.pattern == null || rule.pattern.isBlank()) return "Rule '" + rule.name + "' needs a pattern.";
-      if (!ACTION_PARAMETERS.containsKey(rule.action)) return "Rule '" + rule.name + "' needs an action.";
+      if (rule.name == null || rule.name.isBlank()) {
+        return "Every rule needs a name.";
+      }
+      if (rule.pattern == null || rule.pattern.isBlank()) {
+        return "Rule '" + rule.name + "' needs a pattern.";
+      }
+      if (!ACTION_PARAMETERS.containsKey(rule.action)) {
+        return "Rule '" + rule.name + "' needs an action.";
+      }
     }
     return null;
   }
@@ -611,7 +633,9 @@ public final class ZIDELanguageBuilder {
   }
 
   private static String parameters(Object value) {
-    if (!(value instanceof ZPEList list)) return "";
+    if (!(value instanceof ZPEList list)) {
+      return "";
+    }
     List<String> names = new ArrayList<>();
     for (Object item : list) names.add(decode(item.toString()));
     return String.join(", ", names);
@@ -619,13 +643,17 @@ public final class ZIDELanguageBuilder {
 
   private static List<String> parameterNames(String value) {
     List<String> names = new ArrayList<>();
-    if (value == null) return names;
+    if (value == null) {
+      return names;
+    }
     for (String name : value.split(",")) if (!name.trim().isEmpty()) names.add(name.trim());
     return names;
   }
 
   private static String escape(String value) {
-    if (value == null) return "";
+    if (value == null) {
+      return "";
+    }
     return value.replace("\\", "\\\\").replace("\"", "\\\"")
             .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
   }
@@ -643,7 +671,9 @@ public final class ZIDELanguageBuilder {
 
   private static String describe(String pattern, String action) {
     for (RuleTemplate template : RULE_TEMPLATES) {
-      if (template.pattern.equals(pattern) && template.action.equals(action)) return template.description;
+      if (template.pattern.equals(pattern) && template.action.equals(action)) {
+        return template.description;
+      }
     }
     return "Custom pattern. Open Advanced pattern to edit it.";
   }
@@ -654,12 +684,16 @@ public final class ZIDELanguageBuilder {
   }
 
   private static String friendlySyntaxToPattern(String syntax) {
-    if (syntax == null || syntax.isBlank()) throw new IllegalArgumentException("Enter the syntax for this rule.");
+    if (syntax == null || syntax.isBlank()) {
+      throw new IllegalArgumentException("Enter the syntax for this rule.");
+    }
     StringBuilder result = new StringBuilder();
     for (int index = 0; index < syntax.length();) {
       if (syntax.charAt(index) == '$' && index + 1 < syntax.length() && syntax.charAt(index + 1) == '{') {
         int end = syntax.indexOf('}', index + 2);
-        if (end < 0) throw new IllegalArgumentException("A syntax value is missing its closing }.");
+        if (end < 0) {
+          throw new IllegalArgumentException("A syntax value is missing its closing }.");
+        }
         String[] value = syntax.substring(index + 2, end).trim().split(":", 2);
         if (value.length != 2 || !value[0].matches("[A-Za-z_][A-Za-z0-9_]*")) {
           throw new IllegalArgumentException("Use values in the form ${name:type}.");

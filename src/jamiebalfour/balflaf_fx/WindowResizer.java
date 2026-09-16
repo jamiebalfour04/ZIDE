@@ -142,7 +142,9 @@ final class WindowResizer {
 
   private ResizeMode getMode(Node root, MouseEvent e) {
     javafx.scene.Scene scene = root.getScene();
-    if (scene == null) return ResizeMode.NONE;
+    if (scene == null) {
+      return ResizeMode.NONE;
+    }
     double x = e.getSceneX();
     double y = e.getSceneY();
     double w = scene.getWidth();
@@ -153,14 +155,30 @@ final class WindowResizer {
     boolean top = y <= RESIZE_MARGIN;
     boolean bottom = y >= h - RESIZE_MARGIN;
 
-    if (top && left) return ResizeMode.NW;
-    if (top && right) return ResizeMode.NE;
-    if (bottom && left) return ResizeMode.SW;
-    if (bottom && right) return ResizeMode.SE;
-    if (top) return ResizeMode.N;
-    if (bottom) return ResizeMode.S;
-    if (left) return ResizeMode.W;
-    if (right) return ResizeMode.E;
+    if (top && left) {
+      return ResizeMode.NW;
+    }
+    if (top && right) {
+      return ResizeMode.NE;
+    }
+    if (bottom && left) {
+      return ResizeMode.SW;
+    }
+    if (bottom && right) {
+      return ResizeMode.SE;
+    }
+    if (top) {
+      return ResizeMode.N;
+    }
+    if (bottom) {
+      return ResizeMode.S;
+    }
+    if (left) {
+      return ResizeMode.W;
+    }
+    if (right) {
+      return ResizeMode.E;
+    }
 
     return ResizeMode.NONE;
   }

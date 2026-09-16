@@ -418,7 +418,9 @@ public final class ZIDECollaborationServer implements AutoCloseable {
   }
 
   private static String normalizedCode(Object value) {
-    if (!(value instanceof String)) return null;
+    if (!(value instanceof String)) {
+      return null;
+    }
     String code = ((String)value).trim().toUpperCase(java.util.Locale.ROOT);
     return code.matches("[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}") ? code : null;
   }

@@ -274,8 +274,12 @@ final class ZIDEUnfoldPanel extends VBox {
       if (windows) command.addAll(List.of("cmd.exe", "/c"));
       command.addAll(List.of("zpeedy", "--iast", input.toString(), output.toString()));
       process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
-      if (!process.waitFor(20, TimeUnit.SECONDS)) throw new IOException("Zpeedy compilation timed out.");
-      if (process.exitValue() != 0) throw new IOException(Files.readString(log));
+      if (!process.waitFor(20, TimeUnit.SECONDS)) {
+        throw new IOException("Zpeedy compilation timed out.");
+      }
+      if (process.exitValue() != 0) {
+        throw new IOException(Files.readString(log));
+      }
       return ZPEKit.unfoldStructured(IAST.fromBytes(Files.readAllBytes(output)));
     } finally {
       if (process != null && process.isAlive()) { process.destroyForcibly(); process.waitFor(); }

@@ -36,18 +36,30 @@ final class ZIDERuntimeManager {
   }
 
   String downloadUrl(RuntimeKind kind) {
-    if (kind == RuntimeKind.ZPE) return DOWNLOAD_ROOT + "zpe";
-    if (HelperFunctions.isMac()) return DOWNLOAD_ROOT + "zpe-native-aarch64";
-    if (HelperFunctions.isWindows()) return DOWNLOAD_ROOT + "zpe-native-win-x64";
-    if (HelperFunctions.isUnix()) return DOWNLOAD_ROOT + "zpe-native-ubuntu-linux-x64";
+    if (kind == RuntimeKind.ZPE) {
+      return DOWNLOAD_ROOT + "zpe";
+    }
+    if (HelperFunctions.isMac()) {
+      return DOWNLOAD_ROOT + "zpe-native-aarch64";
+    }
+    if (HelperFunctions.isWindows()) {
+      return DOWNLOAD_ROOT + "zpe-native-win-x64";
+    }
+    if (HelperFunctions.isUnix()) {
+      return DOWNLOAD_ROOT + "zpe-native-ubuntu-linux-x64";
+    }
     throw new IllegalStateException("ZPEX is not available for this operating system.");
   }
 
   Launch prepare(RuntimeKind kind, Path source, Path resourceRoot, boolean debug, String extras)
           throws IOException {
-    if (source == null || !Files.isRegularFile(source)) throw new IOException("The YASS source file does not exist.");
+    if (source == null || !Files.isRegularFile(source)) {
+      throw new IOException("The YASS source file does not exist.");
+    }
     Path runtime = path(kind);
-    if (!Files.isRegularFile(runtime)) throw new IOException(kind + " is not installed in ZIDE.");
+    if (!Files.isRegularFile(runtime)) {
+      throw new IOException(kind + " is not installed in ZIDE.");
+    }
 
     ArrayList<String> command = new ArrayList<>();
     if (kind == RuntimeKind.ZPEX) {
@@ -90,7 +102,9 @@ final class ZIDERuntimeManager {
       throw new IOException("The ZenLang definition does not exist.");
     }
     Path runtime = path(RuntimeKind.ZPE);
-    if (!Files.isRegularFile(runtime)) throw new IOException("ZPE is not installed in ZIDE.");
+    if (!Files.isRegularFile(runtime)) {
+      throw new IOException("ZPE is not installed in ZIDE.");
+    }
     ArrayList<String> command = new ArrayList<>();
     command.add(javaCommand());
     if (HelperFunctions.isMac()) command.add("-XstartOnFirstThread");
@@ -113,7 +127,9 @@ final class ZIDERuntimeManager {
       throw new IOException("The test script does not exist.");
     }
     Path runtime = path(RuntimeKind.ZPE);
-    if (!Files.isRegularFile(runtime)) throw new IOException("ZPE is not installed in ZIDE.");
+    if (!Files.isRegularFile(runtime)) {
+      throw new IOException("ZPE is not installed in ZIDE.");
+    }
     ArrayList<String> command = new ArrayList<>();
     command.add(javaCommand());
     if (HelperFunctions.isMac()) command.add("-XstartOnFirstThread");
@@ -128,12 +144,14 @@ final class ZIDERuntimeManager {
     return new Launch(builder, null, "Testing script with the current ZenLang definition.");
   }
 
-  private static String javaCommand() {
+  static String javaCommand() {
     String executable = HelperFunctions.isWindows() ? "java.exe" : "java";
     String javaHome = System.getProperty("java.home", "");
     if (!javaHome.isEmpty()) {
       Path bundled = Path.of(javaHome, "bin", executable);
-      if (Files.isRegularFile(bundled)) return bundled.toString();
+      if (Files.isRegularFile(bundled)) {
+        return bundled.toString();
+      }
     }
     return executable;
   }

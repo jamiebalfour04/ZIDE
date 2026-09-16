@@ -372,11 +372,19 @@ final class ZIDEScratchPadPanel extends VBox {
   }
 
   private int headingAt(int start, int length) {
-    if (length == 0 || start >= notes.getLength()) return 0;
+    if (length == 0 || start >= notes.getLength()) {
+      return 0;
+    }
     String style = notes.getStyleOfChar(start);
-    if (style.contains("22px")) return 1;
-    if (style.contains("18px")) return 2;
-    if (style.contains("16px")) return 3;
+    if (style.contains("22px")) {
+      return 1;
+    }
+    if (style.contains("18px")) {
+      return 2;
+    }
+    if (style.contains("16px")) {
+      return 3;
+    }
     return 0;
   }
 

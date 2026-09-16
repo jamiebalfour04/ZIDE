@@ -161,8 +161,12 @@ final class ZIDEByteCodePanel extends VBox {
       if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) command.addAll(List.of("cmd.exe", "/c"));
       command.addAll(List.of("zpeedy", "--iast", input.toString(), compiled.toString()));
       process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
-      if (!process.waitFor(20, TimeUnit.SECONDS)) throw new IOException("Zpeedy compilation timed out.");
-      if (process.exitValue() != 0) throw new IOException(Files.readString(log));
+      if (!process.waitFor(20, TimeUnit.SECONDS)) {
+        throw new IOException("Zpeedy compilation timed out.");
+      }
+      if (process.exitValue() != 0) {
+        throw new IOException(Files.readString(log));
+      }
       return ZPE.ASTtoString(IAST.fromBytes(Files.readAllBytes(compiled)));
     } finally {
       if (process != null && process.isAlive()) {

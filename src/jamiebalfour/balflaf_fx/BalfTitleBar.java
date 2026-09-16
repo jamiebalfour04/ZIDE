@@ -180,10 +180,16 @@ public class BalfTitleBar extends Region {
   }
 
   private boolean removeDescendant(Node parent, Node target) {
-    if (!(parent instanceof Pane pane)) return false;
-    if (pane.getChildren().remove(target)) return true;
+    if (!(parent instanceof Pane pane)) {
+      return false;
+    }
+    if (pane.getChildren().remove(target)) {
+      return true;
+    }
     for (Node child : pane.getChildren()) {
-      if (removeDescendant(child, target)) return true;
+      if (removeDescendant(child, target)) {
+        return true;
+      }
     }
     return false;
   }
@@ -299,7 +305,9 @@ public class BalfTitleBar extends Region {
   }
 
   private static double clamp(double v, double min, double max) {
-    if (max < min) return min;
+    if (max < min) {
+      return min;
+    }
     return Math.max(min, Math.min(max, v));
   }
 

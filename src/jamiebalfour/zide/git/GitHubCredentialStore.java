@@ -35,9 +35,13 @@ public final class GitHubCredentialStore {
   }
 
   public Optional<GitHubDeviceFlow.Token> load() throws IOException {
-    if (!Files.isRegularFile(file)) return Optional.empty();
+    if (!Files.isRegularFile(file)) {
+      return Optional.empty();
+    }
     String[] values = Files.readString(file, StandardCharsets.UTF_8).split("\\R", -1);
-    if (values.length < 4) return Optional.empty();
+    if (values.length < 4) {
+      return Optional.empty();
+    }
     Instant expiry = values[2].isBlank() ? null : Instant.parse(values[2]);
     return Optional.of(new GitHubDeviceFlow.Token(decode(values[0]), decode(values[1]), expiry,
             decode(values[3])));

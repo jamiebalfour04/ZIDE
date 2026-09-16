@@ -26,7 +26,9 @@ public class ZIDE {
         }
         try {
           int port = Integer.parseInt(args[1]);
-          if (port < 1 || port > 65535) throw new NumberFormatException();
+          if (port < 1 || port > 65535) {
+            throw new NumberFormatException();
+          }
           ZIDECollaborationServer server = new ZIDECollaborationServer(port);
           Runtime.getRuntime().addShutdownHook(new Thread(server::close, "zide-collaboration-shutdown"));
           server.start();

@@ -56,13 +56,17 @@ final class ZIDEMacApplicationMenu {
   }
 
   private static Pointer message(Pointer receiver, String selector, Object... arguments) {
-    if (isNull(receiver)) return null;
+    if (isNull(receiver)) {
+      return null;
+    }
     Object[] invocation = invocation(receiver, selector, arguments);
     return (Pointer) objectiveC("objc_msgSend").invoke(Pointer.class, invocation);
   }
 
   private static long messageLong(Pointer receiver, String selector, Object... arguments) {
-    if (isNull(receiver)) return 0;
+    if (isNull(receiver)) {
+      return 0;
+    }
     return (Long) objectiveC("objc_msgSend").invoke(long.class,
             invocation(receiver, selector, arguments));
   }

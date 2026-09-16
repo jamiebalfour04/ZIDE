@@ -129,7 +129,9 @@ final class ZIDEFilePickerPanel extends VBox {
       return selected != null && selected.isDirectory() ? selected : currentDirectory;
     }
     String name = fileName.getText() == null ? "" : fileName.getText().trim();
-    if (name.isEmpty() || name.contains("/") || name.contains("\\")) return null;
+    if (name.isEmpty() || name.contains("/") || name.contains("\\")) {
+      return null;
+    }
     return new File(currentDirectory, name);
   }
 
@@ -180,12 +182,18 @@ final class ZIDEFilePickerPanel extends VBox {
   private boolean matchesSelectedFilter(File file) {
     FileChooser.ExtensionFilter filter = fileType.getValue();
     if (filter == null && !filters.isEmpty()) filter = filters.get(0);
-    if (filter == null || filter.getExtensions().isEmpty()) return true;
+    if (filter == null || filter.getExtensions().isEmpty()) {
+      return true;
+    }
     String name = file.getName().toLowerCase(java.util.Locale.ROOT);
     for (String pattern : filter.getExtensions()) {
       String value = pattern.toLowerCase(java.util.Locale.ROOT);
-      if ("*".equals(value) || "*.*".equals(value)) return true;
-      if (value.startsWith("*.") && name.endsWith(value.substring(1))) return true;
+      if ("*".equals(value) || "*.*".equals(value)) {
+        return true;
+      }
+      if (value.startsWith("*.") && name.endsWith(value.substring(1))) {
+        return true;
+      }
     }
     return false;
   }

@@ -77,7 +77,9 @@ public final class ZIDECollaborationClient {
     String scheme = hasScheme ? value.substring(0, value.indexOf("://")).toLowerCase(java.util.Locale.ROOT)
             : "http";
     URI supplied = URI.create(hasScheme ? value : scheme + "://" + value);
-    if (supplied.getHost() == null) throw new IllegalArgumentException("Enter a valid collaboration server name.");
+    if (supplied.getHost() == null) {
+      throw new IllegalArgumentException("Enter a valid collaboration server name.");
+    }
     int effectivePort = supplied.getPort() >= 0 ? supplied.getPort() : port;
     String path = supplied.getPath() == null ? "" : supplied.getPath().replaceAll("/+$", "");
     try {
@@ -90,13 +92,17 @@ public final class ZIDECollaborationClient {
 
   public static long revision(Map<String, Object> state) throws IOException {
     Object value = state.get("revision");
-    if (!(value instanceof Number number)) throw new IOException("The collaboration server omitted the revision.");
+    if (!(value instanceof Number number)) {
+      throw new IOException("The collaboration server omitted the revision.");
+    }
     return number.longValue();
   }
 
   public static String string(Map<String, Object> state, String key) throws IOException {
     Object value = state.get(key);
-    if (!(value instanceof String text)) throw new IOException("The collaboration server omitted " + key + ".");
+    if (!(value instanceof String text)) {
+      throw new IOException("The collaboration server omitted " + key + ".");
+    }
     return text;
   }
 
@@ -107,7 +113,9 @@ public final class ZIDECollaborationClient {
 
   public static List<String> participantNames(Map<String, Object> state) {
     Object value = state.get("participantNames");
-    if (!(value instanceof Iterable<?> names)) return List.of();
+    if (!(value instanceof Iterable<?> names)) {
+      return List.of();
+    }
     List<String> result = new ArrayList<>();
     for (Object name : names) if (name instanceof String text && !text.isBlank()) result.add(text);
     return List.copyOf(result);
@@ -123,7 +131,9 @@ public final class ZIDECollaborationClient {
 
   public static List<TextEdit> edits(Map<String, Object> state) throws IOException {
     Object value = state.get("changes");
-    if (!(value instanceof Iterable<?> changes)) return List.of();
+    if (!(value instanceof Iterable<?> changes)) {
+      return List.of();
+    }
     List<TextEdit> result = new ArrayList<>();
     for (Object item : changes) {
       if (!(item instanceof Map<?, ?> change)
