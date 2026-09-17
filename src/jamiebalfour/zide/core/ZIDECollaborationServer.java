@@ -164,6 +164,8 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       case "edit" -> edit(exchange, request);
       case "presence" -> presence(exchange, request);
       case "chat" -> chat(exchange, request);
+      case "poll-create" -> pollCreate(exchange, request);
+      case "poll-vote" -> pollVote(exchange, request);
       case "heartbeat" -> heartbeat(exchange, request);
       case "file-request" -> requestProjectFile(exchange, request);
       case "file-publish" -> publishProjectFile(exchange, request);
@@ -213,6 +215,34 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       if (session.chat.size() > 100) session.chat.remove(0);
       session.participantRevision++;
       session.notifyAll();
+      send(exchange, 200, pollState(session, session.revision));
+    }
+  }
+
+  private void pollCreate(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request); if (session == null) return;
+    String question = string(request, "question", ""); Object raw = request.get("options");
+    if (question.isBlank() || question.length() > 500 || !(raw instanceof List<?> values) || values.size() < 2 || values.size() > 8) {
+      send(exchange, 400, Map.of("error", "A poll needs a question and 2 to 8 options.")); return;
+    }
+    List<String> options = new ArrayList<>(); for (Object value : values) if (value instanceof String text && !text.isBlank() && text.length() <= 200) options.add(text.trim());
+    if (options.size() < 2) { send(exchange, 400, Map.of("error", "A poll needs at least two valid options.")); return; }
+    synchronized (session) {
+      Map<String,Object> item = new LinkedHashMap<>(); String id = tokenHash(string(request,"token",""));
+      item.put("type", "poll"); item.put("name", session.participantNames.getOrDefault(id, "Participant")); item.put("question", question.trim()); item.put("options", options); item.put("votes", new ArrayList<>(java.util.Collections.nCopies(options.size(), 0))); item.put("voters", new LinkedHashMap<String, Integer>()); item.put("time", System.currentTimeMillis());
+      session.chat.add(item); if (session.chat.size() > 100) session.chat.remove(0); session.participantRevision++; session.notifyAll(); send(exchange, 200, pollState(session, session.revision));
+    }
+  }
+
+  private void pollVote(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request); if (session == null) return;
+    int index = request.get("option") instanceof Number number ? number.intValue() : -1; String voter = tokenHash(string(request,"token",""));
+    synchronized (session) {
+      for (Map<String,Object> item : session.chat) if ("poll".equals(item.get("type")) && String.valueOf(item.get("time")).equals(String.valueOf(request.get("poll")))) {
+        @SuppressWarnings("unchecked") Map<String, Integer> voters = (Map<String, Integer>) item.get("voters"); @SuppressWarnings("unchecked") List<Integer> votes = (List<Integer>) item.get("votes");
+        if (index >= 0 && index < votes.size()) { Integer previous = voters.put(voter, index); if (previous != null && previous >= 0 && previous < votes.size()) votes.set(previous, Math.max(0, votes.get(previous) - 1)); votes.set(index, votes.get(index) + 1); session.participantRevision++; session.notifyAll(); }
+        break;
+      }
       send(exchange, 200, pollState(session, session.revision));
     }
   }
@@ -271,7 +301,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     do {
       code = makeCode();
       String token = makeToken();
-      session = new Session(code, document, fileName, language, token, name, projectFiles);
+      session = new Session(code, document, fileName, language, token, name, avatar(request), projectFiles);
       Session existing = sessions.putIfAbsent(code, session);
       if (existing == null) {
         send(exchange, 201, state(session, token));
@@ -314,6 +344,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       String tokenId = tokenHash(token);
       session.participants.put(tokenId, "guest");
       session.participantNames.put(tokenId, name);
+      session.participantAvatars.put(tokenId, avatar(request));
       session.participantRevision++;
       session.lastActivity = System.currentTimeMillis();
       session.notifyAll();
@@ -326,6 +357,12 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     if (!passwordProtected) return true;
     String supplied = string(request, "authHash", "");
     return MessageDigest.isEqual(passwordHash, supplied.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static String avatar(Map<String, Object> request) {
+    Object value = request.get("avatar");
+    if (!(value instanceof String image) || image.length() > 200_000 || !image.startsWith("data:image/")) return "";
+    return image;
   }
 
   private static byte[] sha256(String value) {
@@ -519,6 +556,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       }
       session.participants.remove(tokenHash(token));
       session.participantNames.remove(tokenHash(token));
+      session.participantAvatars.remove(tokenHash(token));
       session.presence.remove(tokenHash(token));
       session.participantRevision++;
       session.lastActivity = System.currentTimeMillis();
@@ -564,6 +602,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     response.put("language", session.language);
     response.put("participants", session.participants.size());
     response.put("participantNames", List.copyOf(session.participantNames.values()));
+    response.put("participantAvatars", List.copyOf(session.participantAvatars.values()));
     response.put("projectFiles", session.projectFiles);
     response.put("projectFileRevision", session.projectFileRevision);
     response.put("cachedProjectFiles", List.copyOf(session.projectFileCache.keySet()));
@@ -708,6 +747,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     final String language;
     final Map<String, String> participants = new HashMap<>();
     final Map<String, String> participantNames = new LinkedHashMap<>();
+    final Map<String, String> participantAvatars = new LinkedHashMap<>();
     final List<String> projectFiles;
     final Map<String, ProjectFile> projectFileCache = new LinkedHashMap<>();
     final Map<String, Long> pendingProjectFiles = new LinkedHashMap<>();
@@ -722,7 +762,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     long lastActivity = System.currentTimeMillis();
     boolean ended;
 
-    Session(String code, String document, String fileName, String language, String hostToken, String hostName, List<String> projectFiles) {
+    Session(String code, String document, String fileName, String language, String hostToken, String hostName, String hostAvatar, List<String> projectFiles) {
       this.code = code;
       this.document = document;
       this.fileName = fileName;
@@ -730,6 +770,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       String tokenId = tokenHash(hostToken);
       participants.put(tokenId, "host");
       participantNames.put(tokenId, hostName);
+      participantAvatars.put(tokenId, hostAvatar);
       this.projectFiles = List.copyOf(projectFiles);
     }
   }
