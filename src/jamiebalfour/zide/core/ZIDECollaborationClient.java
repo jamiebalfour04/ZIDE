@@ -15,6 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
 
 /** HTTP client for a ZIDE collaboration relay. */
 public final class ZIDECollaborationClient {
@@ -50,8 +57,38 @@ public final class ZIDECollaborationClient {
     return request("create", fields);
   }
 
+  public Map<String, Object> create(String name, String document, String fileName, String language, List<String> projectFiles, String avatar)
+          throws IOException, InterruptedException {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("name", name); fields.put("document", document); fields.put("fileName", fileName);
+    fields.put("language", language); fields.put("projectFiles", projectFiles == null ? List.of() : projectFiles);
+    fields.put("avatar", avatar == null ? "" : avatar); fields.put("authHash", passwordHash());
+    return request("create", fields);
+  }
+
   public Map<String, Object> join(String code, String name) throws IOException, InterruptedException {
     return request("join", Map.of("code", code, "name", name, "authHash", passwordHash()));
+  }
+
+  public Map<String, Object> join(String code, String name, String avatar) throws IOException, InterruptedException {
+    return request("join", Map.of("code", code, "name", name, "avatar", avatar == null ? "" : avatar, "authHash", passwordHash()));
+  }
+
+  /** Encodes a configured image as a compact 128x128 JPEG data payload. */
+  public static String avatarData(String path) throws IOException {
+    if (path == null || path.isBlank()) return "";
+    BufferedImage source = ImageIO.read(Path.of(path).toFile());
+    if (source == null) return "";
+    BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
+    double scale = Math.max(128.0 / source.getWidth(), 128.0 / source.getHeight());
+    int w = (int) Math.round(source.getWidth() * scale), h = (int) Math.round(source.getHeight() * scale);
+    java.awt.Graphics2D graphics = image.createGraphics();
+    graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+    graphics.drawImage(source.getScaledInstance(w, h, Image.SCALE_SMOOTH), (128 - w) / 2, (128 - h) / 2, null);
+    graphics.dispose();
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ImageIO.write(image, "jpg", output);
+    return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
   }
 
   private String passwordHash() {
@@ -86,6 +123,16 @@ public final class ZIDECollaborationClient {
   public Map<String, Object> chat(String code, String token, String message)
           throws IOException, InterruptedException {
     return request("chat", Map.of("code", code, "token", token, "message", message));
+  }
+
+  public Map<String, Object> createPoll(String code, String token, String question, List<String> options)
+          throws IOException, InterruptedException {
+    return request("poll-create", Map.of("code", code, "token", token, "question", question, "options", options));
+  }
+
+  public Map<String, Object> votePoll(String code, String token, long poll, int option)
+          throws IOException, InterruptedException {
+    return request("poll-vote", Map.of("code", code, "token", token, "poll", poll, "option", option));
   }
 
   public Map<String, Object> heartbeat(String code, String token)
@@ -177,6 +224,14 @@ public final class ZIDECollaborationClient {
     }
     List<String> result = new ArrayList<>();
     for (Object name : names) if (name instanceof String text && !text.isBlank()) result.add(text);
+    return List.copyOf(result);
+  }
+
+  public static List<String> participantAvatars(Map<String, Object> state) {
+    Object value = state.get("participantAvatars");
+    if (!(value instanceof Iterable<?> entries)) return List.of();
+    List<String> result = new ArrayList<>();
+    for (Object avatar : entries) result.add(avatar instanceof String text ? text : "");
     return List.copyOf(result);
   }
 

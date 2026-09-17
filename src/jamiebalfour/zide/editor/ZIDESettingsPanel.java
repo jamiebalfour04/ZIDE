@@ -9,6 +9,8 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -34,12 +36,13 @@ final class ZIDESettingsPanel extends HBox {
   private final TextField collaborationPort;
   private final TextField collaborationName;
   private final PasswordField collaborationPassword;
+  private final TextField collaborationAvatar;
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
                     String fontName, int fontSizeValue, boolean wrapLines, boolean preferZpex, boolean showInputPromptValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
-                    String collaborationPasswordValue) {
+                    String collaborationPasswordValue, String collaborationAvatarValue) {
     super(18);
 
     ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "ChatGPT", "Collaboration"));
@@ -112,16 +115,25 @@ final class ZIDESettingsPanel extends HBox {
     collaborationName = new TextField(collaborationDisplayName);
     collaborationPassword = new PasswordField();
     collaborationPassword.setText(collaborationPasswordValue);
+    collaborationAvatar = new TextField(collaborationAvatarValue);
+    collaborationAvatar.setPromptText("Optional image path");
     GridPane collaborationFields = fields();
     collaborationServer.setPromptText("Hostname or https:// address");
     collaborationFields.addRow(0, new Label("Server address"), collaborationServer);
     collaborationFields.addRow(1, new Label("Port"), collaborationPort);
     collaborationFields.addRow(2, new Label("Your name"), collaborationName);
     collaborationFields.addRow(3, new Label("Server password"), collaborationPassword);
+    ImageView avatarPreview = new ImageView();
+    avatarPreview.setFitWidth(36); avatarPreview.setFitHeight(36); avatarPreview.setPreserveRatio(true);
+    HBox avatarField = new HBox(8, collaborationAvatar, avatarPreview);
+    HBox.setHgrow(collaborationAvatar, Priority.ALWAYS);
+    collaborationAvatar.textProperty().addListener((observable, oldValue, newValue) -> updateAvatarPreview(avatarPreview, newValue));
+    updateAvatarPreview(avatarPreview, collaborationAvatar.getText());
+    collaborationFields.addRow(4, new Label("Avatar image"), avatarField);
     Label hostedServerNote = new Label("jamiebalfour.scot provides a free hosted collaboration server with limited resources. For larger sessions, use your own server.");
     hostedServerNote.setWrapText(true);
     hostedServerNote.getStyleClass().add("settings-help-text");
-    collaborationFields.add(hostedServerNote, 0, 4, 2, 1);
+    collaborationFields.add(hostedServerNote, 0, 5, 2, 1);
     GridPane.setHgrow(collaborationServer, Priority.ALWAYS);
     GridPane.setHgrow(collaborationPort, Priority.ALWAYS);
     GridPane.setHgrow(collaborationName, Priority.ALWAYS);
@@ -174,6 +186,15 @@ final class ZIDESettingsPanel extends HBox {
   String getCollaborationPort() { return collaborationPort.getText().trim(); }
   String getCollaborationName() { return collaborationName.getText().trim(); }
   String getCollaborationPassword() { return collaborationPassword.getText(); }
+  String getCollaborationAvatar() { return collaborationAvatar.getText().trim(); }
+
+  private static void updateAvatarPreview(ImageView preview, String path) {
+    try {
+      if (path == null || path.isBlank()) { preview.setImage(null); return; }
+      Image image = new Image(java.nio.file.Path.of(path.trim()).toUri().toString(), 128, 128, true, true, true);
+      preview.setImage(image.isError() ? null : image);
+    } catch (Exception ignored) { preview.setImage(null); }
+  }
 
   private static BalfComboBox<String> combo(List<String> choices, boolean darkMode) {
     BalfComboBox<String> result = new BalfComboBox<>(FXCollections.observableArrayList(choices));
