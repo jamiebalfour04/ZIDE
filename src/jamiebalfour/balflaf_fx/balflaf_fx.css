@@ -239,7 +239,7 @@
 
 .balf-combo-box > .arrow-button {
     -fx-background-color: #f1f3f5;
-    -fx-background-insets: 0;
+    -fx-background-insets: 1px 1px 1px 0;
     -fx-background-radius: 0 5px 5px 0;
     -fx-border-color: transparent;
     -fx-border-radius: 0 5px 5px 0;
@@ -281,6 +281,11 @@
     -fx-text-fill: #17354d;
 }
 
+.balf-combo-popup-cell:filled:hover:not(:selected) {
+    -fx-background-color: #c7e2f7;
+    -fx-text-fill: #123b59;
+}
+
 .balf-combo-popup-list:dark {
     -fx-background-color: #20252e;
     -fx-border-color: #4a535f;
@@ -291,6 +296,11 @@
 .balf-combo-popup-cell:dark:filled:selected,
 .balf-combo-popup-cell:dark:filled:selected:focused {
     -fx-background-color: #07566f;
+    -fx-text-fill: #ffffff;
+}
+
+.balf-combo-popup-cell:dark:filled:hover:not(:selected) {
+    -fx-background-color: #164b63;
     -fx-text-fill: #ffffff;
 }
 

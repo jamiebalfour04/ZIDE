@@ -369,6 +369,93 @@
     -fx-background-color: transparent;
 }
 
+/* A lone tab is content, not a tab switcher. Keep its panel flush. */
+.editor-tabs.single-tab .tab-header-area {
+    visibility: hidden;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+}
+
+.editor-tabs.single-tab .tab-content-area {
+    -fx-padding: 0;
+}
+
+.collaboration-chat-scroll,
+.collaboration-chat-scroll > .viewport {
+    -fx-background-color: #ffffff;
+}
+
+.collaboration-chat-messages {
+    -fx-padding: 8px;
+}
+
+.collaboration-chat-row {
+    -fx-max-width: infinity;
+}
+
+.collaboration-chat-bubble {
+    -fx-background-color: #eef1f5;
+    -fx-background-radius: 7px;
+    -fx-padding: 7px 9px;
+}
+
+.collaboration-chat-bubble-self {
+    -fx-background-color: #d8ebff;
+}
+
+.collaboration-chat-bubble-self .collaboration-chat-sender,
+.collaboration-chat-bubble-self .collaboration-chat-body {
+    -fx-text-fill: #145da0;
+}
+
+.collaboration-chat-sender {
+    -fx-font-weight: bold;
+    -fx-text-fill: #4b5563;
+}
+
+.collaboration-chat-body {
+    -fx-text-fill: #252a31;
+}
+
+.app-root.dark .collaboration-chat-scroll,
+.app-root.dark .collaboration-chat-scroll > .viewport,
+.app-root.dark .collaboration-chat-input {
+    -fx-control-inner-background: #20252c;
+    -fx-background-color: #20252c;
+    -fx-text-fill: #e6e9ee;
+    -fx-prompt-text-fill: #8d96a3;
+}
+
+.app-root.dark .collaboration-chat-bubble {
+    -fx-background-color: #2c333d;
+}
+
+.app-root.dark .collaboration-chat-bubble-self {
+    -fx-background-color: #174b7a;
+}
+
+.app-root.dark .collaboration-chat-sender {
+    -fx-text-fill: #b8c2cf;
+}
+
+.app-root.dark .collaboration-chat-bubble-self .collaboration-chat-sender,
+.app-root.dark .collaboration-chat-bubble-self .collaboration-chat-body {
+    -fx-text-fill: #d8ecff;
+}
+
+.app-root.dark .collaboration-chat-body {
+    -fx-text-fill: #e6e9ee;
+}
+
+.editor-tabs .tab.chat-unread {
+    -fx-background-color: #5b237d;
+}
+
+.editor-tabs .tab.chat-unread .tab-label {
+    -fx-text-fill: white;
+}
+
 .editor-tabs .tab-header-area,
 .editor-tabs .tab-header-background {
     -fx-padding: 0;
@@ -2676,6 +2763,7 @@
 .in-window-modal .combo-box > .arrow-button,
 .in-window-modal-panel .combo-box > .arrow-button {
     -fx-background-color: #f3f3f3;
+    -fx-background-insets: 1px 1px 1px 0;
     -fx-border-color: #d0d0d0;
     -fx-border-width: 0 0 0 1px;
     -fx-background-radius: 0 3px 3px 0;
@@ -2684,11 +2772,22 @@
 
 .in-window-modal-dark .combo-box > .arrow-button {
     -fx-background-color: #252526;
+    -fx-background-insets: 1px 1px 1px 0;
     -fx-border-color: #454545;
 }
 
 .in-window-modal-dark .combo-box > .arrow-button > .arrow {
     -fx-background-color: #d6d6d6;
+}
+
+.in-window-modal .combo-box-popup .list-cell:filled:hover:not(:selected) {
+    -fx-background-color: #c7e2f7;
+    -fx-text-fill: #123b59;
+}
+
+.in-window-modal-dark .combo-box-popup .list-cell:filled:hover:not(:selected) {
+    -fx-background-color: #164b63;
+    -fx-text-fill: #ffffff;
 }
 
 .in-window-modal-primary {
@@ -2728,6 +2827,13 @@
 }
 
 .settings-content { -fx-min-height: 300px; }
+.settings-content .settings-help-text {
+    -fx-text-fill: #77818c;
+    -fx-font-size: 12px;
+}
+.in-window-modal-dark .settings-content .settings-help-text {
+    -fx-text-fill: #9aa6b3;
+}
 .settings-content .list-view {
     -fx-background-color: #eef0f3;
     -fx-background-radius: 8px;
