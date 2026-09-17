@@ -8,6 +8,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
@@ -20,18 +22,48 @@ public final class ZIDECollaborationClient {
   private static final TypeReference<Map<String, Object>> RESPONSE_TYPE = new TypeReference<>() { };
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
   private final URI endpoint;
+  private final String password;
 
   public ZIDECollaborationClient(String server, int port) {
+    this(server, port, "");
+  }
+
+  public ZIDECollaborationClient(String server, int port, String password) {
     endpoint = endpoint(server, port);
+    this.password = password == null ? "" : password;
   }
 
   public Map<String, Object> create(String name, String document, String fileName, String language)
           throws IOException, InterruptedException {
-    return request("create", Map.of("name", name, "document", document, "fileName", fileName, "language", language));
+    return request("create", Map.of("name", name, "document", document, "fileName", fileName, "language", language, "authHash", passwordHash()));
+  }
+
+  public Map<String, Object> create(String name, String document, String fileName, String language, List<String> projectFiles)
+          throws IOException, InterruptedException {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("name", name);
+    fields.put("document", document);
+    fields.put("fileName", fileName);
+    fields.put("language", language);
+    fields.put("projectFiles", projectFiles == null ? List.of() : projectFiles);
+    fields.put("authHash", passwordHash());
+    return request("create", fields);
   }
 
   public Map<String, Object> join(String code, String name) throws IOException, InterruptedException {
-    return request("join", Map.of("code", code, "name", name));
+    return request("join", Map.of("code", code, "name", name, "authHash", passwordHash()));
+  }
+
+  private String passwordHash() {
+    if (password.isEmpty()) return "";
+    try {
+      byte[] digest = MessageDigest.getInstance("SHA-256").digest(password.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      StringBuilder result = new StringBuilder(digest.length * 2);
+      for (byte value : digest) result.append(String.format("%02x", value));
+      return result.toString();
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is unavailable", exception);
+    }
   }
 
   public Map<String, Object> poll(String code, String token, long sinceRevision, long sinceParticipantRevision)
@@ -44,6 +76,33 @@ public final class ZIDECollaborationClient {
           throws IOException, InterruptedException {
     return request("edit", Map.of("code", code, "token", token, "baseRevision", baseRevision,
             "start", start, "deleteLength", deleteLength, "insertText", insertText));
+  }
+
+  public Map<String, Object> presence(String code, String token, String file, int line)
+          throws IOException, InterruptedException {
+    return request("presence", Map.of("code", code, "token", token, "file", file, "line", line));
+  }
+
+  public Map<String, Object> chat(String code, String token, String message)
+          throws IOException, InterruptedException {
+    return request("chat", Map.of("code", code, "token", token, "message", message));
+  }
+
+  public Map<String, Object> heartbeat(String code, String token)
+          throws IOException, InterruptedException {
+    return request("heartbeat", Map.of("code", code, "token", token));
+  }
+
+  /** Requests a project-relative file. A pending result means the owner is loading it. */
+  public Map<String, Object> requestProjectFile(String code, String token, String path)
+          throws IOException, InterruptedException {
+    return request("file-request", Map.of("code", code, "token", token, "path", path));
+  }
+
+  /** Publishes a project file into the collaboration server's temporary session cache. */
+  public Map<String, Object> publishProjectFile(String code, String token, String path, String content)
+          throws IOException, InterruptedException {
+    return request("file-publish", Map.of("code", code, "token", token, "path", path, "content", content));
   }
 
   public void leave(String code, String token) throws IOException, InterruptedException {
@@ -121,6 +180,36 @@ public final class ZIDECollaborationClient {
     return List.copyOf(result);
   }
 
+  public static List<Presence> presences(Map<String, Object> state) {
+    Object value = state.get("presence");
+    if (!(value instanceof Iterable<?> entries)) {
+      return List.of();
+    }
+    List<Presence> result = new ArrayList<>();
+    for (Object entry : entries) {
+      if (entry instanceof Map<?, ?> presence
+              && presence.get("name") instanceof String name
+              && presence.get("file") instanceof String file
+              && presence.get("line") instanceof Number line
+              && !name.isBlank() && !file.isBlank() && line.intValue() > 0) {
+        result.add(new Presence(name, file, line.intValue()));
+      }
+    }
+    return List.copyOf(result);
+  }
+
+  public static List<String> projectFileRequests(Map<String, Object> state) {
+    Object value = state.get("projectFileRequests");
+    if (!(value instanceof Iterable<?> paths)) {
+      return List.of();
+    }
+    List<String> result = new ArrayList<>();
+    for (Object path : paths) {
+      if (path instanceof String text && !text.isBlank()) result.add(text);
+    }
+    return List.copyOf(result);
+  }
+
   public static boolean snapshotRequired(Map<String, Object> state) {
     return Boolean.TRUE.equals(state.get("snapshotRequired"));
   }
@@ -149,6 +238,8 @@ public final class ZIDECollaborationClient {
   }
 
   public record TextEdit(long revision, int start, int deleteLength, String insertText) { }
+
+  public record Presence(String name, String file, int line) { }
 
   public static final class CollaborationException extends IOException {
     private final int statusCode;
