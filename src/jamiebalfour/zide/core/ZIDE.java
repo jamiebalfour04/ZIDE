@@ -20,7 +20,7 @@ public class ZIDE {
         printHelp();
       } else if (args[0].equals("-s")) {
         if (args.length < 2) {
-          System.err.println("Missing port number. Usage: zide.jar -s <port>");
+          System.err.println("Missing port number. Usage: zide.jar -s <port> [-max-sessions <count>] [-max-users <count>] [-password <value>]");
           System.exit(2);
           return;
         }
@@ -29,11 +29,31 @@ public class ZIDE {
           if (port < 1 || port > 65535) {
             throw new NumberFormatException();
           }
-          ZIDECollaborationServer server = new ZIDECollaborationServer(port);
+          int maxSessions = 128;
+          int maxUsers = 32;
+          String password = "";
+          for (int index = 2; index < args.length; index += 2) {
+            if (index + 1 >= args.length) {
+              throw new IllegalArgumentException("Usage: zide.jar -s <port> [-max-sessions <count>] [-max-users <count>] [-password <value>]");
+            }
+            if ("-max-sessions".equals(args[index])) {
+              maxSessions = Integer.parseInt(args[index + 1]);
+            } else if ("-max-users".equals(args[index])) {
+              maxUsers = Integer.parseInt(args[index + 1]);
+            } else if ("-password".equals(args[index])) {
+              password = args[index + 1];
+            } else {
+              throw new IllegalArgumentException("Usage: zide.jar -s <port> [-max-sessions <count>] [-max-users <count>] [-password <value>]");
+            }
+          }
+          ZIDECollaborationServer server = new ZIDECollaborationServer(port, maxSessions, maxUsers, password);
           Runtime.getRuntime().addShutdownHook(new Thread(server::close, "zide-collaboration-shutdown"));
           server.start();
         } catch (NumberFormatException exception) {
-          System.err.println("Invalid port number. Usage: zide.jar -s <port>");
+          System.err.println("Invalid server setting. Usage: zide.jar -s <port> [-max-sessions <count>] [-max-users <count>] [-password <value>]");
+          System.exit(2);
+        } catch (IllegalArgumentException exception) {
+          System.err.println(exception.getMessage());
           System.exit(2);
         } catch (Exception exception) {
           System.err.println("Could not start the collaboration server: " + exception.getMessage());
@@ -63,7 +83,7 @@ public class ZIDE {
     System.out.println("ZIDE " + getVersion());
     System.out.println("Usage:");
     System.out.println("  zide.jar                 Start the ZIDE editor");
-    System.out.println("  zide.jar -s <port>       Start the collaboration server");
+    System.out.println("  zide.jar -s <port> [-max-sessions <count>] [-max-users <count>] [-password <value>]  Start the collaboration server (defaults: 128 sessions, 32 users/session)");
     System.out.println("  zide.jar --version       Show the version");
     System.out.println("  zide.jar -h              Show this help");
   }
