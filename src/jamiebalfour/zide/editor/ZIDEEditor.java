@@ -1423,7 +1423,7 @@ public class ZIDEEditor extends Application {
               if (selectedChoice != null && selectedChoice == choice) vote.setSelected(true);
               ProgressBar bar = new ProgressBar(totalVotes == 0 ? 0 : (double) numericCount / totalVotes);
               bar.setMaxWidth(Double.MAX_VALUE); bar.getStyleClass().add("collaboration-poll-progress");
-              vote.setOnAction(event -> COLLABORATION_WORKER.execute(() -> {
+              vote.setOnMouseClicked(event -> COLLABORATION_WORKER.execute(() -> {
                 if (session != null) session.pollVotes.put(((Number) message.get("time")).longValue(), choice);
                 try { session.client.votePoll(session.code, session.token, ((Number) message.get("time")).longValue(), choice); }
                 catch (Exception ignored) { }

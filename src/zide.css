@@ -446,6 +446,13 @@
 .collaboration-poll-card .radio-button:selected .radio {
     -fx-background-color: #14b8a6;
     -fx-border-color: #14b8a6;
+    -fx-background-radius: 1em;
+    -fx-border-radius: 1em;
+}
+
+.collaboration-poll-card .radio-button .radio {
+    -fx-background-radius: 1em;
+    -fx-border-radius: 1em;
 }
 
 .collaboration-poll-card .radio-button:selected .dot {
