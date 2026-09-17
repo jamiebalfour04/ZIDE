@@ -78,6 +78,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -156,6 +157,7 @@ public class ZIDEEditor extends Application {
   private String editorFontFamily = "Menlo";
   private int editorFontSize = 14;
   private boolean preferZpex = true;
+  private boolean showInputPrompt = true;
   Node loadFromOnline;
   Node saveToOnline;
   Node loginToZPEOnlineMenuItem;
@@ -190,6 +192,7 @@ public class ZIDEEditor extends Application {
   private Tab aiAssistDockTab;
   private BalfGlassMenuBar.GlassMenu projectMenu;
   private BalfGlassMenuBar.GlassMenu zpeOnlineMenu;
+  private BalfGlassMenuBar.GlassMenu gitMenu;
   private TextField editorSearchField;
   private boolean darkThemeEnabled;
   private boolean darkIconsApplied;
@@ -207,8 +210,11 @@ public class ZIDEEditor extends Application {
   private Node scriptCompileSeparator;
   private Node scriptTranspileSeparator;
   private Node transpileSubmenuItem;
+  private Node sqarlToYassMenuItem;
+  private Node sqarlToPythonMenuItem;
   private Node runYassProgramMenuItem;
   private Node runYassScriptMenuItem;
+  private Node scratchPadMenuItem;
   private Node toolsMsiSeparator;
   private Node toolsAiSeparator;
   private Node layoutBuilderMenuItem;
@@ -258,6 +264,17 @@ public class ZIDEEditor extends Application {
   private SplitPane mainHorizontalSplit;
   private SplitPane mainVerticalSplit;
   private Node projectExplorerPane;
+  private TabPane leftSidePanels;
+  private VBox collaborationParticipantList;
+  private Tab collaborationTab;
+  private Tab filesTab;
+  private Tab collaborationFilesTab;
+  private Tab collaborationChatTab;
+  private TabPane collaborationSidebar;
+  private TreeView<CollaborativeProjectItem> collaborationProjectTree;
+  private VBox collaborationChatMessages;
+  private ScrollPane collaborationChatScroll;
+  private TextField collaborationChatInput;
   private Node bottomPanelNode;
   private Node statusBarNode;
   private boolean focusModeActive;
@@ -828,7 +845,9 @@ public class ZIDEEditor extends Application {
     if (mainHorizontalSplit != null && mainHorizontalSplit.getWidth() > 0) {
       double[] positions = mainHorizontalSplit.getDividerPositions();
       if (positions.length > 0) {
-        MAIN_PROPERTIES.setProperty("LAYOUT_EXPLORER_WIDTH", Double.toString(positions[0] * mainHorizontalSplit.getWidth()));
+        String widthProperty = mainHorizontalSplit.getItems().contains(collaborationSidebar)
+                ? "LAYOUT_COLLABORATION_SIDEBAR_WIDTH" : "LAYOUT_EXPLORER_WIDTH";
+        MAIN_PROPERTIES.setProperty(widthProperty, Double.toString(positions[0] * mainHorizontalSplit.getWidth()));
       }
     }
     if (focusModeActive) {
@@ -1012,6 +1031,7 @@ public class ZIDEEditor extends Application {
     editorDarkTheme = MAIN_PROPERTIES.getProperty("EDITOR_DARK_THEME", "ZIDE");
     editorFontFamily = MAIN_PROPERTIES.getProperty("EDITOR_FONT_FAMILY", "Menlo");
     preferZpex = Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("PREFER_ZPEX", "true"));
+    showInputPrompt = Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("SHOW_INPUT_PROMPT", "true"));
     try {
       editorFontSize = Math.max(8, Math.min(32, Integer.parseInt(MAIN_PROPERTIES.getProperty("EDITOR_FONT_SIZE", "14"))));
     } catch (NumberFormatException ignored) {
@@ -1068,7 +1088,98 @@ public class ZIDEEditor extends Application {
     rememberProjectRoot(currentProjectRoot);
     updateProjectMenuVisibility();
     startProjectDirectoryWatcher(projectDir);
-    Node leftPane = projectTree;
+    leftSidePanels = new TabPane();
+    leftSidePanels.getStyleClass().add("editor-tabs");
+    leftSidePanels.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+    filesTab = new Tab("Files", projectTree);
+    filesTab.setClosable(false);
+    collaborationParticipantList = new VBox(6);
+    collaborationParticipantList.setPadding(new Insets(10));
+    collaborationParticipantList.getStyleClass().add("collaboration-participants");
+    collaborationTab = new Tab("Users", new ScrollPane(collaborationParticipantList));
+    collaborationTab.setClosable(true);
+    collaborationProjectTree = new TreeView<>(new TreeItem<>(new CollaborativeProjectItem("Project", null)));
+    collaborationProjectTree.getStyleClass().add("project-tree");
+    collaborationProjectTree.setShowRoot(true);
+    collaborationProjectTree.setCellFactory(tree -> new TreeCell<>() {
+      @Override
+      protected void updateItem(CollaborativeProjectItem item, boolean empty) {
+        super.updateItem(item, empty);
+        if (empty || item == null) {
+          setText(null);
+          setGraphic(null);
+          return;
+        }
+        if (item.relativePath() == null) {
+          setText(item.name());
+          setGraphic(null);
+          return;
+        }
+        Label fileName = new Label(item.name());
+        fileName.getStyleClass().add("project-file-name");
+        HBox fileContents = new HBox(4, projectFileIcon(new File(item.name())), fileName);
+        fileContents.setAlignment(Pos.CENTER_LEFT);
+        fileContents.setTranslateX(-13);
+        fileContents.setMouseTransparent(true);
+        setText(null);
+        setGraphic(fileContents);
+      }
+    });
+    collaborationProjectTree.setOnMouseClicked(event -> {
+      if (event.getClickCount() != 2) return;
+      TreeItem<CollaborativeProjectItem> selected = collaborationProjectTree.getSelectionModel().getSelectedItem();
+      if (selected == null || selected.getValue().relativePath() == null) return;
+      ActiveCollaboration session = activeCollaboration;
+      if (session == null) return;
+      String relativePath = selected.getValue().relativePath();
+      if (session.isOwner && session.projectRoot != null) {
+        try {
+          Path localFile = session.projectRoot.resolve(relativePath).normalize();
+          if (localFile.startsWith(session.projectRoot) && Files.isRegularFile(localFile)) {
+            openTab(localFile.getFileName().toString(), localFile.toString());
+          }
+        } catch (Exception exception) {
+          statusLabel.setText("Could not open project file: " + relativePath);
+        }
+      } else {
+        requestCollaborativeProjectFile(session, relativePath);
+      }
+    });
+    collaborationFilesTab = new Tab("Files", collaborationProjectTree);
+    collaborationFilesTab.setClosable(false);
+    collaborationChatMessages = new VBox(8);
+    collaborationChatMessages.getStyleClass().add("collaboration-chat-messages");
+    collaborationChatScroll = new ScrollPane(collaborationChatMessages);
+    collaborationChatScroll.getStyleClass().add("collaboration-chat-scroll");
+    collaborationChatScroll.setFitToWidth(true);
+    collaborationChatScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    collaborationChatInput = new TextField();
+    collaborationChatInput.getStyleClass().add("collaboration-chat-input");
+    collaborationChatInput.setPromptText("Message");
+    Button sendChat = new Button("Send");
+    sendChat.setOnAction(event -> sendCollaborationChat());
+    collaborationChatInput.setOnAction(event -> sendCollaborationChat());
+    HBox chatComposer = new HBox(6, collaborationChatInput, sendChat);
+    HBox.setHgrow(collaborationChatInput, Priority.ALWAYS);
+    VBox chatContent = new VBox(8, collaborationChatScroll, chatComposer);
+    VBox.setVgrow(collaborationChatScroll, Priority.ALWAYS);
+    collaborationChatTab = new Tab("Chat", chatContent);
+    collaborationChatTab.setClosable(true);
+    collaborationChatTab.setOnSelectionChanged(event -> {
+      if (collaborationChatTab.isSelected()) collaborationChatTab.getStyleClass().remove("chat-unread");
+    });
+    leftSidePanels.getTabs().add(filesTab);
+    leftSidePanels.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) change -> updateTabHeaderVisibility(leftSidePanels));
+    updateTabHeaderVisibility(leftSidePanels);
+    collaborationSidebar = new TabPane();
+    collaborationSidebar.getStyleClass().add("editor-tabs");
+    collaborationSidebar.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+    collaborationSidebar.setMinWidth(260);
+    collaborationSidebar.setPrefWidth(400);
+    collaborationSidebar.getTabs().addAll(collaborationFilesTab, collaborationTab, collaborationChatTab);
+    collaborationSidebar.setVisible(false);
+    collaborationSidebar.setManaged(false);
+    Node leftPane = leftSidePanels;
     projectExplorerPane = leftPane;
     //leftPane.setMinWidth(260);
 
@@ -1243,6 +1354,64 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  private void sendCollaborationChat() {
+    ActiveCollaboration session = activeCollaboration;
+    if (session == null || collaborationChatInput == null) return;
+    String message = collaborationChatInput.getText().trim();
+    if (message.isEmpty()) return;
+    collaborationChatInput.clear();
+    COLLABORATION_WORKER.execute(() -> {
+      try { session.client.chat(session.code, session.token, message); }
+      catch (Exception exception) { Platform.runLater(() -> statusLabel.setText("Chat update failed: " + safeMessage(exception))); }
+    });
+  }
+
+  private void renderCollaborationChat(Map<String, Object> state) {
+    if (collaborationChatMessages == null) return;
+    Object value = state.get("chat");
+    if (!(value instanceof Iterable<?> messages)) return;
+    List<Node> rows = new ArrayList<>();
+    int messageCount = 0;
+    ActiveCollaboration session = activeCollaboration;
+    for (Object item : messages) {
+      if (item instanceof Map<?, ?> message) {
+        Object body = message.get("message");
+        if (body != null) {
+          messageCount++;
+          Object name = message.get("name");
+          String sender = name == null ? "Participant" : name.toString();
+          boolean ownMessage = session != null && sender.equals(session.localName);
+          Label senderLabel = new Label(sender);
+          senderLabel.getStyleClass().add("collaboration-chat-sender");
+          Label messageLabel = new Label(body.toString());
+          messageLabel.setWrapText(true);
+          messageLabel.setMaxWidth(Double.MAX_VALUE);
+          messageLabel.getStyleClass().add("collaboration-chat-body");
+          VBox bubble = new VBox(3, senderLabel, messageLabel);
+          bubble.getStyleClass().add("collaboration-chat-bubble");
+          bubble.setMaxWidth(330);
+          if (ownMessage) bubble.getStyleClass().add("collaboration-chat-bubble-self");
+          HBox row = new HBox(bubble);
+          row.setAlignment(ownMessage ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+          row.getStyleClass().add("collaboration-chat-row");
+          rows.add(row);
+        }
+      }
+    }
+    int previousCount = collaborationChatMessages.getProperties().get("message-count") instanceof Integer count ? count : 0;
+    collaborationChatMessages.getProperties().put("message-count", messageCount);
+    if (messageCount > previousCount && (collaborationSidebar == null
+            || collaborationSidebar.getSelectionModel().getSelectedItem() != collaborationChatTab)) {
+      Platform.runLater(() -> {
+        if (!collaborationChatTab.getStyleClass().contains("chat-unread")) collaborationChatTab.getStyleClass().add("chat-unread");
+      });
+    }
+    Platform.runLater(() -> {
+      collaborationChatMessages.getChildren().setAll(rows);
+      if (collaborationChatScroll != null) collaborationChatScroll.setVvalue(1);
+    });
+  }
+
   private void configureMacNativeTitlebar(Stage stage) {
     if (!isMacPlatform()) return;
     Platform.runLater(() -> {
@@ -1378,6 +1547,14 @@ public class ZIDEEditor extends Application {
 
       splitPane.setDividerPositions(pixels / total);
     });
+  }
+
+  private void saveCurrentLeftSidebarWidth(String property) {
+    if (MAIN_PROPERTIES == null || mainHorizontalSplit == null || mainHorizontalSplit.getWidth() <= 0) return;
+    double[] positions = mainHorizontalSplit.getDividerPositions();
+    if (positions.length > 0) {
+      MAIN_PROPERTIES.setProperty(property, Double.toString(positions[0] * mainHorizontalSplit.getWidth()));
+    }
   }
 
   private void registerKeyboardShortcuts(Scene scene) {
@@ -1786,7 +1963,7 @@ public class ZIDEEditor extends Application {
     unfoldMenuItem.setDisable(true);
     byteCodeMenuItem = viewMenu.createItem("Byte Code", "", this::toggleByteCodePanel);
     byteCodeMenuItem.setDisable(true);
-    viewMenu.createItem("Scratch Pad", "", this::toggleScratchPadPanel);
+    scratchPadMenuItem = viewMenu.createItem("Scratch Pad", "", this::toggleScratchPadPanel);
     viewMenu.createItem("View Breakpoints", "", this::showBreakpointsDialog);
 
     HBox zoomRow = new HBox(4);
@@ -1862,6 +2039,10 @@ public class ZIDEEditor extends Application {
         transpileMenuItems.add(transpileItem);
       }
     }
+    sqarlToYassMenuItem = transpileSubmenu.createItem("YASS (via IAST)", "", () -> transpileSqarlWithRuntime("yass"));
+    sqarlToPythonMenuItem = transpileSubmenu.createItem("Python", "", () -> transpileSqarlWithRuntime("python"));
+    transpileMenuItems.add(sqarlToYassMenuItem);
+    transpileMenuItems.add(sqarlToPythonMenuItem);
 
     var tools = bar.menu("Tools");
 
@@ -1872,7 +2053,8 @@ public class ZIDEEditor extends Application {
     aiBuilderMenuItem = tools.createItem("Build with AI Assistant", "", this::openAIBuilder);
     aiProblemMenuItem = tools.createItem("Solve problem with AI", "", this::openAIProblemSolver);
     aiValidateMenuItem = tools.createItem("Validate with AI", "", this::openAIValidation);
-    var git = bar.menu("Git");
+    gitMenu = bar.menu("Git");
+    var git = gitMenu;
 
     githubSignInMenuItem = git.createItem("Sign in to GitHub", "", this::signInToGitHub);
     githubSignOutMenuItem = git.createItem("Sign out of GitHub", "", this::signOutOfGitHub);
@@ -3151,6 +3333,39 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  private void transpileSqarlWithRuntime(String target) {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || !"sqarl".equals(tab.getLanguageId())) {
+      showError("SQARL transpilation failed", "Open a SQARL file first.");
+      return;
+    }
+    String extension = "yass".equals(target) ? "yas" : "py";
+    File sourceFile = tab.getPath() == null ? new File("program.sqarl") : new File(tab.getPath());
+    FileChooser chooser = new FileChooser();
+    chooser.setTitle("Transpile SQARL to " + ("yass".equals(target) ? "YASS" : "Python"));
+    chooser.setInitialFileName(sourceFile.getName().replaceFirst("\\.[^.]+$", "") + "." + extension);
+    if (sourceFile.getParentFile() != null && sourceFile.getParentFile().isDirectory()) {
+      chooser.setInitialDirectory(sourceFile.getParentFile());
+    }
+    chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("." + extension + " files", "*." + extension));
+    File destination = chooser.showSaveDialog(_stage);
+    if (destination == null) return;
+
+    try {
+      Path source = writeTemporarySource(tab, "zide-sqarl-transpile-", ".sqarl");
+      String option = "yass".equals(target) ? "-yass" : "-python";
+      Process process = commandFor("sqarl", option, source.toString()).redirectErrorStream(true).start();
+      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      if (process.waitFor() != 0) {
+        throw new IOException(output.isBlank() ? "SQARL transpilation failed." : output.trim());
+      }
+      Files.writeString(destination.toPath(), output, StandardCharsets.UTF_8);
+      showMessage("Transpilation complete", "Saved at:\n" + destination.getAbsolutePath());
+    } catch (Exception exception) {
+      showError("SQARL transpilation failed", exception.getMessage());
+    }
+  }
+
   private void loginToZPEOnline() {
     TextField usernameField = new TextField(username == null ? "" : username);
     usernameField.setPromptText("Username");
@@ -3374,6 +3589,35 @@ public class ZIDEEditor extends Application {
     showMessage(header, message);
   }
 
+  /** Shows a validation message above the current modal without discarding it. */
+  private void showValidationPopup(String title, String message) {
+    if (windowStack == null) {
+      showMessage(title, message);
+      return;
+    }
+    Label heading = new Label(title == null || title.isBlank() ? "Collaboration" : title);
+    heading.getStyleClass().add("in-window-modal-title");
+    Label body = new Label(message == null || message.isBlank() ? "Unknown error" : message);
+    body.setWrapText(true);
+    body.setMaxWidth(540);
+    body.getStyleClass().add("in-window-modal-message");
+    Button dismiss = new Button("OK");
+    dismiss.getStyleClass().add("in-window-modal-primary");
+    HBox actions = new HBox(dismiss);
+    actions.setAlignment(Pos.CENTER_RIGHT);
+    VBox panel = new VBox(14, heading, body, actions);
+    panel.getStyleClass().add("in-window-modal-panel");
+    panel.setMaxWidth(560);
+    StackPane popup = new StackPane(panel);
+    popup.getStyleClass().add("in-window-modal-overlay");
+    if (isDarkThemeEnabled()) popup.getStyleClass().add("in-window-modal-dark");
+    popup.setOnMouseClicked(MouseEvent::consume);
+    dismiss.setOnAction(event -> windowStack.getChildren().remove(popup));
+    windowStack.getChildren().add(popup);
+    popup.toFront();
+    dismiss.requestFocus();
+  }
+
   private void openCollaboration() {
     if (applicationMenuBar != null) applicationMenuBar.hideMenus();
     ActiveCollaboration active = activeCollaboration;
@@ -3382,16 +3626,14 @@ public class ZIDEEditor extends Application {
       return;
     }
     EditorTab tab = getCurrentTab();
-    if (tab == null) {
-      showError("Collaborate", "Open a file before starting or joining a collaboration session.");
-      return;
-    }
 
     TextField code = new TextField();
     code.setPromptText("8-character session code");
-    Label state = new Label("Create a session to share this file, or join with a code.");
+    Label state = new Label("Create a session to share the selected project, or join with a code.");
     state.setWrapText(true);
-    Label file = new Label("File: " + tab.getDisplayTitle() + " (joining replaces its current text)");
+    Label file = new Label(tab == null
+            ? "Creating uses the selected project. Joining requires an open file."
+            : "Joining replaces the text in " + tab.getDisplayTitle() + ".");
     GridPane fields = new GridPane();
     fields.setHgap(12);
     fields.setVgap(10);
@@ -3406,24 +3648,151 @@ public class ZIDEEditor extends Application {
               return true;
             }),
             new ModalAction("Create session", true, () -> {
-              connectCollaboration(tab, true, "", state, attemptActive);
+              connectCollaboration(getCurrentTab(), true, "", state, attemptActive);
               return false;
             }),
             new ModalAction("Join session", true, () -> {
               String sessionCode = code.getText().trim().toUpperCase(Locale.ROOT);
               if (!sessionCode.matches("[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}")) {
-                state.setText("Use the exact 8-character share code shown by the host. Codes use letters and 2-9; 0 and 1 are omitted.");
+                showValidationPopup("Invalid session code", "Use the exact 8-character share code shown by the host. Codes use letters and 2-9; 0 and 1 are omitted.");
                 return false;
               }
-              connectCollaboration(tab, false, sessionCode, state, attemptActive);
+              connectCollaboration(getCurrentTab(), false, sessionCode, state, attemptActive);
               return false;
             })));
     setActiveModalWidth(680);
   }
 
+  private Path selectedCollaborationProjectRoot() {
+    if (projectTree == null || projectTree.getRoot() == null) return null;
+    TreeItem<File> selected = projectTree.getSelectionModel().getSelectedItem();
+    TreeItem<File> root = projectTree.getRoot();
+    if (selected == null || selected.getValue() == null || root.getValue() == null) return null;
+
+    TreeItem<File> projectItem = root;
+    if (isWorkspaceContainerRoot(root.getValue())) {
+      if (selected == root) return null;
+      projectItem = selected;
+      while (projectItem.getParent() != null && projectItem.getParent() != root) {
+        projectItem = projectItem.getParent();
+      }
+    }
+
+    File project = projectItem.getValue();
+    if (project == null || !project.isDirectory() || isWorkspaceContainerRoot(project)) return null;
+    return project.toPath().toAbsolutePath().normalize();
+  }
+
+  private static boolean isTabInsideProject(EditorTab tab, Path projectRoot) {
+    if (tab == null || tab.getPath() == null || tab.getPath().isBlank() || projectRoot == null) return false;
+    try {
+      return Path.of(tab.getPath()).toAbsolutePath().normalize().startsWith(projectRoot);
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private static boolean isVisibleCollaborationPath(String relativePath) {
+    if (relativePath == null || relativePath.isBlank()) return false;
+    String[] segments = relativePath.replace('\\', '/').split("/");
+    for (int index = 0; index < segments.length; index++) {
+      String segment = segments[index];
+      boolean projectManifest = index == segments.length - 1 && ".project.yas".equalsIgnoreCase(segment);
+      if (segment.isBlank() || segment.startsWith(".") && !projectManifest) return false;
+    }
+    return !"scratch pad.pad".equalsIgnoreCase(segments[segments.length - 1]);
+  }
+
+  /** The project manifest is shared for execution, but is not an editor-facing file. */
+  private static boolean isBrowsableCollaborationPath(String relativePath) {
+    if (!isVisibleCollaborationPath(relativePath)) {
+      return false;
+    }
+    for (String segment : relativePath.replace('\\', '/').split("/")) {
+      if (segment.startsWith(".")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private void updateCollaborationModeMenus() {
+    boolean collaborating = activeCollaboration != null;
+    if (gitMenu != null) gitMenu.setVisible(!collaborating);
+    if (zpeOnlineMenu != null) zpeOnlineMenu.setVisible(!collaborating);
+    if (scratchPadMenuItem != null) scratchPadMenuItem.setDisable(collaborating);
+  }
+
+  private Path selectedCollaborationPrimaryFile(Path projectRoot, List<String> manifest) {
+    TreeItem<File> selected = projectTree == null ? null : projectTree.getSelectionModel().getSelectedItem();
+    if (selected != null && selected.getValue() != null && selected.getValue().isFile()) {
+      Path selectedPath = selected.getValue().toPath().toAbsolutePath().normalize();
+      if (selectedPath.startsWith(projectRoot)
+              && isVisibleCollaborationPath(projectRoot.relativize(selectedPath).toString())) {
+        return selectedPath;
+      }
+    }
+    EditorTab current = getCurrentTab();
+    if (isTabInsideProject(current, projectRoot)) {
+      Path currentPath = Path.of(current.getPath()).toAbsolutePath().normalize();
+      if (isVisibleCollaborationPath(projectRoot.relativize(currentPath).toString())) return currentPath;
+    }
+    return manifest.isEmpty() ? null : projectRoot.resolve(manifest.getFirst()).normalize();
+  }
+
+  private EditorTab collaborationPrimaryTab(EditorTab tab, Path projectRoot, List<String> manifest) {
+    if (isTabInsideProject(tab, projectRoot)
+            && isVisibleCollaborationPath(projectRoot.relativize(Path.of(tab.getPath()).toAbsolutePath().normalize()).toString())) {
+      return tab;
+    }
+    Path primaryFile = selectedCollaborationPrimaryFile(projectRoot, manifest);
+    if (primaryFile == null || !Files.isRegularFile(primaryFile)) return null;
+    openTab(primaryFile.getFileName().toString(), primaryFile.toString());
+    EditorTab opened = getCurrentTab();
+    return isTabInsideProject(opened, projectRoot) ? opened : null;
+  }
+
+  private List<String> collaborationProjectManifest(Path projectRoot) {
+    if (projectRoot == null || !Files.isDirectory(projectRoot)) return List.of();
+    try (java.util.stream.Stream<Path> paths = Files.walk(projectRoot)) {
+      return paths.filter(Files::isRegularFile)
+              .map(path -> projectRoot.relativize(path).toString().replace('\\', '/'))
+              .filter(ZIDEEditor::isVisibleCollaborationPath)
+              .sorted().toList();
+    } catch (IOException exception) {
+      return List.of();
+    }
+  }
+
   private void connectCollaboration(EditorTab tab, boolean create, String code, Label message, AtomicBoolean attemptActive) {
+    Path projectRoot = null;
+    List<String> projectManifest = List.of();
+    if (create) {
+      projectRoot = selectedCollaborationProjectRoot();
+      if (projectRoot == null) {
+        showValidationPopup("Cannot start collaboration", "Select a project or a file inside a project before starting collaboration.");
+        return;
+      }
+      projectManifest = collaborationProjectManifest(projectRoot);
+      if (projectManifest.isEmpty()) {
+        showValidationPopup("Cannot start collaboration", "The selected project has no visible files to share.");
+        return;
+      }
+      tab = collaborationPrimaryTab(tab, projectRoot, projectManifest);
+      if (tab == null) {
+        showValidationPopup("Cannot start collaboration", "Could not open a file from the selected project to start collaboration.");
+        return;
+      }
+    } else if (tab == null) {
+      showValidationPopup("Cannot join collaboration", "Open a file before joining a collaboration session.");
+      return;
+    }
+    final EditorTab sessionTab = tab;
+    final Path sessionProjectRoot = projectRoot;
+    final List<String> sessionProjectManifest = projectManifest;
     String server = MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot").trim();
     String displayName = MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")).trim();
+    String collaborationPassword = MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", "");
     int port;
     try {
       port = Integer.parseInt(MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"));
@@ -3431,32 +3800,34 @@ public class ZIDEEditor extends Application {
         throw new NumberFormatException();
       }
     } catch (NumberFormatException exception) {
-      message.setText("Set a valid server port in Settings > Collaboration.");
+      showValidationPopup("Invalid collaboration settings", "Set a valid server port in Settings > Collaboration.");
       return;
     }
     ZIDECollaborationClient client;
     try {
-      client = new ZIDECollaborationClient(server, port);
+      client = new ZIDECollaborationClient(server, port, collaborationPassword);
     } catch (IllegalArgumentException exception) {
-      message.setText(exception.getMessage());
+      showValidationPopup("Invalid collaboration settings", exception.getMessage());
       return;
     }
     message.setText(create ? "Creating session…" : "Joining session…");
-    String document = tab.getEditor().getText();
-    String fileName = tab.getPath() == null || tab.getPath().isBlank() ? tab.getDisplayTitle() : Path.of(tab.getPath()).getFileName().toString();
-    String language = tab.getLanguageId() == null ? "text" : tab.getLanguageId();
+    String document = sessionTab.getEditor().getText();
+    String fileName = collaborationFileName(sessionTab, sessionProjectRoot);
+    String language = sessionTab.getLanguageId() == null ? "text" : sessionTab.getLanguageId();
     COLLABORATION_WORKER.execute(() -> {
       try {
         Map<String, Object> response = create
-                ? client.create(displayName, document, fileName, language)
+                ? client.create(displayName, document, fileName, language, sessionProjectManifest)
                 : client.join(code, displayName);
         String actualCode = ZIDECollaborationClient.string(response, "code");
         String token = ZIDECollaborationClient.string(response, "token");
         String sharedDocument = ZIDECollaborationClient.string(response, "document");
         String sharedLanguage = ZIDECollaborationClient.string(response, "language");
+        String sharedFileName = ZIDECollaborationClient.string(response, "fileName");
         long revision = ZIDECollaborationClient.revision(response);
         long participantRevision = ZIDECollaborationClient.participantRevision(response);
         List<String> participantNames = ZIDECollaborationClient.participantNames(response);
+        List<ZIDECollaborationClient.Presence> presences = ZIDECollaborationClient.presences(response);
         if (!attemptActive.get()) {
           client.leave(actualCode, token);
           return;
@@ -3466,18 +3837,34 @@ public class ZIDEEditor extends Application {
           throw new IOException("This session shares a " + sharedLanguage + " file. Open a file of the same language before joining.");
         }
         Platform.runLater(() -> {
-          if (!create) tab.getEditor().setText(sharedDocument);
-          ActiveCollaboration session = new ActiveCollaboration(client, tab, actualCode, token, revision,
-                  participantRevision, participantNames, sharedDocument);
+          if (!create) sessionTab.getEditor().setText(sharedDocument);
+          renderCollaborationChat(response);
+          refreshCollaborationSyntax(sessionTab, true);
+          ActiveCollaboration session = new ActiveCollaboration(client, sessionTab, actualCode, token, revision,
+                  participantRevision, participantNames, sharedDocument, create, sessionProjectRoot, displayName, sharedFileName);
           activeCollaboration = session;
+          updateCollaborationModeMenus();
+          renderCollaborativeProjectFiles(response);
+          saveCurrentLeftSidebarWidth("LAYOUT_EXPLORER_WIDTH");
+          collaborationSidebar.setVisible(true);
+          collaborationSidebar.setManaged(true);
+          leftSidePanels.setVisible(false);
+          leftSidePanels.setManaged(false);
+          mainHorizontalSplit.getItems().remove(leftSidePanels);
+          if (!mainHorizontalSplit.getItems().contains(collaborationSidebar)) {
+            mainHorizontalSplit.getItems().add(0, collaborationSidebar);
+          }
+          setLeftSplitWidth(mainHorizontalSplit,
+                  layoutDimension("LAYOUT_COLLABORATION_SIDEBAR_WIDTH", 400, 260, 700));
+          collaborationSidebar.getSelectionModel().select(collaborationFilesTab);
           updateCollaborationAvatars(participantNames);
-          session.ownsFocusMode = !focusModeActive;
-          setFocusMode(tab, true);
-          focusModeExitButton.setVisible(false);
-          focusModeExitButton.setManaged(false);
+          updateCollaborationParticipants(participantNames);
           collaborationModeButton.setVisible(true);
           collaborationModeButton.setManaged(true);
           installCollaborationListener(session);
+          installCollaborationLineIndicators(session, sessionTab);
+          updateCollaborationLineIndicators(session, presences);
+          Platform.runLater(() -> refreshCollaborationSyntax(sessionTab, false));
           closeInWindowModal();
           statusLabel.setText("Collaborating · " + actualCode);
           showActiveCollaboration(session);
@@ -3485,9 +3872,23 @@ public class ZIDEEditor extends Application {
         });
       } catch (Exception exception) {
         String details = collaborationFailureMessage(exception, server, port);
-        Platform.runLater(() -> message.setText(details));
+        Platform.runLater(() -> showValidationPopup("Collaboration connection failed", details));
       }
     });
+  }
+
+  private void refreshCollaborationSyntax(EditorTab tab, boolean resetDocument) {
+    if (tab == null) return;
+    String language = tab.getLanguageId();
+    if (language == null || language.isBlank()) {
+      language = languageForFile(tab.getPath());
+      tab.setLanguageId(language);
+    }
+    setLanguage(language, tab.getEditor());
+    if (resetDocument) {
+      tab.getEditor().setText(tab.getEditor().getText());
+    }
+    tab.scheduleAnalysis();
   }
 
   private void installCollaborationListener(ActiveCollaboration session) {
@@ -3499,6 +3900,61 @@ public class ZIDEEditor extends Application {
       session.pendingUpdate = COLLABORATION_DEBOUNCE.schedule(() -> pushCollaborationUpdate(session), 350, java.util.concurrent.TimeUnit.MILLISECONDS);
     };
     session.tab.getEditor().getEditor().textProperty().addListener(session.listener);
+    publishCollaborationPresence(session);
+  }
+
+  private void publishCollaborationPresence(ActiveCollaboration session) {
+    if (session.stopped || session.paused) return;
+    EditorTab tab = getCurrentTab();
+    String file = collaborationFileForTab(session, tab);
+    if (tab == null || file == null) return;
+    int line = collaborationLineNumber(tab);
+    COLLABORATION_WORKER.execute(() -> {
+      try {
+        Map<String, Object> response = session.client.presence(session.code, session.token, file, line);
+        session.participantRevision = Math.max(session.participantRevision,
+                ZIDECollaborationClient.participantRevision(response));
+      } catch (Exception ignored) {
+        // Presence is advisory; an unavailable update must not interrupt editing.
+      }
+    });
+  }
+
+  private void publishActiveCollaborationPresence() {
+    ActiveCollaboration session = activeCollaboration;
+    if (session != null) publishCollaborationPresence(session);
+  }
+
+  private static String collaborationFileName(EditorTab tab, Path projectRoot) {
+    if (tab.getPath() != null && projectRoot != null) {
+      try {
+        Path path = Path.of(tab.getPath()).toAbsolutePath().normalize();
+        if (path.startsWith(projectRoot)) return projectRoot.relativize(path).toString().replace('\\', '/');
+      } catch (Exception ignored) {
+        // Fall back to the tab title for paths that are not local files.
+      }
+    }
+    return tab.getPath() == null || tab.getPath().isBlank() ? tab.getDisplayTitle() : Path.of(tab.getPath()).getFileName().toString();
+  }
+
+  private String collaborationFileForTab(ActiveCollaboration session, EditorTab tab) {
+    if (tab == null) return null;
+    if (tab == session.tab) {
+      return session.primaryFile;
+    }
+    String prefix = "collaboration:" + session.code + ":";
+    String id = tab.getId();
+    return id != null && id.startsWith(prefix) ? id.substring(prefix.length()) : null;
+  }
+
+  private static int collaborationLineNumber(EditorTab tab) {
+    String text = tab.getEditor().getText();
+    int caret = Math.max(0, Math.min(tab.getEditor().getCaretPosition(), text.length()));
+    int line = 1;
+    for (int index = 0; index < caret; index++) {
+      if (text.charAt(index) == '\n') line++;
+    }
+    return line;
   }
 
   private void pushCollaborationUpdate(ActiveCollaboration session) {
@@ -3536,9 +3992,17 @@ public class ZIDEEditor extends Application {
       try {
         Map<String, Object> response = session.client.poll(session.code, session.token, session.revision,
                 session.participantRevision);
+        session.client.heartbeat(session.code, session.token);
         long revision = ZIDECollaborationClient.revision(response);
         long participantRevision = ZIDECollaborationClient.participantRevision(response);
         List<String> participantNames = ZIDECollaborationClient.participantNames(response);
+        List<ZIDECollaborationClient.Presence> presences = ZIDECollaborationClient.presences(response);
+        fulfillProjectFileRequests(session, response);
+        synchroniseCollaborativeProjectFiles(session, response);
+        Platform.runLater(() -> {
+          renderCollaborativeProjectFiles(response);
+          renderCollaborationChat(response);
+        });
         long priorRevision = session.revision;
         String baseDocument = session.lastSharedDocument;
         String document = baseDocument;
@@ -3560,7 +4024,9 @@ public class ZIDEEditor extends Application {
             if (session.stopped || session.paused) return;
             session.participantRevision = Math.max(session.participantRevision, participantRevision);
             session.participantNames = participantNames;
+            updateCollaborationLineIndicators(session, presences);
             updateCollaborationAvatars(participantNames);
+            updateCollaborationParticipants(participantNames);
             if (revision <= session.revision) return;
             String localDocument = session.tab.getEditor().getText();
             if (!localDocument.equals(baseDocument) && !localDocument.equals(updatedDocument)) {
@@ -3582,12 +4048,236 @@ public class ZIDEEditor extends Application {
         } else {
           session.participantRevision = Math.max(session.participantRevision, participantRevision);
           session.participantNames = participantNames;
+          Platform.runLater(() -> {
+            updateCollaborationLineIndicators(session, presences);
+            updateCollaborationParticipants(participantNames);
+          });
         }
       } catch (Exception exception) {
         if (session.stopped || session.paused || exception instanceof InterruptedException) return;
         Platform.runLater(() -> statusLabel.setText("Collaboration connection lost: " + safeMessage(exception)));
         try { Thread.sleep(2000); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
       }
+    }
+  }
+
+  /** The owner reads files only after a collaborator asks for a manifest path. */
+  private void fulfillProjectFileRequests(ActiveCollaboration session, Map<String, Object> response) {
+    if (!session.isOwner || session.projectRoot == null) return;
+    for (String relativePath : ZIDECollaborationClient.projectFileRequests(response)) {
+      if (!isVisibleCollaborationPath(relativePath)) continue;
+      if (!session.pendingProjectFilePublishes.add(relativePath)) continue;
+      try {
+        Path file = session.projectRoot.resolve(relativePath).normalize();
+        if (!file.startsWith(session.projectRoot) || !Files.isRegularFile(file)) continue;
+        String content = Files.readString(file, StandardCharsets.UTF_8);
+        session.client.publishProjectFile(session.code, session.token, relativePath, content);
+      } catch (Exception exception) {
+        if (!session.stopped) {
+          Platform.runLater(() -> statusLabel.setText("Could not share project file: " + relativePath));
+        }
+      } finally {
+        session.pendingProjectFilePublishes.remove(relativePath);
+      }
+    }
+  }
+
+  private void renderCollaborativeProjectFiles(Map<String, Object> state) {
+    if (collaborationProjectTree == null) return;
+    TreeItem<CollaborativeProjectItem> root = new TreeItem<>(new CollaborativeProjectItem("Project", null));
+    root.setExpanded(true);
+    Map<String, TreeItem<CollaborativeProjectItem>> folders = new LinkedHashMap<>();
+    folders.put("", root);
+    Object manifest = state.get("projectFiles");
+    if (manifest instanceof Iterable<?> paths) {
+      for (Object entry : paths) {
+        if (!(entry instanceof String relativePath) || !isBrowsableCollaborationPath(relativePath)) {
+          continue;
+        }
+        String[] segments = relativePath.replace('\\', '/').split("/");
+        TreeItem<CollaborativeProjectItem> parent = root;
+        StringBuilder folderPath = new StringBuilder();
+        for (int index = 0; index < segments.length - 1; index++) {
+          if (folderPath.length() > 0) folderPath.append('/');
+          folderPath.append(segments[index]);
+          String key = folderPath.toString();
+          TreeItem<CollaborativeProjectItem> folder = folders.get(key);
+          if (folder == null) {
+            folder = new TreeItem<>(new CollaborativeProjectItem(segments[index], null));
+            folder.setExpanded(true);
+            parent.getChildren().add(folder);
+            folders.put(key, folder);
+          }
+          parent = folder;
+        }
+        if (segments.length > 0 && !segments[segments.length - 1].isBlank()) {
+          parent.getChildren().add(new TreeItem<>(new CollaborativeProjectItem(segments[segments.length - 1], relativePath)));
+        }
+      }
+    }
+    sortCollaborativeProjectTree(root);
+    collaborationProjectTree.setRoot(root);
+  }
+
+  private static void sortCollaborativeProjectTree(TreeItem<CollaborativeProjectItem> item) {
+    if (item == null) return;
+    for (TreeItem<CollaborativeProjectItem> child : item.getChildren()) {
+      sortCollaborativeProjectTree(child);
+    }
+    item.getChildren().sort(Comparator
+            .comparing((TreeItem<CollaborativeProjectItem> child) -> child.getValue().relativePath() != null)
+            .thenComparing(child -> child.getValue().name(), String.CASE_INSENSITIVE_ORDER));
+  }
+
+  private void requestCollaborativeProjectFile(ActiveCollaboration session, String relativePath) {
+    if (!isVisibleCollaborationPath(relativePath)) return;
+    if (!session.pendingProjectFileLoads.add(relativePath)) return;
+    Platform.runLater(() -> statusLabel.setText("Loading " + relativePath + " from the project owner…"));
+    COLLABORATION_WORKER.execute(() -> {
+      try {
+        for (int attempt = 0; attempt < 30 && !session.stopped; attempt++) {
+          Map<String, Object> response = session.client.requestProjectFile(session.code, session.token, relativePath);
+          if ("ready".equals(response.get("status")) && response.get("content") instanceof String content) {
+            Platform.runLater(() -> openCollaborativeProjectFile(session, relativePath, content));
+            return;
+          }
+          Thread.sleep(250);
+        }
+        if (!session.stopped) {
+          Platform.runLater(() -> statusLabel.setText("The project owner did not provide " + relativePath));
+        }
+      } catch (Exception exception) {
+        if (!session.stopped) {
+          Platform.runLater(() -> statusLabel.setText("Could not load shared project file: " + safeMessage(exception)));
+        }
+      } finally {
+        session.pendingProjectFileLoads.remove(relativePath);
+      }
+    });
+  }
+
+  private void synchroniseCollaborativeProjectFiles(ActiveCollaboration session, Map<String, Object> state) {
+    Object revisionValue = state.get("projectFileRevision");
+    long revision = revisionValue instanceof Number number ? number.longValue() : session.projectFileRevision;
+    if (revision <= session.projectFileRevision) return;
+    session.projectFileRevision = revision;
+    Object paths = state.get("cachedProjectFiles");
+    if (!(paths instanceof Iterable<?> cachedPaths)) return;
+    for (Object item : cachedPaths) {
+      if (item instanceof String path && isVisibleCollaborationPath(path)) {
+        requestCollaborativeProjectFile(session, path);
+      }
+    }
+  }
+
+  private void openCollaborativeProjectFile(ActiveCollaboration session, String relativePath, String content) {
+    if (relativePath.toLowerCase(Locale.ROOT).endsWith(".ui.yas")) {
+      openCollaborativeLayoutBuilder(session, relativePath, content);
+      return;
+    }
+    if (session.isOwner && session.projectRoot != null) {
+      try {
+        Path localFile = session.projectRoot.resolve(relativePath).normalize();
+        if (!localFile.startsWith(session.projectRoot)) return;
+        Files.writeString(localFile, content, StandardCharsets.UTF_8);
+        for (Tab openTab : editorTabs.getTabs()) {
+          if (openTab instanceof EditorTab localTab && localTab.getPath() != null
+                  && localFile.equals(Path.of(localTab.getPath()).toAbsolutePath().normalize())
+                  && localTab != session.tab && !localTab.getEditor().getText().equals(content)) {
+            session.applyingRemote = true;
+            localTab.getEditor().setText(content);
+            session.applyingRemote = false;
+          }
+        }
+        statusLabel.setText("Updated shared project file · " + relativePath);
+      } catch (Exception exception) {
+        statusLabel.setText("Could not save shared project file: " + relativePath);
+      }
+      return;
+    }
+    String id = "collaboration:" + session.code + ":" + relativePath;
+    for (Tab tab : editorTabs.getTabs()) {
+      if (id.equals(tab.getId())) {
+        if (tab instanceof EditorTab existing && !existing.getEditor().getText().equals(content)) {
+          session.applyingRemote = true;
+          int caret = existing.getEditor().getCaretPosition();
+          existing.getEditor().setText(content);
+          existing.getEditor().setCaretPosition(Math.min(caret, content.length()));
+          session.applyingRemote = false;
+        }
+        editorTabs.getSelectionModel().select(tab);
+        return;
+      }
+    }
+    CodeEditorViewFX editor = new CodeEditorViewFX();
+    editor.setSyntaxThemes(editorLightTheme, editorDarkTheme);
+    editor.setFontFamily(editorFontFamily);
+    editor.setFontSize(editorFontSize);
+    editor.setWordWrap(USE_WORD_WRAP);
+    editor.setDarkMode(isDarkThemeEnabled());
+    String language = languageForFile(relativePath);
+    setLanguage(language, editor);
+    editor.setText(content);
+    editor.setEditable(true);
+    StackPane editorContent = new StackPane(editor.getView());
+    String title = Path.of(relativePath).getFileName().toString();
+    EditorTab tab = (EditorTab) createEditorTab(title, editor, null, editorContent);
+    tab.setLanguageId(language);
+    tab.setId(id);
+    tab.markLoadedContentClean();
+    editorTabs.getTabs().add(tab);
+    editorTabs.getSelectionModel().select(tab);
+    javafx.beans.value.ChangeListener<String> listener = (observable, oldText, newText) -> {
+      if (session.stopped || session.paused || session.applyingRemote) return;
+      java.util.concurrent.ScheduledFuture<?> pending = session.projectFileUpdates.get(tab);
+      if (pending != null) pending.cancel(false);
+      session.projectFileUpdates.put(tab, COLLABORATION_DEBOUNCE.schedule(() -> {
+        try {
+          session.client.publishProjectFile(session.code, session.token, relativePath, newText);
+        } catch (Exception exception) {
+          if (!session.stopped) Platform.runLater(() -> statusLabel.setText("Could not share project file: " + relativePath));
+        }
+      }, 350, java.util.concurrent.TimeUnit.MILLISECONDS));
+    };
+    editor.getEditor().textProperty().addListener(listener);
+    session.projectFileListeners.put(tab, listener);
+    installCollaborationLineIndicators(session, tab);
+    updateTabHeaderVisibility(editorTabs);
+    statusLabel.setText("Viewing shared project file · " + relativePath);
+  }
+
+  private void openCollaborativeLayoutBuilder(ActiveCollaboration session, String relativePath, String content) {
+    try {
+      Path layoutFile;
+      if (session.isOwner && session.projectRoot != null) {
+        layoutFile = session.projectRoot.resolve(relativePath).normalize();
+        if (!layoutFile.startsWith(session.projectRoot)) {
+          return;
+        }
+      } else {
+        layoutFile = Files.createTempFile("zide-collaboration-layout-", ".ui.yas");
+        layoutFile.toFile().deleteOnExit();
+      }
+      Files.writeString(layoutFile, content, StandardCharsets.UTF_8);
+      Path sharedLayoutFile = layoutFile;
+      openLayoutBuilderFile(layoutFile, () -> {
+        try {
+          String updatedContent = Files.readString(sharedLayoutFile, StandardCharsets.UTF_8);
+          COLLABORATION_WORKER.execute(() -> {
+            try {
+              session.client.publishProjectFile(session.code, session.token, relativePath, updatedContent);
+            } catch (Exception exception) {
+              if (!session.stopped) {
+                Platform.runLater(() -> statusLabel.setText("Could not share layout file: " + relativePath));
+              }
+            }
+          });
+        } catch (IOException exception) {
+          statusLabel.setText("Could not save shared layout file: " + relativePath);
+        }
+      });
+    } catch (IOException exception) {
+      statusLabel.setText("Could not open shared layout file: " + relativePath);
     }
   }
 
@@ -3605,6 +4295,57 @@ public class ZIDEEditor extends Application {
     return new TextChange(prefix, beforeEnd - prefix, after.substring(prefix, afterEnd));
   }
 
+  private void installCollaborationLineIndicators(ActiveCollaboration session, EditorTab tab) {
+    if (tab == null || session.lineIndicatorFactories.containsKey(tab)) return;
+    String file = collaborationFileForTab(session, tab);
+    if (file == null) return;
+    var area = tab.getEditor().getEditor();
+    IntFunction<? extends Node> originalFactory = area.paragraphGraphicFactoryProperty().get();
+    session.lineIndicatorFactories.put(tab, originalFactory);
+    area.paragraphGraphicFactoryProperty().set(lineIndex -> {
+      HBox gutter = new HBox(3);
+      gutter.setAlignment(Pos.CENTER_LEFT);
+      if (originalFactory != null) gutter.getChildren().add(originalFactory.apply(lineIndex));
+      for (ZIDECollaborationClient.Presence presence : session.presences) {
+        if (presence.file().equals(file) && presence.line() == lineIndex + 1
+                && !presence.name().equals(session.localName)) {
+          Label avatar = new Label(collaborationInitials(presence.name()));
+          avatar.setAlignment(Pos.CENTER);
+          avatar.setMinSize(18, 18);
+          avatar.setPrefSize(18, 18);
+          avatar.setMaxSize(18, 18);
+          avatar.setStyle("-fx-background-color: " + collaborationAvatarColour(session.participantNames, presence.name())
+                  + "; -fx-background-radius: 50%; -fx-text-fill: white; -fx-font-size: 8px; -fx-font-weight: bold;");
+          avatar.setTooltip(new Tooltip(presence.name() + " · line " + presence.line()));
+          gutter.getChildren().add(avatar);
+        }
+      }
+      return gutter;
+    });
+  }
+
+  private void updateCollaborationLineIndicators(ActiveCollaboration session,
+                                                   List<ZIDECollaborationClient.Presence> presences) {
+    session.presences = List.copyOf(presences);
+    for (Map.Entry<EditorTab, IntFunction<? extends Node>> entry : session.lineIndicatorFactories.entrySet()) {
+      var area = entry.getKey().getEditor().getEditor();
+      for (int line = 0; line < area.getParagraphs().size(); line++) {
+        area.recreateParagraphGraphic(line);
+      }
+    }
+  }
+
+  private void removeCollaborationLineIndicators(ActiveCollaboration session) {
+    for (Map.Entry<EditorTab, IntFunction<? extends Node>> entry : session.lineIndicatorFactories.entrySet()) {
+      var area = entry.getKey().getEditor().getEditor();
+      area.paragraphGraphicFactoryProperty().set(entry.getValue());
+      for (int line = 0; line < area.getParagraphs().size(); line++) {
+        area.recreateParagraphGraphic(line);
+      }
+    }
+    session.lineIndicatorFactories.clear();
+  }
+
   private void updateCollaborationAvatars(List<String> participantNames) {
     populateCollaborationAvatars(collaborationAvatars, participantNames, 24);
     populateCollaborationAvatars(collaborationInfoAvatars, participantNames, 28);
@@ -3618,21 +4359,34 @@ public class ZIDEEditor extends Application {
     collaborationAvatars.setManaged(true);
   }
 
+  private void updateCollaborationParticipants(List<String> participantNames) {
+    if (collaborationParticipantList == null) return;
+    collaborationParticipantList.getChildren().clear();
+    if (participantNames == null || participantNames.isEmpty()) {
+      collaborationParticipantList.getChildren().add(new Label("No other users yet"));
+      return;
+    }
+    Map<String, ZIDECollaborationClient.Presence> locations = new HashMap<>();
+    ActiveCollaboration session = activeCollaboration;
+    if (session != null) {
+      for (ZIDECollaborationClient.Presence presence : session.presences) {
+        locations.put(presence.name(), presence);
+      }
+    }
+    for (String participant : participantNames) {
+      ZIDECollaborationClient.Presence location = locations.get(participant);
+      String text = location == null ? participant : participant + " · " + location.file() + ":" + location.line();
+      Label row = new Label(text);
+      row.getStyleClass().add("collaboration-participant");
+      row.setMaxWidth(Double.MAX_VALUE);
+      collaborationParticipantList.getChildren().add(row);
+    }
+  }
+
   private static void populateCollaborationAvatars(HBox container, List<String> participantNames, double diameter) {
     if (container == null) { return; }
     container.getChildren().clear();
     if (participantNames == null || participantNames.isEmpty()) { return; }
-    ArrayList<String> colours = new ArrayList<>();
-
-    colours.add("#007f8b");
-      colours.add("#8c4a9e");
-    colours.add("#b35c20");
-    colours.add("#2767a5");
-    colours.add("#a83d62");
-    colours.add("#527d32");
-    colours.add("#6554a4");
-    colours.add("#14745c");
-
     for (int i = 0; i < participantNames.size(); i++) {
       String name = participantNames.get(i);
       if (name == null || name.isBlank()) { continue; }
@@ -3641,11 +4395,18 @@ public class ZIDEEditor extends Application {
       avatar.setMinSize(diameter, diameter);
       avatar.setPrefSize(diameter, diameter);
       avatar.setMaxSize(diameter, diameter);
-      avatar.setStyle("-fx-background-color: " + colours.get(i % colours.size())
+      avatar.setStyle("-fx-background-color: " + collaborationAvatarColour(participantNames, name)
               + "; -fx-background-radius: 50%; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold;");
       avatar.setTooltip(new Tooltip(name));
       container.getChildren().add(avatar);
     }
+  }
+
+  private static String collaborationAvatarColour(List<String> participantNames, String name) {
+    List<String> colours = List.of("#007f8b", "#8c4a9e", "#b35c20", "#2767a5",
+            "#a83d62", "#527d32", "#6554a4", "#14745c");
+    int index = participantNames == null ? -1 : participantNames.indexOf(name);
+    return colours.get(Math.floorMod(index < 0 ? name.hashCode() : index, colours.size()));
   }
 
   private static String collaborationInitials(String name) {
@@ -3701,13 +4462,32 @@ public class ZIDEEditor extends Application {
     session.stopped = true;
     if (session.pendingUpdate != null) session.pendingUpdate.cancel(false);
     if (session.listener != null) session.tab.getEditor().getEditor().textProperty().removeListener(session.listener);
+    for (Map.Entry<EditorTab, javafx.beans.value.ChangeListener<String>> entry : session.projectFileListeners.entrySet()) {
+      entry.getKey().getEditor().getEditor().textProperty().removeListener(entry.getValue());
+    }
+    for (java.util.concurrent.ScheduledFuture<?> update : session.projectFileUpdates.values()) {
+      update.cancel(false);
+    }
+    session.projectFileListeners.clear();
+    session.projectFileUpdates.clear();
+    removeCollaborationLineIndicators(session);
     if (activeCollaboration == session) activeCollaboration = null;
+    updateCollaborationModeMenus();
     updateCollaborationAvatars(List.of());
     collaborationInfoAvatars = null;
     collaborationModeButton.setVisible(false);
     collaborationModeButton.setManaged(false);
-    if (session.ownsFocusMode) setFocusMode(null, false);
-    else if (focusModeActive) {
+    saveCurrentLeftSidebarWidth("LAYOUT_COLLABORATION_SIDEBAR_WIDTH");
+    mainHorizontalSplit.getItems().remove(collaborationSidebar);
+    collaborationSidebar.setVisible(false);
+    collaborationSidebar.setManaged(false);
+    leftSidePanels.setVisible(true);
+    leftSidePanels.setManaged(true);
+    if (!mainHorizontalSplit.getItems().contains(leftSidePanels)) {
+      mainHorizontalSplit.getItems().add(0, leftSidePanels);
+    }
+    setLeftSplitWidth(mainHorizontalSplit, layoutDimension("LAYOUT_EXPLORER_WIDTH", 260, 180, 700));
+    if (focusModeActive) {
       focusModeExitButton.setVisible(true);
       focusModeExitButton.setManaged(true);
     }
@@ -3978,13 +4758,14 @@ public class ZIDEEditor extends Application {
     if (applicationMenuBar != null) applicationMenuBar.hideMenus();
     ZIDESettingsPanel settings = new ZIDESettingsPanel(darkThemeEnabled,
             isDarkThemeEnabled() ? "Dark" : "Light", editorLightTheme, editorDarkTheme,
-            editorFontFamily, editorFontSize, USE_WORD_WRAP, preferZpex,
+            editorFontFamily, editorFontSize, USE_WORD_WRAP, preferZpex, showInputPrompt,
             MAIN_PROPERTIES.getProperty("CHATGPT_URL", "https://api.openai.com/v1/responses"),
             MAIN_PROPERTIES.getProperty("CHATGPT_KEY", ""),
             MAIN_PROPERTIES.getProperty("CHATGPT_MODEL", "gpt-5-mini"),
             MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"),
             MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"),
-            MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")));
+            MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")),
+            MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""));
 
     showInWindowModal("Settings", "Configure ZIDE", settings, "Save", () -> {
       if (!settings.hasValidChatGPTSettings()) {
@@ -4001,6 +4782,7 @@ public class ZIDEEditor extends Application {
       MAIN_PROPERTIES.setProperty("COLLABORATION_SERVER", settings.getCollaborationServer());
       MAIN_PROPERTIES.setProperty("COLLABORATION_PORT", settings.getCollaborationPort());
       MAIN_PROPERTIES.setProperty("COLLABORATION_NAME", settings.getCollaborationName());
+      MAIN_PROPERTIES.setProperty("COLLABORATION_PASSWORD", settings.getCollaborationPassword());
       applyThemePreference("Dark".equals(settings.getTheme()), true);
       editorLightTheme = settings.getLightEditorTheme();
       editorDarkTheme = settings.getDarkEditorTheme();
@@ -4013,6 +4795,8 @@ public class ZIDEEditor extends Application {
       MAIN_PROPERTIES.setProperty("EDITOR_FONT_SIZE", Integer.toString(editorFontSize));
       preferZpex = settings.isZpexPreferred();
       MAIN_PROPERTIES.setProperty("PREFER_ZPEX", Boolean.toString(preferZpex));
+      showInputPrompt = settings.isInputPromptEnabled();
+      MAIN_PROPERTIES.setProperty("SHOW_INPUT_PROMPT", Boolean.toString(showInputPrompt));
       applyEditorPreferences();
       applyWordWrapPreference(settings.isWordWrapEnabled());
       saveProps();
@@ -4219,7 +5003,9 @@ public class ZIDEEditor extends Application {
     try {
       if (getCurrentTab() == null) return;
       EditorTab tab = getCurrentTab();
-      Path manifest = runYassProgram ? projectManifestFor(tab) : null;
+      // A project manifest is the execution entry point, regardless of which
+      // run command the user used from an editor tab inside that project.
+      Path manifest = projectManifestFor(tab);
       if (manifest != null && !ensureProjectManifestHasScripts(tab)) return;
       Path tempPath = Files.createTempFile(ZPEHelperFunctions.generateRandomWord(12), ".yas");
       runBtn.getStyleClass().add("running");
@@ -4254,25 +5040,15 @@ public class ZIDEEditor extends Application {
       return null;
     }
 
-    if (currentProjectRoot != null) {
-      Path projectRoot = currentProjectRoot.toPath().toAbsolutePath().normalize();
-      if (file.startsWith(projectRoot)) {
-        Path search = folder;
-        while (search != null && search.startsWith(projectRoot)) {
-          Path manifest = search.resolve(".project.yas");
-          if (Files.isRegularFile(manifest)) {
-            return manifest;
-          }
-          if (search.equals(projectRoot)) {
-            break;
-          }
-          search = search.getParent();
-        }
+    Path search = folder;
+    while (search != null) {
+      Path manifest = search.resolve(".project.yas");
+      if (Files.isRegularFile(manifest)) {
+        return manifest;
       }
+      search = search.getParent();
     }
-
-    Path manifest = folder.resolve(".project.yas");
-    return Files.isRegularFile(manifest) ? manifest : null;
+    return null;
   }
 
   private boolean ensureProjectManifestHasScripts(EditorTab tab) {
@@ -4323,7 +5099,7 @@ public class ZIDEEditor extends Application {
         runBtn.getStyleClass().remove("running");
         statusLabel.setText("Ready");
       }));
-      consoleOutputTextArea.runProcess(process);
+      runConsoleProcess("zpeedy > ", process);
     } catch (IOException exception) {
       runBtn.getStyleClass().remove("running");
       statusLabel.setText("Ready");
@@ -4348,7 +5124,7 @@ public class ZIDEEditor extends Application {
       if (!debug) statusLabel.setText("Executing code with " + kind.name());
       consoleOutputTextArea.append("$ " + displayCommand(launch.processBuilder()) + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
       consoleOutputTextArea.append(launch.description() + "\n\n", InteractiveConsoleFX.OutputKind.KEY);
-      consoleOutputTextArea.runProcess(launch.processBuilder(), launch::processStarted);
+      runConsoleProcess("zpe > ", launch.processBuilder(), launch::processStarted);
       return true;
     } catch (IOException exception) {
       if (exception.getMessage() != null && exception.getMessage().contains("is not installed")) {
@@ -4402,7 +5178,7 @@ public class ZIDEEditor extends Application {
       consoleOutputTextArea.clear();
       consoleOutputTextArea.append(launch.description() + "\n\n", InteractiveConsoleFX.OutputKind.KEY);
       showBottomPanel(consoleView);
-      consoleOutputTextArea.runProcess(launch.processBuilder());
+      runConsoleProcess("zpe > ", launch.processBuilder());
       statusLabel.setText("Training " + definition.getFileName());
     } catch (IOException exception) {
       showError("Unable to train language", exception.getMessage());
@@ -4419,7 +5195,7 @@ public class ZIDEEditor extends Application {
       consoleOutputTextArea.clear();
       consoleOutputTextArea.append(launch.description() + "\n\n", InteractiveConsoleFX.OutputKind.KEY);
       showBottomPanel(consoleView);
-      consoleOutputTextArea.runProcess(launch.processBuilder());
+      runConsoleProcess("zpe > ", launch.processBuilder());
       statusLabel.setText("Testing " + source.getFileName());
     } catch (IOException exception) {
       showError("Unable to test language", exception.getMessage());
@@ -4477,10 +5253,19 @@ public class ZIDEEditor extends Application {
   }
 
   private void openLayoutBuilderFile(Path layoutFile) {
+    openLayoutBuilderFile(layoutFile, null);
+  }
+
+  private void openLayoutBuilderFile(Path layoutFile, Runnable afterSave) {
     try {
       String source = Files.isRegularFile(layoutFile) ? Files.readString(layoutFile, StandardCharsets.UTF_8) : "";
       if (layoutBuilderOverlay != null) workspaceStack.getChildren().remove(layoutBuilderOverlay);
-      layoutBuilder = new ZUILayoutBuilder(_stage, layoutFile, source, () -> statusLabel.setText("Saved " + layoutFile.getFileName()), () -> {
+      layoutBuilder = new ZUILayoutBuilder(_stage, layoutFile, source, () -> {
+        if (afterSave != null) {
+          afterSave.run();
+        }
+        statusLabel.setText("Saved " + layoutFile.getFileName());
+      }, () -> {
         workspaceStack.getChildren().remove(layoutBuilderOverlay);
         layoutBuilderOverlay = null;
         layoutBuilder = null;
@@ -4889,6 +5674,29 @@ public class ZIDEEditor extends Application {
     currentBreakpoint.stopExecution();
     currentBreakpoint = null;
     breakpointVariables.clear();
+  }
+
+  private Process runConsoleProcess(String prompt, ProcessBuilder process) throws IOException {
+    configureInputPrompt(prompt, process);
+    return consoleOutputTextArea.runProcess(process);
+  }
+
+  private Process runConsoleProcess(String prompt, ProcessBuilder process,
+                                    java.util.function.Consumer<Process> started) throws IOException {
+    configureInputPrompt(prompt, process);
+    return consoleOutputTextArea.runProcess(process, started);
+  }
+
+  private void configureInputPrompt(String prompt, ProcessBuilder process) {
+    boolean runtimePrompt = prompt.startsWith("zpe ") || prompt.startsWith("sqarl ");
+    if (runtimePrompt && showInputPrompt) {
+      process.environment().put("ZIDE_INPUT_PROMPT", prompt);
+    } else {
+      process.environment().remove("ZIDE_INPUT_PROMPT");
+    }
+    // ZPE and SQARL emit the marker at the actual auto_input/readLine call;
+    // other runtimes retain the delayed fallback used by the console bridge.
+    consoleOutputTextArea.setFallbackPrompt(showInputPrompt && !runtimePrompt ? prompt : null);
   }
 
   private Node buildProjectTree(File projectDir) {
@@ -5679,6 +6487,13 @@ public class ZIDEEditor extends Application {
   }
 
   private void checkPendingExternalFileChanges() {
+    if (activeCollaboration != null) {
+      // During collaboration, the session transport owns synchronisation. A
+      // second ZIDE instance may still watch the same local project, so its
+      // file events must not produce competing reload prompts.
+      pendingExternalFileChanges.clear();
+      return;
+    }
     if (activeModalOverlay != null) {
       externalFileChangeTimer.playFromStart();
       return;
@@ -5700,6 +6515,16 @@ public class ZIDEEditor extends Application {
       }
       try {
         String diskContent = Files.readString(changedPath, StandardCharsets.UTF_8);
+        ActiveCollaboration session = activeCollaboration;
+        boolean collaborationManaged = session != null
+                && (session.tab == tab
+                || (session.isOwner && session.projectRoot != null && changedPath.startsWith(session.projectRoot)));
+        if (collaborationManaged) {
+          // Collaboration writes are deliberate synchronisation, not edits made
+          // by another application. Do not interrupt the host with a reload prompt.
+          tab.setLastDiskContent(diskContent);
+          return;
+        }
         if (Objects.equals(diskContent, tab.getLastDiskContent())) return;
         if (Objects.equals(diskContent, tab.getEditor().getText())) {
           tab.setLastDiskContent(diskContent);
@@ -5780,6 +6605,7 @@ public class ZIDEEditor extends Application {
         double panelWidth = layoutDimension("LAYOUT_RIGHT_PANEL_WIDTH", 340, 220, 900);
         rightSidePanels.setPrefWidth(panelWidth);
       }
+      updateTabHeaderVisibility(rightSidePanels);
       updateEditorRightPanelLayout();
       scheduleEditorLayoutSave();
     });
@@ -5794,14 +6620,19 @@ public class ZIDEEditor extends Application {
           for (Tab t : c.getAddedSubList()) {
             t.textProperty().addListener((o, oldText, newText) -> refreshRunText.run());
             if (t instanceof EditorTab editorTab) {
-              editorTab.getEditor().getEditor().caretPositionProperty().addListener((o, oldPosition, newPosition) -> updateCaretPosition());
+              editorTab.getEditor().getEditor().caretPositionProperty().addListener((o, oldPosition, newPosition) -> {
+                updateCaretPosition();
+                publishActiveCollaborationPresence();
+              });
               editorTab.getEditor().getEditor().textProperty().addListener((o, oldText, newText) -> updateCaretPosition());
             }
           }
         }
       }
+      updateTabHeaderVisibility(editorTabs);
       scheduleEditorLayoutSave();
     });
+    updateTabHeaderVisibility(editorTabs);
 
     editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
       scheduleEditorLayoutSave();
@@ -5822,6 +6653,7 @@ public class ZIDEEditor extends Application {
       if (newTab instanceof EditorTab) syncLanguageSelector((EditorTab) newTab);
       updateZoomPercentage();
       updateCaretPosition();
+      publishActiveCollaborationPresence();
     });
 
     editorRightSplit = new SplitPane(editorTabs);
@@ -5842,6 +6674,15 @@ public class ZIDEEditor extends Application {
     updateEditorRightPanelLayout();
     editorTabs.setMinWidth(0);
     return editorRightSplit;
+  }
+
+  private static void updateTabHeaderVisibility(TabPane pane) {
+    if (pane == null) return;
+    if (pane.getTabs().size() <= 1) {
+      if (!pane.getStyleClass().contains("single-tab")) pane.getStyleClass().add("single-tab");
+    } else {
+      pane.getStyleClass().remove("single-tab");
+    }
   }
 
   private void setEditorRightPanelWidth(double requestedWidth) {
@@ -6569,14 +7410,17 @@ public class ZIDEEditor extends Application {
     boolean compilable = language != null && language.canCompile();
     boolean yass = language != null && language.isYass();
     boolean yassProject = yass && projectManifestFor(getCurrentTab()) != null;
-    boolean canTranspile = language != null && language.canTranspile()
-            && (yass || "zpeedy".equals(language.id));
+    boolean sqarlLanguage = language != null && "sqarl".equals(language.id);
+    boolean canTranspile = language != null && (language.canTranspile()
+            && (yass || "zpeedy".equals(language.id)) || sqarlLanguage);
     boolean debuggable = language != null && language.canDebug();
     boolean transpilable = language != null && language.canTranspile();
     if (scriptMenu != null) scriptMenu.setVisible(runnable || compilable || debuggable || transpilable);
     // Keep ZPE Online browsing and account actions available for every file
     // type; only the save item is restricted to validated YASS documents.
-    if (zpeOnlineMenu != null) zpeOnlineMenu.setVisible(true);
+    if (zpeOnlineMenu != null) {
+      zpeOnlineMenu.setVisible(activeCollaboration == null);
+    }
     setMenuItemAvailable(runScriptMenuItem, runnable && !yassProject);
     setMenuItemAvailable(runYassProgramMenuItem, yassProject);
     setMenuItemAvailable(runYassScriptMenuItem, yassProject);
@@ -6592,6 +7436,8 @@ public class ZIDEEditor extends Application {
     setMenuItemAvailable(aiProblemMenuItem, yass);
     setMenuItemAvailable(aiValidateMenuItem, yass);
     for (Node item : transpileMenuItems) setMenuItemAvailable(item, canTranspile);
+    setMenuItemAvailable(sqarlToYassMenuItem, sqarlLanguage);
+    setMenuItemAvailable(sqarlToPythonMenuItem, sqarlLanguage);
     setMenuItemAvailable(transpileSubmenuItem, canTranspile && !transpileMenuItems.isEmpty());
     setMenuItemAvailable(scriptCompileSeparator, runnable && (compilable || transpilable));
     setMenuItemAvailable(scriptTranspileSeparator, canTranspile && (runnable || compilable));
@@ -6943,7 +7789,7 @@ public class ZIDEEditor extends Application {
         runBtn.getStyleClass().remove("running");
         statusLabel.setText("Ready");
       }));
-      consoleOutputTextArea.runProcess(process);
+      runConsoleProcess("python > ", process);
     } catch (IOException exception) {
       runBtn.getStyleClass().remove("running");
       statusLabel.setText("Ready");
@@ -6981,7 +7827,7 @@ public class ZIDEEditor extends Application {
         statusLabel.setText("Ready");
         try { Files.deleteIfExists(executionSource); } catch (IOException ignored) { }
       }));
-      consoleOutputTextArea.runProcess(process);
+      runConsoleProcess("php > ", process);
     } catch (IOException exception) {
       if (source != null) try { Files.deleteIfExists(source); } catch (IOException ignored) { }
       runBtn.getStyleClass().remove("running");
@@ -7020,7 +7866,7 @@ public class ZIDEEditor extends Application {
         statusLabel.setText("Ready");
         try { Files.deleteIfExists(executionSource); } catch (IOException ignored) { }
       }));
-      consoleOutputTextArea.runProcess(process);
+      runConsoleProcess("lua > ", process);
     } catch (IOException exception) {
       if (source != null) try { Files.deleteIfExists(source); } catch (IOException ignored) { }
       runBtn.getStyleClass().remove("running");
@@ -7138,7 +7984,7 @@ public class ZIDEEditor extends Application {
       continueButton.setDisable(true);
       stepOverButton.setDisable(true);
       beginProfilerSession(ProfileKind.PYTHON);
-      Process python = consoleOutputTextArea.runProcess(process);
+      Process python = runConsoleProcess("python > ", process);
       startPythonProfiler(python);
       python.onExit().thenRun(() -> Platform.runLater(() -> {
         session.close();
@@ -7377,7 +8223,7 @@ public class ZIDEEditor extends Application {
         runBtn.getStyleClass().remove("running");
         statusLabel.setText("Ready");
       }));
-      consoleOutputTextArea.runProcess(process);
+      runConsoleProcess("sqarl > ", process);
     } catch (IOException exception) {
       runBtn.getStyleClass().remove("running");
       statusLabel.setText("Ready");
@@ -9076,9 +9922,20 @@ public class ZIDEEditor extends Application {
     final EditorTab tab;
     final String code;
     final String token;
+    final boolean isOwner;
+    final Path projectRoot;
+    final String localName;
+    final String primaryFile;
+    final Set<String> pendingProjectFilePublishes = ConcurrentHashMap.newKeySet();
+    final Set<String> pendingProjectFileLoads = ConcurrentHashMap.newKeySet();
+    final Map<EditorTab, IntFunction<? extends Node>> lineIndicatorFactories = new IdentityHashMap<>();
+    final Map<EditorTab, javafx.beans.value.ChangeListener<String>> projectFileListeners = new IdentityHashMap<>();
+    final Map<EditorTab, java.util.concurrent.ScheduledFuture<?>> projectFileUpdates = new IdentityHashMap<>();
     volatile long revision;
     volatile long participantRevision;
     volatile List<String> participantNames;
+    volatile List<ZIDECollaborationClient.Presence> presences = List.of();
+    volatile long projectFileRevision;
     boolean ownsFocusMode;
     volatile String lastSharedDocument;
     volatile String pendingDocument;
@@ -9089,7 +9946,8 @@ public class ZIDEEditor extends Application {
     javafx.beans.value.ChangeListener<String> listener;
 
     ActiveCollaboration(ZIDECollaborationClient client, EditorTab tab, String code, String token,
-                        long revision, long participantRevision, List<String> participantNames, String document) {
+                        long revision, long participantRevision, List<String> participantNames, String document,
+                        boolean isOwner, Path projectRoot, String localName, String primaryFile) {
       this.client = client;
       this.tab = tab;
       this.code = code;
@@ -9099,7 +9957,15 @@ public class ZIDEEditor extends Application {
       this.participantNames = List.copyOf(participantNames);
       this.lastSharedDocument = document;
       this.pendingDocument = document;
+      this.isOwner = isOwner;
+      this.projectRoot = projectRoot;
+      this.localName = localName;
+      this.primaryFile = primaryFile;
     }
+  }
+
+  private record CollaborativeProjectItem(String name, String relativePath) {
+    @Override public String toString() { return name; }
   }
 
 
