@@ -3459,3 +3459,29 @@
 .runtime-install-prompt .button {
     -fx-padding: 5px 10px;
 }
+
+/* Windows uses a square client frame; keep the transparent stage from
+   leaking through rounded bottom corners. */
+.window-stack:not(.mac-window),
+.window-stack:not(.mac-window) .window-frame-border {
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+}
+
+/* Native-looking title-bar actions stay transparent on Windows. */
+.app-root .titlebar-actions .titlebar-action-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-effect: none;
+}
+
+.app-root .titlebar-actions .titlebar-action-button:hover,
+.app-root .titlebar-actions .titlebar-action-button:pressed,
+.app-root .titlebar-actions .titlebar-action-button:focused {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
