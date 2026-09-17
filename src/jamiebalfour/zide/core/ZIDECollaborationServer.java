@@ -26,8 +26,10 @@ import java.util.concurrent.TimeUnit;
 /** Lightweight in-memory relay for ZIDE live-editing sessions. */
 public final class ZIDECollaborationServer implements AutoCloseable {
   private static final int MAX_DOCUMENT_BYTES = 1_048_576;
+  private static final int MAX_PROJECT_FILES = 10_000;
+  private static final int DEFAULT_MAX_SESSIONS = 128;
   private static final int MAX_REQUEST_BYTES = MAX_DOCUMENT_BYTES + 65_536;
-  private static final int MAX_PARTICIPANTS = 8;
+  private static final int DEFAULT_MAX_USERS = 32;
   private static final long SESSION_TTL_MILLIS = TimeUnit.HOURS.toMillis(12);
   private static final long MAX_POLL_MILLIS = TimeUnit.SECONDS.toMillis(15);
   private static final int MAX_EDIT_HISTORY = 4096;
@@ -37,6 +39,10 @@ public final class ZIDECollaborationServer implements AutoCloseable {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private final HttpServer server;
+  private final int maxSessions;
+  private final int maxUsers;
+  private final byte[] passwordHash;
+  private final boolean passwordProtected;
   private final ScheduledExecutorService cleanup = Executors.newSingleThreadScheduledExecutor(r -> {
     Thread thread = new Thread(r, "zide-collaboration-cleanup");
     thread.setDaemon(true);
@@ -45,10 +51,45 @@ public final class ZIDECollaborationServer implements AutoCloseable {
   private final ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
 
   public ZIDECollaborationServer(int port) throws IOException {
-    this(new InetSocketAddress("0.0.0.0", port));
+    this(new InetSocketAddress("0.0.0.0", port), DEFAULT_MAX_SESSIONS);
   }
 
   public ZIDECollaborationServer(InetSocketAddress address) throws IOException {
+    this(address, DEFAULT_MAX_SESSIONS);
+  }
+
+  public ZIDECollaborationServer(int port, int maxSessions) throws IOException {
+    this(new InetSocketAddress("0.0.0.0", port), maxSessions, DEFAULT_MAX_USERS);
+  }
+
+  public ZIDECollaborationServer(InetSocketAddress address, int maxSessions) throws IOException {
+    this(address, maxSessions, DEFAULT_MAX_USERS);
+  }
+
+  public ZIDECollaborationServer(int port, int maxSessions, int maxUsers) throws IOException {
+    this(new InetSocketAddress("0.0.0.0", port), maxSessions, maxUsers);
+  }
+
+  public ZIDECollaborationServer(InetSocketAddress address, int maxSessions, int maxUsers) throws IOException {
+    this(address, maxSessions, maxUsers, "");
+  }
+
+  public ZIDECollaborationServer(int port, int maxSessions, int maxUsers, String password) throws IOException {
+    this(new InetSocketAddress("0.0.0.0", port), maxSessions, maxUsers, password);
+  }
+
+  public ZIDECollaborationServer(InetSocketAddress address, int maxSessions, int maxUsers, String password) throws IOException {
+    if (maxSessions < 1 || maxSessions > 10_000) {
+      throw new IllegalArgumentException("maxSessions must be between 1 and 10000.");
+    }
+    if (maxUsers < 1 || maxUsers > 10_000) {
+      throw new IllegalArgumentException("maxUsers must be between 1 and 10000.");
+    }
+    this.maxSessions = maxSessions;
+    this.maxUsers = maxUsers;
+    String configuredPassword = password == null ? "" : password;
+    this.passwordProtected = !configuredPassword.isBlank();
+    this.passwordHash = sha256(configuredPassword);
     server = HttpServer.create(address, 64);
     server.createContext("/health", this::handleHealth);
     server.createContext("/api/v1/collaboration", this::handleApi);
@@ -64,6 +105,9 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     cleanup.scheduleAtFixedRate(this::removeExpiredSessions, 1, 1, TimeUnit.MINUTES);
     System.out.println("ZIDE collaboration server listening on " + server.getAddress());
     System.out.println("API: http://<server-host>:" + server.getAddress().getPort() + "/api/v1/collaboration");
+    System.out.println("Maximum sessions: " + maxSessions);
+    System.out.println("Maximum users per session: " + maxUsers);
+    System.out.println("Password protection: " + (passwordProtected ? "enabled" : "disabled"));
     System.out.println("Use HTTPS in production by placing this service behind a TLS reverse proxy.");
   }
 
@@ -118,17 +162,93 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       case "join" -> join(exchange, request);
       case "poll" -> poll(exchange, request);
       case "edit" -> edit(exchange, request);
+      case "presence" -> presence(exchange, request);
+      case "chat" -> chat(exchange, request);
+      case "heartbeat" -> heartbeat(exchange, request);
+      case "file-request" -> requestProjectFile(exchange, request);
+      case "file-publish" -> publishProjectFile(exchange, request);
       case "update" -> update(exchange, request);
       case "leave" -> leave(exchange, request);
       default -> send(exchange, 400, Map.of("error", "Unknown action."));
     }
   }
 
+  private void presence(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request);
+    if (session == null) return;
+    String token = string(request, "token", "");
+    Long line = number(request.get("line"));
+    String file = string(request, "file", null);
+    if (line == null || line < 1 || file == null || file.isBlank() || file.length() > 512) {
+      send(exchange, 400, Map.of("error", "Presence requires a file and one-based line number."));
+      return;
+    }
+    synchronized (session) {
+      String id = tokenHash(token);
+      session.presence.put(id, Map.of("name", session.participantNames.getOrDefault(id, "Participant"), "file", file,
+              "line", line));
+      session.participantRevision++;
+      session.lastActivity = System.currentTimeMillis();
+      session.notifyAll();
+      send(exchange, 200, pollState(session, session.revision));
+    }
+  }
+
+  private void chat(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request);
+    if (session == null) return;
+    String token = string(request, "token", "");
+    String message = string(request, "message", "");
+    if (message == null || message.isBlank() || message.length() > 2000) {
+      send(exchange, 400, Map.of("error", "Chat messages must contain 1 to 2000 characters."));
+      return;
+    }
+    synchronized (session) {
+      Map<String, Object> item = new LinkedHashMap<>();
+      String id = tokenHash(token);
+      item.put("name", session.participantNames.getOrDefault(id, "Participant"));
+      item.put("message", message);
+      item.put("time", System.currentTimeMillis());
+      session.chat.add(item);
+      if (session.chat.size() > 100) session.chat.remove(0);
+      session.participantRevision++;
+      session.notifyAll();
+      send(exchange, 200, pollState(session, session.revision));
+    }
+  }
+
+  private void heartbeat(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request);
+    if (session == null) return;
+    synchronized (session) {
+      session.lastActivity = System.currentTimeMillis();
+      send(exchange, 200, Map.of("alive", true, "expiresAt", session.lastActivity + SESSION_TTL_MILLIS));
+    }
+  }
+
   private void create(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    if (!passwordMatches(request)) {
+      send(exchange, 401, Map.of("error", "A valid collaboration password is required."));
+      return;
+    }
     String document = string(request, "document", "");
     String fileName = string(request, "fileName", "Untitled");
     String language = string(request, "language", "text");
     String name = string(request, "name", "ZIDE User");
+    List<String> projectFiles = new ArrayList<>();
+    Object manifest = request.get("projectFiles");
+    if (manifest instanceof Iterable<?> files) {
+      for (Object file : files) {
+        String path = normalizedProjectPath(file);
+        if (path != null && !projectFiles.contains(path)) {
+          projectFiles.add(path);
+          if (projectFiles.size() > MAX_PROJECT_FILES) {
+            send(exchange, 413, Map.of("error", "Project manifest contains too many files."));
+            return;
+          }
+        }
+      }
+    }
     if (document == null || fileName == null || language == null || name == null) {
       send(exchange, 400, Map.of("error", "Document metadata must be text."));
       return;
@@ -141,7 +261,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       send(exchange, 400, Map.of("error", "Document metadata is too long."));
       return;
     }
-    if (sessions.size() >= 10_000) {
+    if (sessions.size() >= maxSessions) {
       send(exchange, 503, Map.of("error", "The server is at session capacity."));
       return;
     }
@@ -151,7 +271,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     do {
       code = makeCode();
       String token = makeToken();
-      session = new Session(code, document, fileName, language, token, name);
+      session = new Session(code, document, fileName, language, token, name, projectFiles);
       Session existing = sessions.putIfAbsent(code, session);
       if (existing == null) {
         send(exchange, 201, state(session, token));
@@ -161,6 +281,10 @@ public final class ZIDECollaborationServer implements AutoCloseable {
   }
 
   private void join(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    if (!passwordMatches(request)) {
+      send(exchange, 401, Map.of("error", "A valid collaboration password is required."));
+      return;
+    }
     String code = normalizedCode(request.get("code"));
     if (code == null) {
       send(exchange, 400, Map.of("error", "Session code must be eight characters."));
@@ -183,7 +307,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
         send(exchange, 404, Map.of("error", "Session code was not found or has expired."));
         return;
       }
-      if (session.participants.size() >= MAX_PARTICIPANTS) {
+      if (session.participants.size() >= maxUsers) {
         send(exchange, 409, Map.of("error", "This session is full."));
         return;
       }
@@ -195,6 +319,20 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       session.notifyAll();
       Map<String, Object> response = state(session, token);
       send(exchange, 200, response);
+    }
+  }
+
+  private boolean passwordMatches(Map<String, Object> request) {
+    if (!passwordProtected) return true;
+    String supplied = string(request, "authHash", "");
+    return MessageDigest.isEqual(passwordHash, supplied.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static byte[] sha256(String value) {
+    try {
+      return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+    } catch (java.security.NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is unavailable", exception);
     }
   }
 
@@ -227,7 +365,57 @@ public final class ZIDECollaborationServer implements AutoCloseable {
         return;
       }
       session.lastActivity = System.currentTimeMillis();
-      send(exchange, 200, pollState(session, sinceRevision));
+      String tokenId = tokenHash(string(request, "token", ""));
+      send(exchange, 200, pollState(session, sinceRevision, tokenId));
+    }
+  }
+
+  /** Queues a project file for the owner, or returns its current session copy. */
+  private void requestProjectFile(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request);
+    if (session == null) return;
+    String path = normalizedProjectPath(request.get("path"));
+    if (path == null || !session.projectFiles.contains(path)) {
+      send(exchange, 404, Map.of("error", "Project file was not found in this session."));
+      return;
+    }
+    synchronized (session) {
+      ProjectFile cached = session.projectFileCache.get(path);
+      if (cached != null) {
+        send(exchange, 200, projectFileResponse("ready", path, cached));
+        return;
+      }
+      if (!session.pendingProjectFiles.containsKey(path)) {
+        session.pendingProjectFiles.put(path, System.currentTimeMillis());
+        session.participantRevision++;
+        session.notifyAll();
+      }
+      send(exchange, 200, Map.of("status", "pending", "path", path));
+    }
+  }
+
+  /** Accepts a shared project-file update and makes it available to all collaborators. */
+  private void publishProjectFile(HttpExchange exchange, Map<String, Object> request) throws IOException {
+    Session session = findAuthorized(exchange, request);
+    if (session == null) return;
+    String path = normalizedProjectPath(request.get("path"));
+    String content = string(request, "content", null);
+    if (path == null || !session.projectFiles.contains(path)) {
+      send(exchange, 404, Map.of("error", "Project file was not found in this session."));
+      return;
+    }
+    if (content == null || content.getBytes(StandardCharsets.UTF_8).length > MAX_DOCUMENT_BYTES) {
+      send(exchange, 413, Map.of("error", "Project file exceeds the 1 MiB session limit."));
+      return;
+    }
+    synchronized (session) {
+      ProjectFile cached = new ProjectFile(content, ++session.projectFileRevision);
+      session.projectFileCache.put(path, cached);
+      session.pendingProjectFiles.remove(path);
+      session.participantRevision++;
+      session.lastActivity = System.currentTimeMillis();
+      session.notifyAll();
+      send(exchange, 200, projectFileResponse("ready", path, cached));
     }
   }
 
@@ -331,6 +519,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       }
       session.participants.remove(tokenHash(token));
       session.participantNames.remove(tokenHash(token));
+      session.presence.remove(tokenHash(token));
       session.participantRevision++;
       session.lastActivity = System.currentTimeMillis();
       session.notifyAll();
@@ -375,6 +564,11 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     response.put("language", session.language);
     response.put("participants", session.participants.size());
     response.put("participantNames", List.copyOf(session.participantNames.values()));
+    response.put("projectFiles", session.projectFiles);
+    response.put("projectFileRevision", session.projectFileRevision);
+    response.put("cachedProjectFiles", List.copyOf(session.projectFileCache.keySet()));
+    response.put("presence", new ArrayList<>(session.presence.values()));
+    response.put("chat", List.copyOf(session.chat));
     response.put("participantRevision", session.participantRevision);
     response.put("expiresAt", session.lastActivity + SESSION_TTL_MILLIS);
     if (token != null) {
@@ -385,13 +579,25 @@ public final class ZIDECollaborationServer implements AutoCloseable {
   }
 
   private static Map<String, Object> pollState(Session session, long sinceRevision) {
+    return pollState(session, sinceRevision, null);
+  }
+
+  private static Map<String, Object> pollState(Session session, long sinceRevision, String tokenId) {
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("revision", session.revision);
     response.put("participantRevision", session.participantRevision);
     response.put("participantNames", List.copyOf(session.participantNames.values()));
+    response.put("projectFiles", session.projectFiles);
+    response.put("projectFileRevision", session.projectFileRevision);
+    response.put("cachedProjectFiles", List.copyOf(session.projectFileCache.keySet()));
+    response.put("presence", new ArrayList<>(session.presence.values()));
+    response.put("chat", List.copyOf(session.chat));
     response.put("participants", session.participants.size());
     response.put("fileName", session.fileName);
     response.put("language", session.language);
+    if (tokenId != null && "host".equals(session.participants.get(tokenId))) {
+      response.put("projectFileRequests", List.copyOf(session.pendingProjectFiles.keySet()));
+    }
     boolean snapshotRequired = sinceRevision < session.revision
             && (session.edits.isEmpty() || sinceRevision < session.edits.getFirst().revision - 1);
     response.put("snapshotRequired", snapshotRequired);
@@ -405,6 +611,15 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       }
       response.put("changes", changes);
     }
+    return response;
+  }
+
+  private static Map<String, Object> projectFileResponse(String status, String path, ProjectFile file) {
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("status", status);
+    response.put("path", path);
+    response.put("content", file.content);
+    response.put("fileRevision", file.revision);
     return response;
   }
 
@@ -423,6 +638,17 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     }
     String code = ((String)value).trim().toUpperCase(java.util.Locale.ROOT);
     return code.matches("[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}") ? code : null;
+  }
+
+  private static String normalizedProjectPath(Object value) {
+    if (!(value instanceof String raw)) return null;
+    String path = raw.replace('\\', '/');
+    if (path.isBlank() || path.length() > 512 || path.startsWith("/") || path.startsWith("~/")
+            || path.matches("^[A-Za-z]:.*")) return null;
+    for (String part : path.split("/", -1)) {
+      if (part.isEmpty() || ".".equals(part) || "..".equals(part)) return null;
+    }
+    return path;
   }
 
   private static String makeCode() {
@@ -482,15 +708,21 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     final String language;
     final Map<String, String> participants = new HashMap<>();
     final Map<String, String> participantNames = new LinkedHashMap<>();
+    final List<String> projectFiles;
+    final Map<String, ProjectFile> projectFileCache = new LinkedHashMap<>();
+    final Map<String, Long> pendingProjectFiles = new LinkedHashMap<>();
+    final Map<String, Map<String, Object>> presence = new LinkedHashMap<>();
+    final List<Map<String, Object>> chat = new ArrayList<>();
     final ArrayDeque<Edit> edits = new ArrayDeque<>();
     String document;
     long revision;
     long participantRevision;
+    long projectFileRevision;
     int editHistoryBytes;
     long lastActivity = System.currentTimeMillis();
     boolean ended;
 
-    Session(String code, String document, String fileName, String language, String hostToken, String hostName) {
+    Session(String code, String document, String fileName, String language, String hostToken, String hostName, List<String> projectFiles) {
       this.code = code;
       this.document = document;
       this.fileName = fileName;
@@ -498,6 +730,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       String tokenId = tokenHash(hostToken);
       participants.put(tokenId, "host");
       participantNames.put(tokenId, hostName);
+      this.projectFiles = List.copyOf(projectFiles);
     }
   }
 
@@ -512,4 +745,6 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       return result;
     }
   }
+
+  private record ProjectFile(String content, long revision) { }
 }
