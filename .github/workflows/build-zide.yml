@@ -91,6 +91,7 @@ jobs:
         with:
           name: zide-macos-aarch64-app
           path: build/native/ZIDE.app
+          retention-days: 3
           if-no-files-found: error
 
       - name: Upload macOS app archive
@@ -98,6 +99,7 @@ jobs:
         with:
           name: zide-macos-aarch64-app-zip
           path: build/native/ZIDE-macos-arm64.zip
+          retention-days: 3
           if-no-files-found: error
 
       - name: Upload ZIDE
@@ -105,6 +107,7 @@ jobs:
         with:
           name: zide-macos-aarch64
           path: build/native/zide-aarch64
+          retention-days: 3
           if-no-files-found: error
 
       - name: Deploy macOS ZIDE with rsync
@@ -207,6 +210,7 @@ jobs:
             build/native/zide-win-x64.exe
             build/native/zide.png
             build/native/ZIDE-windows-x64.zip
+          retention-days: 3
           if-no-files-found: error
       - name: Install rsync
         uses: msys2/setup-msys2@v2
@@ -290,6 +294,7 @@ jobs:
             build/native/zide-linux-x64
             build/native/zide.png
             build/native/ZIDE-linux-x64.tar.gz
+          retention-days: 3
           if-no-files-found: error
       - name: Deploy Linux ZIDE with rsync
         env:
