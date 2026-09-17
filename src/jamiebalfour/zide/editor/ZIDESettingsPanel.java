@@ -26,17 +26,20 @@ final class ZIDESettingsPanel extends HBox {
   private final Spinner<Integer> fontSize;
   private final CheckBox wordWrap;
   private final CheckBox useZpex;
+  private final CheckBox showInputPrompt;
   private final TextField url;
   private final PasswordField key;
   private final BalfComboBox<String> model;
   private final TextField collaborationServer;
   private final TextField collaborationPort;
   private final TextField collaborationName;
+  private final PasswordField collaborationPassword;
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
-                    String fontName, int fontSizeValue, boolean wrapLines, boolean preferZpex,
+                    String fontName, int fontSizeValue, boolean wrapLines, boolean preferZpex, boolean showInputPromptValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
-                    String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName) {
+                    String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
+                    String collaborationPasswordValue) {
     super(18);
 
     ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "ChatGPT", "Collaboration"));
@@ -78,9 +81,11 @@ final class ZIDESettingsPanel extends HBox {
 
     useZpex = new CheckBox("Use ZPEX when available");
     useZpex.setSelected(preferZpex);
+    showInputPrompt = new CheckBox("Show a language prompt when input is required");
+    showInputPrompt.setSelected(showInputPromptValue);
     Label yassTitle = new Label("YASS");
     yassTitle.getStyleClass().add("settings-group-title");
-    VBox yassGroup = new VBox(10, yassTitle, useZpex);
+    VBox yassGroup = new VBox(10, yassTitle, useZpex, showInputPrompt);
     yassGroup.getStyleClass().add("settings-option-group");
     Label executionTitle = new Label("Execution");
     executionTitle.getStyleClass().add("settings-section-title");
@@ -105,11 +110,18 @@ final class ZIDESettingsPanel extends HBox {
     collaborationServer = new TextField(collaborationServerName);
     collaborationPort = new TextField(collaborationPortNumber);
     collaborationName = new TextField(collaborationDisplayName);
+    collaborationPassword = new PasswordField();
+    collaborationPassword.setText(collaborationPasswordValue);
     GridPane collaborationFields = fields();
     collaborationServer.setPromptText("Hostname or https:// address");
     collaborationFields.addRow(0, new Label("Server address"), collaborationServer);
     collaborationFields.addRow(1, new Label("Port"), collaborationPort);
     collaborationFields.addRow(2, new Label("Your name"), collaborationName);
+    collaborationFields.addRow(3, new Label("Server password"), collaborationPassword);
+    Label hostedServerNote = new Label("jamiebalfour.scot provides a free hosted collaboration server with limited resources. For larger sessions, use your own server.");
+    hostedServerNote.setWrapText(true);
+    hostedServerNote.getStyleClass().add("settings-help-text");
+    collaborationFields.add(hostedServerNote, 0, 4, 2, 1);
     GridPane.setHgrow(collaborationServer, Priority.ALWAYS);
     GridPane.setHgrow(collaborationPort, Priority.ALWAYS);
     GridPane.setHgrow(collaborationName, Priority.ALWAYS);
@@ -154,12 +166,14 @@ final class ZIDESettingsPanel extends HBox {
   int getFontSize() { return fontSize.getValue(); }
   boolean isWordWrapEnabled() { return wordWrap.isSelected(); }
   boolean isZpexPreferred() { return useZpex.isSelected(); }
+  boolean isInputPromptEnabled() { return showInputPrompt.isSelected(); }
   String getChatGPTUrl() { return url.getText().trim(); }
   String getChatGPTKey() { return key.getText().trim(); }
   String getChatGPTModel() { return model.getEditor().getText().trim(); }
   String getCollaborationServer() { return collaborationServer.getText().trim(); }
   String getCollaborationPort() { return collaborationPort.getText().trim(); }
   String getCollaborationName() { return collaborationName.getText().trim(); }
+  String getCollaborationPassword() { return collaborationPassword.getText(); }
 
   private static BalfComboBox<String> combo(List<String> choices, boolean darkMode) {
     BalfComboBox<String> result = new BalfComboBox<>(FXCollections.observableArrayList(choices));
