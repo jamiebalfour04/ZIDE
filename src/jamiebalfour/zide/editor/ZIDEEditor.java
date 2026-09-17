@@ -1158,8 +1158,11 @@ public class ZIDEEditor extends Application {
     collaborationChatInput.setPromptText("Message");
     Button sendChat = new Button("Send");
     sendChat.setOnAction(event -> sendCollaborationChat());
+    Button pollChat = new Button("Poll");
+    pollChat.setOnAction(event -> createCollaborationPoll());
     collaborationChatInput.setOnAction(event -> sendCollaborationChat());
-    HBox chatComposer = new HBox(6, collaborationChatInput, sendChat);
+    HBox chatComposer = new HBox(6, collaborationChatInput, sendChat, pollChat);
+    chatComposer.getStyleClass().add("collaboration-chat-composer");
     HBox.setHgrow(collaborationChatInput, Priority.ALWAYS);
     VBox chatContent = new VBox(8, collaborationChatScroll, chatComposer);
     VBox.setVgrow(collaborationChatScroll, Priority.ALWAYS);
@@ -1173,7 +1176,8 @@ public class ZIDEEditor extends Application {
     updateTabHeaderVisibility(leftSidePanels);
     collaborationSidebar = new TabPane();
     collaborationSidebar.getStyleClass().add("editor-tabs");
-    collaborationSidebar.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
+    collaborationSidebar.getStyleClass().add("collaboration-tabs");
+    collaborationSidebar.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
     collaborationSidebar.setMinWidth(260);
     collaborationSidebar.setPrefWidth(400);
     collaborationSidebar.getTabs().addAll(collaborationFilesTab, collaborationTab, collaborationChatTab);
@@ -1366,6 +1370,25 @@ public class ZIDEEditor extends Application {
     });
   }
 
+  private void createCollaborationPoll() {
+    ActiveCollaboration session = activeCollaboration;
+    if (session == null) return;
+    TextField question = new TextField(); question.setPromptText("Question");
+    TextArea optionsInput = new TextArea(); optionsInput.setPromptText("Each option goes on a separate line."); optionsInput.setPrefRowCount(5); optionsInput.setWrapText(true);
+    VBox content = new VBox(10, new Label("Question"), question, new Label("List each option on a separate line"), optionsInput);
+    content.setPrefWidth(560);
+    showInWindowModal("Create poll", "Ask the group a quick question", content, List.of(
+            new ModalAction("Cancel", false, () -> true),
+            new ModalAction("Create poll", true, () -> {
+              if (question.getText().trim().isEmpty()) { showError("Create poll", "Enter a question."); return false; }
+              List<String> options = new ArrayList<>(); for (String option : optionsInput.getText().split("\\R")) if (!option.trim().isEmpty()) options.add(option.trim());
+              if (options.size() < 2) { showError("Create poll", "Enter at least two options."); return false; }
+              COLLABORATION_WORKER.execute(() -> { try { session.client.createPoll(session.code, session.token, question.getText().trim(), options); } catch (Exception exception) { Platform.runLater(() -> statusLabel.setText("Poll failed: " + safeMessage(exception))); } });
+              return true;
+            })));
+    Platform.runLater(question::requestFocus);
+  }
+
   private void renderCollaborationChat(Map<String, Object> state) {
     if (collaborationChatMessages == null) return;
     Object value = state.get("chat");
@@ -1376,6 +1399,48 @@ public class ZIDEEditor extends Application {
     for (Object item : messages) {
       if (item instanceof Map<?, ?> message) {
         Object body = message.get("message");
+        Node pollNode = null;
+        if ("poll".equals(message.get("type"))) {
+          Object question = message.get("question"); Object options = message.get("options");
+          VBox poll = new VBox(6, new Label(String.valueOf(question)));
+          if (options instanceof Iterable<?> values) {
+            int index = 0;
+            List<?> voteCounts = message.get("votes") instanceof List<?> counts ? counts : List.of();
+            int totalVotes = 0; for (Object count : voteCounts) if (count instanceof Number n) totalVotes += n.intValue();
+            ToggleGroup group = new ToggleGroup();
+            for (Object option : values) {
+              final int choice = index++;
+              Object count = choice < voteCounts.size() ? voteCounts.get(choice) : 0;
+              int numericCount = count instanceof Number number ? number.intValue() : 0;
+              RadioButton vote = new RadioButton(String.valueOf(option));
+              vote.setToggleGroup(group); vote.setMaxWidth(Double.MAX_VALUE);
+              Label voteCount = new Label(String.valueOf(numericCount));
+              voteCount.getStyleClass().add("collaboration-poll-count");
+              HBox voteRow = new HBox(8, vote, voteCount);
+              voteRow.setMaxWidth(Double.MAX_VALUE);
+              HBox.setHgrow(vote, Priority.ALWAYS);
+              Integer selectedChoice = session == null ? null : session.pollVotes.get(((Number) message.get("time")).longValue());
+              if (selectedChoice != null && selectedChoice == choice) vote.setSelected(true);
+              ProgressBar bar = new ProgressBar(totalVotes == 0 ? 0 : (double) numericCount / totalVotes);
+              bar.setMaxWidth(Double.MAX_VALUE); bar.getStyleClass().add("collaboration-poll-progress");
+              vote.setOnAction(event -> COLLABORATION_WORKER.execute(() -> {
+                if (session != null) session.pollVotes.put(((Number) message.get("time")).longValue(), choice);
+                try { session.client.votePoll(session.code, session.token, ((Number) message.get("time")).longValue(), choice); }
+                catch (Exception ignored) { }
+              }));
+              poll.getChildren().addAll(voteRow, bar);
+            }
+          }
+          poll.getStyleClass().add("collaboration-poll-card");
+          body = null;
+          pollNode = poll;
+        }
+        if (pollNode != null) {
+          messageCount++;
+          VBox bubble = new VBox(pollNode); bubble.getStyleClass().add("collaboration-chat-bubble"); bubble.setMaxWidth(Double.MAX_VALUE);
+          HBox pollRow = new HBox(bubble); HBox.setHgrow(bubble, Priority.ALWAYS); pollRow.setMaxWidth(Double.MAX_VALUE);
+          rows.add(pollRow); continue;
+        }
         if (body != null) {
           messageCount++;
           Object name = message.get("name");
@@ -1410,6 +1475,10 @@ public class ZIDEEditor extends Application {
       collaborationChatMessages.getChildren().setAll(rows);
       if (collaborationChatScroll != null) collaborationChatScroll.setVvalue(1);
     });
+  }
+
+  private static List<String> toStringList(Iterable<?> values) {
+    List<String> result = new ArrayList<>(); for (Object value : values) result.add(String.valueOf(value)); return result;
   }
 
   private void configureMacNativeTitlebar(Stage stage) {
@@ -1679,6 +1748,7 @@ public class ZIDEEditor extends Application {
     for (ModalAction modalAction : modalActions) {
       Button button = new Button(modalAction.text());
       button.getStyleClass().add(modalAction.primary() ? "in-window-modal-primary" : "in-window-modal-secondary");
+      if (modalAction.primary()) button.setDefaultButton(true);
       button.setOnAction(event -> {
         if (modalAction.action().getAsBoolean()) closeInWindowModal();
       });
@@ -1712,6 +1782,7 @@ public class ZIDEEditor extends Application {
         closeInWindowModal();
         event.consume();
       } else if (event.getCode() == KeyCode.ENTER) {
+        if (event.getTarget() instanceof TextArea) return;
         modalActions.stream().filter(ModalAction::primary).findFirst().ifPresent(action -> {
           if (action.action().getAsBoolean()) closeInWindowModal();
         });
@@ -1905,7 +1976,7 @@ public class ZIDEEditor extends Application {
     file.createItem("New File", "⌘N", this::newFile, true);
     file.createItem("Open project folder", "⌘O", this::openProjectFolder, true);
     file.separator();
-    file.createItem("Collaborate…", "", this::openCollaboration, true);
+    file.createItem("Collaborate", "", this::openCollaboration, true);
     file.separator();
     file.createItem("Save", "⌘S", this::saveCurrentFile, true);
     file.createItem("Save As...", "", this::saveCurrentFileAs, true);
@@ -3602,16 +3673,24 @@ public class ZIDEEditor extends Application {
     body.setMaxWidth(540);
     body.getStyleClass().add("in-window-modal-message");
     Button dismiss = new Button("OK");
+    dismiss.setDefaultButton(true);
     dismiss.getStyleClass().add("in-window-modal-primary");
     HBox actions = new HBox(dismiss);
     actions.setAlignment(Pos.CENTER_RIGHT);
     VBox panel = new VBox(14, heading, body, actions);
     panel.getStyleClass().add("in-window-modal-panel");
     panel.setMaxWidth(560);
+    panel.setMaxHeight(Region.USE_PREF_SIZE);
     StackPane popup = new StackPane(panel);
     popup.getStyleClass().add("in-window-modal-overlay");
     if (isDarkThemeEnabled()) popup.getStyleClass().add("in-window-modal-dark");
     popup.setOnMouseClicked(MouseEvent::consume);
+    popup.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+      if (event.getCode() == KeyCode.ESCAPE) {
+        windowStack.getChildren().remove(popup);
+        event.consume();
+      }
+    });
     dismiss.setOnAction(event -> windowStack.getChildren().remove(popup));
     windowStack.getChildren().add(popup);
     popup.toFront();
@@ -3661,6 +3740,7 @@ public class ZIDEEditor extends Application {
               return false;
             })));
     setActiveModalWidth(680);
+    Platform.runLater(() -> { code.requestFocus(); code.selectAll(); });
   }
 
   private Path selectedCollaborationProjectRoot() {
@@ -3793,6 +3873,10 @@ public class ZIDEEditor extends Application {
     String server = MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot").trim();
     String displayName = MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")).trim();
     String collaborationPassword = MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", "");
+    String collaborationAvatarPath = MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", "").trim();
+    String collaborationAvatar;
+    try { collaborationAvatar = ZIDECollaborationClient.avatarData(collaborationAvatarPath); }
+    catch (IOException exception) { collaborationAvatar = ""; }
     int port;
     try {
       port = Integer.parseInt(MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"));
@@ -3810,15 +3894,16 @@ public class ZIDEEditor extends Application {
       showValidationPopup("Invalid collaboration settings", exception.getMessage());
       return;
     }
-    message.setText(create ? "Creating session…" : "Joining session…");
+    message.setText(create ? "Creating session..." : "Joining session...");
     String document = sessionTab.getEditor().getText();
     String fileName = collaborationFileName(sessionTab, sessionProjectRoot);
     String language = sessionTab.getLanguageId() == null ? "text" : sessionTab.getLanguageId();
+    String finalCollaborationAvatar = collaborationAvatar;
     COLLABORATION_WORKER.execute(() -> {
       try {
         Map<String, Object> response = create
-                ? client.create(displayName, document, fileName, language, sessionProjectManifest)
-                : client.join(code, displayName);
+                ? client.create(displayName, document, fileName, language, sessionProjectManifest, finalCollaborationAvatar)
+                : client.join(code, displayName, finalCollaborationAvatar);
         String actualCode = ZIDECollaborationClient.string(response, "code");
         String token = ZIDECollaborationClient.string(response, "token");
         String sharedDocument = ZIDECollaborationClient.string(response, "document");
@@ -3827,6 +3912,7 @@ public class ZIDEEditor extends Application {
         long revision = ZIDECollaborationClient.revision(response);
         long participantRevision = ZIDECollaborationClient.participantRevision(response);
         List<String> participantNames = ZIDECollaborationClient.participantNames(response);
+        List<String> participantAvatars = ZIDECollaborationClient.participantAvatars(response);
         List<ZIDECollaborationClient.Presence> presences = ZIDECollaborationClient.presences(response);
         if (!attemptActive.get()) {
           client.leave(actualCode, token);
@@ -3841,7 +3927,7 @@ public class ZIDEEditor extends Application {
           renderCollaborationChat(response);
           refreshCollaborationSyntax(sessionTab, true);
           ActiveCollaboration session = new ActiveCollaboration(client, sessionTab, actualCode, token, revision,
-                  participantRevision, participantNames, sharedDocument, create, sessionProjectRoot, displayName, sharedFileName);
+                  participantRevision, participantNames, participantAvatars, sharedDocument, create, sessionProjectRoot, displayName, sharedFileName);
           activeCollaboration = session;
           updateCollaborationModeMenus();
           renderCollaborativeProjectFiles(response);
@@ -3857,6 +3943,7 @@ public class ZIDEEditor extends Application {
           setLeftSplitWidth(mainHorizontalSplit,
                   layoutDimension("LAYOUT_COLLABORATION_SIDEBAR_WIDTH", 400, 260, 700));
           collaborationSidebar.getSelectionModel().select(collaborationFilesTab);
+          session.participantAvatars = participantAvatars;
           updateCollaborationAvatars(participantNames);
           updateCollaborationParticipants(participantNames);
           collaborationModeButton.setVisible(true);
@@ -3983,7 +4070,12 @@ public class ZIDEEditor extends Application {
         Platform.runLater(() -> statusLabel.setText("Collaboration update failed: " + safeMessage(exception)));
       }
     } catch (Exception exception) {
-      if (!session.stopped) Platform.runLater(() -> statusLabel.setText("Collaboration update failed: " + safeMessage(exception)));
+      if (!session.stopped) Platform.runLater(() -> {
+        if (activeCollaboration == session) {
+          leaveCollaboration(session);
+          statusLabel.setText("Collaboration connection lost: " + safeMessage(exception));
+        }
+      });
     }
   }
 
@@ -3996,6 +4088,7 @@ public class ZIDEEditor extends Application {
         long revision = ZIDECollaborationClient.revision(response);
         long participantRevision = ZIDECollaborationClient.participantRevision(response);
         List<String> participantNames = ZIDECollaborationClient.participantNames(response);
+        List<String> participantAvatars = ZIDECollaborationClient.participantAvatars(response);
         List<ZIDECollaborationClient.Presence> presences = ZIDECollaborationClient.presences(response);
         fulfillProjectFileRequests(session, response);
         synchroniseCollaborativeProjectFiles(session, response);
@@ -4024,6 +4117,7 @@ public class ZIDEEditor extends Application {
             if (session.stopped || session.paused) return;
             session.participantRevision = Math.max(session.participantRevision, participantRevision);
             session.participantNames = participantNames;
+            session.participantAvatars = participantAvatars;
             updateCollaborationLineIndicators(session, presences);
             updateCollaborationAvatars(participantNames);
             updateCollaborationParticipants(participantNames);
@@ -4048,6 +4142,7 @@ public class ZIDEEditor extends Application {
         } else {
           session.participantRevision = Math.max(session.participantRevision, participantRevision);
           session.participantNames = participantNames;
+          session.participantAvatars = participantAvatars;
           Platform.runLater(() -> {
             updateCollaborationLineIndicators(session, presences);
             updateCollaborationParticipants(participantNames);
@@ -4055,8 +4150,15 @@ public class ZIDEEditor extends Application {
         }
       } catch (Exception exception) {
         if (session.stopped || session.paused || exception instanceof InterruptedException) return;
-        Platform.runLater(() -> statusLabel.setText("Collaboration connection lost: " + safeMessage(exception)));
-        try { Thread.sleep(2000); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return; }
+        String details = "Collaboration connection lost: " + safeMessage(exception);
+        // Stop the worker immediately; all pending FX refreshes are guarded by session.stopped.
+        Platform.runLater(() -> {
+          if (activeCollaboration == session && !session.stopped) {
+            leaveCollaboration(session);
+            statusLabel.setText(details);
+          }
+        });
+        return;
       }
     }
   }
@@ -4765,7 +4867,8 @@ public class ZIDEEditor extends Application {
             MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"),
             MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"),
             MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")),
-            MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""));
+            MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""),
+            MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", ""));
 
     showInWindowModal("Settings", "Configure ZIDE", settings, "Save", () -> {
       if (!settings.hasValidChatGPTSettings()) {
@@ -4783,6 +4886,7 @@ public class ZIDEEditor extends Application {
       MAIN_PROPERTIES.setProperty("COLLABORATION_PORT", settings.getCollaborationPort());
       MAIN_PROPERTIES.setProperty("COLLABORATION_NAME", settings.getCollaborationName());
       MAIN_PROPERTIES.setProperty("COLLABORATION_PASSWORD", settings.getCollaborationPassword());
+      MAIN_PROPERTIES.setProperty("COLLABORATION_AVATAR", settings.getCollaborationAvatar());
       applyThemePreference("Dark".equals(settings.getTheme()), true);
       editorLightTheme = settings.getLightEditorTheme();
       editorDarkTheme = settings.getDarkEditorTheme();
@@ -9934,6 +10038,8 @@ public class ZIDEEditor extends Application {
     volatile long revision;
     volatile long participantRevision;
     volatile List<String> participantNames;
+    volatile List<String> participantAvatars = List.of();
+    final Map<Long, Integer> pollVotes = new ConcurrentHashMap<>();
     volatile List<ZIDECollaborationClient.Presence> presences = List.of();
     volatile long projectFileRevision;
     boolean ownsFocusMode;
@@ -9946,7 +10052,7 @@ public class ZIDEEditor extends Application {
     javafx.beans.value.ChangeListener<String> listener;
 
     ActiveCollaboration(ZIDECollaborationClient client, EditorTab tab, String code, String token,
-                        long revision, long participantRevision, List<String> participantNames, String document,
+                        long revision, long participantRevision, List<String> participantNames, List<String> participantAvatars, String document,
                         boolean isOwner, Path projectRoot, String localName, String primaryFile) {
       this.client = client;
       this.tab = tab;
@@ -9955,6 +10061,7 @@ public class ZIDEEditor extends Application {
       this.revision = revision;
       this.participantRevision = participantRevision;
       this.participantNames = List.copyOf(participantNames);
+      this.participantAvatars = List.copyOf(participantAvatars == null ? List.of() : participantAvatars);
       this.lastSharedDocument = document;
       this.pendingDocument = document;
       this.isOwner = isOwner;

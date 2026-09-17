@@ -390,6 +390,22 @@
     -fx-padding: 8px;
 }
 
+.collaboration-chat-composer {
+    -fx-padding: 8px 10px 10px 10px;
+    -fx-alignment: center-left;
+}
+
+.collaboration-chat-composer .text-field {
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+}
+
+.collaboration-chat-composer .button {
+    -fx-padding: 6px 12px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+}
+
 .collaboration-chat-row {
     -fx-max-width: infinity;
 }
@@ -402,6 +418,45 @@
 
 .collaboration-chat-bubble-self {
     -fx-background-color: #d8ebff;
+}
+
+.collaboration-poll-card {
+    -fx-padding: 6px;
+    -fx-spacing: 4px;
+}
+
+.collaboration-poll-progress {
+    -fx-accent: #14b8a6;
+    -fx-pref-height: 8px;
+    -fx-padding: 0;
+}
+
+.collaboration-poll-progress .track {
+    -fx-background-color: #d9e2e3;
+    -fx-background-radius: 999px;
+    -fx-border-color: transparent;
+}
+
+.collaboration-poll-progress .bar {
+    -fx-background-color: #14b8a6;
+    -fx-background-radius: 999px;
+    -fx-background-insets: 0;
+}
+
+.collaboration-poll-card .radio-button:selected .radio {
+    -fx-background-color: #14b8a6;
+    -fx-border-color: #14b8a6;
+}
+
+.collaboration-poll-card .radio-button:selected .dot {
+    -fx-background-color: white;
+}
+
+.collaboration-poll-count {
+    -fx-font-weight: bold;
+    -fx-alignment: CENTER-RIGHT;
+    -fx-min-width: 28px;
+    -fx-text-alignment: right;
 }
 
 .collaboration-chat-bubble-self .collaboration-chat-sender,
@@ -429,6 +484,10 @@
 
 .app-root.dark .collaboration-chat-bubble {
     -fx-background-color: #2c333d;
+}
+
+.app-root.dark .collaboration-poll-progress .track {
+    -fx-background-color: #29343b;
 }
 
 .app-root.dark .collaboration-chat-bubble-self {
@@ -475,6 +534,17 @@
     -fx-border-width: 0 0 3 0;
     -fx-border-insets: 0;
     -fx-padding: 3 10 2 10;
+}
+
+.collaboration-tabs .tab {
+    -fx-tab-min-width: 0;
+    -fx-tab-pref-width: -1;
+    -fx-tab-max-width: 140px;
+    -fx-padding: 3px 12px 2px 12px;
+}
+
+.collaboration-tabs .tab .tab-label {
+    -fx-padding: 0;
 }
 
 .editor-tabs .tab:hover {
