@@ -3,6 +3,8 @@
     -fx-font-family: "Inter", "Segoe UI", system;
     -fx-font-size: 13px;
     -fx-text-inner-color: #202020;
+    -fx-text-background-color: #202020;
+    -fx-text-base-color: #202020;
     -fx-highlight-text-fill: #ffffff;
 
     -fx-base: #f3f3f3;
@@ -37,13 +39,16 @@
     -fx-background-radius: 11;
     -fx-text-fill: #e6e9ee;
     -fx-text-inner-color: #e6e9ee;
+    -fx-text-background-color: #e6e9ee;
+    -fx-text-base-color: #e6e9ee;
     -fx-highlight-text-fill: #ffffff;
 }
 .window-stack {
     -fx-background-color: #517;
-    -fx-border-color: #3f4853;
-    -fx-border-width: 1;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-padding: 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 22, 0.18, 0, 7);
 }
 .app-root.dark .window-stack {
     -fx-background-color: #0f1216;
@@ -56,7 +61,7 @@
 
 .window-frame-border {
     -fx-background-color: transparent;
-    -fx-border-color: #3f4853;
+    -fx-border-color: rgba(63, 72, 83, 0.58);
     -fx-border-width: 1px;
     -fx-border-radius: 16px;
     -fx-background-radius: 16px;
@@ -193,6 +198,7 @@
 .glass-context-menu .menu-item .label {
     -fx-font-family: "Inter", "Segoe UI", system;
     -fx-font-size: 13px;
+    -fx-font-weight: normal;
     -fx-text-fill: #292d33;
 }
 .context-menu .menu-item .language-file-icon,
@@ -201,12 +207,14 @@
     -fx-pref-width: 36px;
     -fx-max-width: 36px;
     -fx-font-size: 9px;
-    -fx-text-fill: #ffffff;
     -fx-text-overrun: clip;
 }
-.glass-context-menu .menu-item:focused,
 .glass-context-menu .menu-item:hover {
     -fx-background-color: #dceef5;
+}
+.glass-context-menu .menu-item.project-colour-palette-item:hover,
+.glass-context-menu .menu-item.project-colour-palette-item:focused {
+    -fx-background-color: transparent;
 }
 .glass-context-menu .separator:horizontal .line {
     -fx-border-color: rgba(82, 91, 102, 0.22) transparent transparent transparent;
@@ -259,14 +267,17 @@
 }
 .app-root.dark .glass-context-menu .menu-item .label,
 .glass-context-menu-dark .menu-item .label { -fx-text-fill: #e6e9ee; }
-.app-root.dark .glass-context-menu .menu-item .language-file-icon { -fx-text-fill: #ffffff; }
-.app-root.dark .glass-context-menu .menu-item:focused,
 .app-root.dark .glass-context-menu .menu-item:hover {
     -fx-background-color: #07566f;
 }
-.glass-context-menu-dark .menu-item:focused,
 .glass-context-menu-dark .menu-item:hover {
     -fx-background-color: #07566f;
+}
+.app-root.dark .glass-context-menu .menu-item.project-colour-palette-item:hover,
+.app-root.dark .glass-context-menu .menu-item.project-colour-palette-item:focused,
+.glass-context-menu-dark .menu-item.project-colour-palette-item:hover,
+.glass-context-menu-dark .menu-item.project-colour-palette-item:focused {
+    -fx-background-color: transparent;
 }
 .app-root.dark .glass-context-menu .separator:horizontal .line,
 .glass-context-menu-dark .separator:horizontal .line {
@@ -342,18 +353,85 @@
 }
 
 .project-tree {
-    -fx-background-color: #f3f3f3;
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
     -fx-padding: 6;
 }
 
+/* Explicit project navigator: stable rows, indentation and project grouping. */
+.project-browser {
+    -fx-background-color: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-padding: 6;
+    -fx-background-insets: 0;
+}
+.project-browser > .viewport {
+    -fx-background-color: transparent;
+}
+.project-browser-content {
+    -fx-padding: 2;
+}
+.project-browser-project {
+    -fx-padding: 2 0 2 0;
+    -fx-background-color: transparent;
+    -fx-border-radius: 0;
+}
+.project-browser-row {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+}
+.project-browser-row:hover {
+    -fx-background-color: transparent;
+    -fx-font-weight: bold;
+}
+.project-browser-arrow {
+    -fx-text-fill: #4a535f;
+    -fx-font-size: 14px;
+}
+.editor-fold-marker {
+    -fx-min-width: 18px;
+    -fx-pref-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-height: 18px;
+    -fx-alignment: center;
+    -fx-padding: 0 3px;
+    -fx-background-color: rgba(120, 130, 145, 0.12);
+    -fx-background-radius: 4px;
+    -fx-text-fill: #9aa3af;
+    -fx-font-size: 12px;
+}
+.app-root.dark .editor-fold-marker {
+    -fx-background-color: rgba(220, 230, 240, 0.10);
+    -fx-text-fill: #aeb8c4;
+}
+.app-root.dark .project-browser {
+    -fx-background-color: #1b1f26;
+    -fx-control-inner-background: #1b1f26;
+}
+.app-root.dark .project-browser-project {
+    -fx-background-color: transparent;
+}
+.app-root.dark .project-browser-row,
+.app-root.dark .project-browser-row:hover {
+    -fx-background-color: transparent;
+}
+.app-root.dark .project-browser-arrow {
+    -fx-text-fill: #cbd3dc;
+}
 
-.tree-view:focused .tree-cell:selected {
-    -fx-background-color: #007acc;
-    -fx-text-fill: white;
+
+.app-root:not(.dark) .tree-view:focused .tree-cell:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: #202020;
+}
+
+.app-root:not(.dark) .project-tree .tree-cell:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: #202020;
 }
 
 .app-root.dark .tree-view .tree-cell:selected {
-    -fx-background-color: #2a2f38; /* dark unfocused */
+    -fx-background-color: transparent;
     -fx-text-fill: #e6e9ee;
 }
 
@@ -378,6 +456,20 @@
 }
 
 .editor-tabs.single-tab .tab-content-area {
+    -fx-padding: 0;
+}
+
+/* Project grouping still needs a visible switcher when only one group is
+ * currently visible.  This must override the compact lone-tab rule above. */
+.editor-tabs.project-grouping.single-tab .tab-header-area {
+    visibility: visible;
+    -fx-pref-height: 26px;
+    -fx-min-height: 26px;
+    -fx-max-height: 26px;
+    -fx-padding: 0;
+}
+
+.editor-tabs.project-grouping.single-tab .tab-content-area {
     -fx-padding: 0;
 }
 
@@ -533,6 +625,9 @@
 }
 
 .editor-tabs .tab {
+    -fx-tab-min-width: 96px;
+    -fx-tab-pref-width: -1;
+    -fx-tab-max-width: 260px;
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 0;
@@ -556,6 +651,17 @@
 
 .editor-tabs .tab:hover {
     -fx-background-color: rgba(0, 0, 0, 0.045);
+}
+.editor-tabs .tab.project-tab-group {
+    -fx-background-radius: 7px 7px 0 0;
+    -fx-padding: 3px 12px 2px;
+}
+.editor-tabs .tab.project-tab-group .tab-label {
+    -fx-text-fill: white;
+    -fx-font-weight: 700;
+}
+.editor-tabs .tab.project-tab-group:hover {
+    -fx-opacity: 0.86;
 }
 
 .editor-tabs .tab:selected {
@@ -607,6 +713,8 @@
 }
 .right-side-panels .tab-content-area {
     -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
 }
 .ai-assist-panel {
     -fx-background-color: #ffffff;
@@ -658,8 +766,9 @@
 }
 
 .app-root.dark .code-area .caret,
-.app-root.dark .zpe-code-area .caret {
-    -fx-stroke: #ffffff;
+.app-root.dark .zpe-code-area .caret,
+.app-root.dark .console-output .caret {
+    -fx-stroke: #e6e9ee;
 }
 
 /* Low-profile editor scrollbars matching the desktop ZPE code editor. */
@@ -690,6 +799,7 @@
     -fx-background-color: #b9bec5;
     -fx-background-insets: 2px 0 2px 0;
     -fx-background-radius: 3px;
+    -fx-min-height: 30px;
 }
 
 .code-editor-scroll-pane .scroll-bar:horizontal .thumb {
@@ -704,7 +814,9 @@
 .console-output .scroll-bar:vertical,
 .terminal-output .scroll-bar:vertical,
 .project-tree .scroll-bar:vertical,
-.table-view .scroll-bar:vertical {
+.project-browser .scroll-bar:vertical,
+.table-view .scroll-bar:vertical,
+.log-view .scroll-bar:vertical {
     -fx-pref-width: 18px;
     -fx-min-width: 18px;
     -fx-max-width: 18px;
@@ -715,7 +827,9 @@
 .console-output .scroll-bar:horizontal,
 .terminal-output .scroll-bar:horizontal,
 .project-tree .scroll-bar:horizontal,
-.table-view .scroll-bar:horizontal {
+.project-browser .scroll-bar:horizontal,
+.table-view .scroll-bar:horizontal,
+.log-view .scroll-bar:horizontal {
     -fx-pref-height: 10px;
     -fx-min-height: 10px;
     -fx-max-height: 10px;
@@ -726,9 +840,12 @@
 .console-output .scroll-bar .track,
 .terminal-output .scroll-bar .track,
 .project-tree .scroll-bar .track,
+.project-browser .scroll-bar .track,
 .table-view .scroll-bar .track,
+.log-view .scroll-bar .track,
 .console-output .scroll-bar .track-background,
-.terminal-output .scroll-bar .track-background {
+.terminal-output .scroll-bar .track-background,
+.log-view .scroll-bar .track-background {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
 }
@@ -736,28 +853,47 @@
 .console-output .scroll-bar .thumb,
 .terminal-output .scroll-bar .thumb,
 .project-tree .scroll-bar .thumb,
-.table-view .scroll-bar .thumb {
+.project-browser .scroll-bar .thumb,
+.table-view .scroll-bar .thumb,
+.log-view .scroll-bar .thumb {
     -fx-background-color: #b9bec5;
     -fx-background-insets: 2px 0 2px 0;
     -fx-background-radius: 3px;
+    -fx-min-height: 30px;
+}
+.console-output .scroll-bar:horizontal .thumb,
+.terminal-output .scroll-bar:horizontal .thumb,
+.project-tree .scroll-bar:horizontal .thumb,
+.project-browser .scroll-bar:horizontal .thumb,
+.table-view .scroll-bar:horizontal .thumb,
+.log-view .scroll-bar:horizontal .thumb {
+    -fx-min-width: 24px;
 }
 
 .app-root.dark .console-output .scroll-bar,
 .app-root.dark .terminal-output .scroll-bar,
 .app-root.dark .project-tree .scroll-bar,
-.app-root.dark .table-view .scroll-bar {
+.app-root.dark .project-browser .scroll-bar,
+.app-root.dark .table-view .scroll-bar,
+.app-root.dark .log-view .scroll-bar {
     -fx-background-color: #21262f;
 }
 
 .app-root.dark .console-output .scroll-bar .thumb,
 .app-root.dark .terminal-output .scroll-bar .thumb,
 .app-root.dark .project-tree .scroll-bar .thumb,
-.app-root.dark .table-view .scroll-bar .thumb {
+.app-root.dark .project-browser .scroll-bar .thumb,
+.app-root.dark .table-view .scroll-bar .thumb,
+.app-root.dark .log-view .scroll-bar .thumb {
     -fx-background-color: #59616d;
 }
 
 .code-editor-scroll-pane .scroll-bar .increment-button,
-.code-editor-scroll-pane .scroll-bar .decrement-button {
+.code-editor-scroll-pane .scroll-bar .decrement-button,
+.project-browser .scroll-bar .increment-button,
+.project-browser .scroll-bar .decrement-button,
+.log-view .scroll-bar .increment-button,
+.log-view .scroll-bar .decrement-button {
     -fx-pref-width: 0;
     -fx-pref-height: 0;
     -fx-min-width: 0;
@@ -769,7 +905,11 @@
 }
 
 .code-editor-scroll-pane .scroll-bar .increment-arrow,
-.code-editor-scroll-pane .scroll-bar .decrement-arrow {
+.code-editor-scroll-pane .scroll-bar .decrement-arrow,
+.project-browser .scroll-bar .increment-arrow,
+.project-browser .scroll-bar .decrement-arrow,
+.log-view .scroll-bar .increment-arrow,
+.log-view .scroll-bar .decrement-arrow {
     -fx-shape: "";
     -fx-padding: 0;
 }
@@ -1030,6 +1170,14 @@
     -fx-padding: 0 2 0 0;
 }
 
+/* Tabs use JavaFX's original title label plus the close graphic. */
+.editor-tabs .tab > .tab-label,
+.right-side-panels .tab > .tab-label {
+    -fx-opacity: 1;
+    -fx-text-fill: -fx-text-base-color;
+    -fx-padding: 0;
+}
+
 .tab-close-button {
     -fx-background-color: transparent;
     -fx-padding: 0;
@@ -1064,6 +1212,18 @@
 
 .tab-close-button:pressed {
     -fx-background-color: rgba(0,0,0,0.18);
+}
+
+.app-root.dark .tab-close-button {
+    -fx-background-color: rgba(255,255,255,0.86);
+}
+
+.app-root.dark .tab-close-button:hover {
+    -fx-background-color: rgba(255,255,255,0.64);
+}
+
+.app-root.dark .tab-close-button:pressed {
+    -fx-background-color: rgba(255,255,255,0.48);
 }
 
 .profiler-pane {
@@ -1757,6 +1917,12 @@
     -fx-text-fill: #202020;
 }
 
+/* Keep keyboard shortcuts close to their command instead of stretching the
+   spacer across the full popup width. */
+.glass-menu-item > .region {
+    -fx-max-width: 22px;
+}
+
 .glass-menu-submenu-arrow {
     -fx-font-size: 18px;
     -fx-text-fill: #555555;
@@ -1799,7 +1965,9 @@
 
 .app-root .balf-titlebar {
     -fx-background-color: #517;
-    -fx-background-radius: 16px 16px 0 0;
+    /* The window stack supplies the rounded outer clip. Keeping this layer
+       square prevents the app-root background from showing through corners. */
+    -fx-background-radius: 0;
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-effect: none;
@@ -1941,15 +2109,15 @@
 }
 
 .project-tree .tree-cell.active-project-root {
-    -fx-background-color: #e8eef5;
-    -fx-border-color: transparent transparent transparent #517;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
     -fx-border-width: 0 0 0 3px;
-    -fx-font-weight: bold;
+    -fx-font-weight: normal;
 }
 
 .project-tree .tree-cell.active-project-file {
     /* Open files get a slim marker, but must not look selected. */
-    -fx-background-color: #f3f3f3;
+    -fx-background-color: transparent;
     -fx-border-color: transparent transparent transparent #007acc;
     -fx-border-width: 0 0 0 3px;
 }
@@ -1958,12 +2126,12 @@
 }
 
 .app-root.dark .project-tree .tree-cell.active-project-root {
-    -fx-background-color: #252b35;
-    -fx-border-color: transparent transparent transparent #b36ac7;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
 }
 
 .app-root.dark .project-tree .tree-cell.active-project-file {
-    -fx-background-color: #1b1f26;
+    -fx-background-color: transparent;
     -fx-border-color: transparent transparent transparent #3794ff;
 }
 
@@ -2386,43 +2554,71 @@
     -fx-background-color: #f8f8f8;
 }
 
+.project-explorer {
+    -fx-background-color: transparent;
+}
+.project-tree-heading {
+    -fx-padding: 8px 10px 7px 14px;
+    -fx-font-weight: bold;
+    -fx-font-size: 15px;
+    -fx-text-fill: #202020;
+    -fx-background-color: #e8e8e8;
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-color: #d2d2d2;
+}
+.app-root.dark .project-tree-heading {
+    -fx-text-fill: #e6e9ee;
+    -fx-background-color: #252a32;
+    -fx-border-color: #343a44;
+}
+
 .project-tree .tree-cell {
     -fx-background-color: #ffffff;
     -fx-border-color: transparent;
     -fx-border-width: 0 0 0 3px;
 }
+.project-tree .tree-disclosure-node > .arrow {
+    -fx-background-color: #4a4a4a;
+}
 .app-root.dark .project-tree .tree-cell {
     -fx-background-color: #1b1f26;
+}
+.app-root.dark .project-tree .tree-disclosure-node > .arrow {
+    -fx-background-color: #ffffff;
 }
 .app-root.dark .project-tree .tree-cell.active-project-file .project-file-name {
     -fx-text-fill: #e6e9ee;
 }
 .project-tree .project-file-name { -fx-text-fill: #202020; }
+.project-tree .project-file-name {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+}
+.project-tree .project-file-open-indicator {
+    -fx-background-color: transparent;
+    -fx-background-radius: 50%;
+}
+.app-root:not(.dark) .project-tree .project-file-open-indicator.open {
+    -fx-background-color: #007acc;
+}
+.app-root.dark .project-tree .project-file-open-indicator.open {
+    -fx-background-color: #3794ff;
+}
 .project-tree .tree-cell .project-file-name { -fx-text-fill: #202020; }
-.project-tree .tree-cell:selected .project-file-name { -fx-text-fill: #202020; }
-.project-tree .tree-cell:selected:not(:focused) .project-file-name { -fx-text-fill: #202020; }
-.project-tree:not(:focused) .tree-cell:selected,
-.project-tree:not(:focused) .tree-cell:selected .project-file-name { -fx-text-fill: #202020; }
 .app-root.dark .project-tree .project-file-name { -fx-text-fill: #e6e9ee; }
 .app-root.dark .project-tree .tree-cell .project-file-name { -fx-text-fill: #e6e9ee; }
-.app-root.dark .project-tree .tree-cell:selected .project-file-name { -fx-text-fill: #e6e9ee; }
-.app-root.dark .project-tree .tree-cell:selected:not(:focused) .project-file-name { -fx-text-fill: #e6e9ee; }
-.app-root.dark .project-tree:not(:focused) .tree-cell:selected,
-.app-root.dark .project-tree:not(:focused) .tree-cell:selected .project-file-name { -fx-text-fill: #e6e9ee; }
-.project-tree:not(:focused) .tree-cell.active-project-file .project-file-name,
-.project-tree .tree-cell.active-project-file .project-file-name { -fx-text-fill: #202020; }
 
 .pane-header {
     -fx-background-color: #f3f3f3;
 }
 
-.project-tree .tree-cell:filled:hover,
 .editor-tabs .tab:hover {
     -fx-background-color: #e8e8e8;
 }
 
-.tree-view:focused .tree-cell:selected {
-    -fx-background-color: #0060c0;
+.app-root:not(.dark) .tree-view:focused .tree-cell:selected {
+    -fx-background-color: transparent;
+    -fx-text-fill: #202020;
 }
 
 .editor-tabs .tab:selected {
@@ -2454,13 +2650,33 @@
     -fx-background-color: #c1c1c1;
 }
 
+/* Editor scrollbars blend into the active editor surface and stay compact. */
+.code-editor-scroll-pane .scroll-bar:vertical {
+    -fx-pref-width: 12px;
+    -fx-min-width: 12px;
+    -fx-max-width: 12px;
+    -fx-background-color: #fffaf3;
+    -fx-padding: 0 3px;
+}
+.code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-pref-height: 8px;
+    -fx-min-height: 8px;
+    -fx-max-height: 8px;
+    -fx-background-color: #fffaf3;
+    -fx-padding: 1px;
+}
+.app-root.dark .code-editor-scroll-pane .scroll-bar:vertical,
+.app-root.dark .code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: #191724;
+}
+
 .status-bar {
     -fx-border-width: 1 0 0 0;
 }
 
 .language-file-icon {
-    -fx-min-width: 30px;
-    -fx-pref-width: 30px;
+    -fx-min-width: 46px;
+    -fx-pref-width: 46px;
     -fx-min-height: 17px;
     -fx-padding: 2px 4px;
     -fx-alignment: center;
@@ -2472,7 +2688,22 @@
 .language-icon-python { -fx-background-color: #3776ab; -fx-text-fill: white; }
 .language-icon-php { -fx-background-color: #777bb4; -fx-text-fill: white; }
 .language-icon-lua { -fx-background-color: #00007D; -fx-text-fill: white; }
-.language-icon-js { -fx-background-color: #c3b21e; -fx-text-fill: white; }
+.language-icon-js { -fx-background-color: #f0c500; -fx-text-fill: #202020; }
+.language-icon-typescript { -fx-background-color: #3178c6; -fx-text-fill: white; }
+.language-icon-jsx { -fx-background-color: #61dafb; -fx-text-fill: #202020; }
+.language-icon-java {
+    -fx-background-color: #f89820;
+    -fx-text-fill: white;
+}
+.language-icon-json { -fx-background-color: #f0c500; -fx-text-fill: #202020; }
+.language-icon-ini { -fx-background-color: #8e44ad; -fx-text-fill: white; }
+.language-icon-yaml { -fx-background-color: #cb171e; -fx-text-fill: white; }
+.language-icon-toml { -fx-background-color: #3f51b5; -fx-text-fill: white; }
+.language-icon-jbml { -fx-background-color: #ff6600; -fx-text-fill: white; }
+.language-icon-xml { -fx-background-color: #e44d26; -fx-text-fill: white; }
+.language-icon-html { -fx-background-color: #e34f26; -fx-text-fill: white; }
+.language-icon-css { -fx-background-color: #1572b6; -fx-text-fill: white; }
+.language-icon-csv { -fx-background-color: #217346; -fx-text-fill: white; }
 .language-icon-zpeedy { -fx-background-color: #7a118c; -fx-text-fill: white; }
 .language-icon-sqarl { -fx-background-color: #16825d; -fx-text-fill: white; }
 .language-icon-zenlang { -fx-background-color: #087f8c; -fx-text-fill: white; }
@@ -2482,15 +2713,209 @@
 .language-icon-pad { -fx-background-color: #8a6d3b; -fx-text-fill: white; }
 .language-icon-txt { -fx-background-color: #6b7280; -fx-text-fill: white; }
 
+/* The global dark label rule is broader than the badge classes; keep the
+   bright JavaScript/JSON badges readable with their intended black text. */
+.app-root.dark .language-icon-js,
+.app-root.dark .language-icon-json {
+    -fx-text-fill: #202020;
+}
+.app-root.dark .new-file-type-choice .language-icon-js,
+.app-root.dark .new-file-type-choice .language-icon-json {
+    -fx-text-fill: #202020;
+}
+
 .new-file-types {
     -fx-padding: 2 0 0 0;
 }
 
+.new-file-type-surface {
+    -fx-min-height: 92px;
+}
+
+.new-file-type-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+}
+
+.new-file-type-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.new-file-type-scroll .scroll-bar:vertical {
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
+    -fx-max-width: 18px;
+    -fx-padding: 0 6px 0 6px;
+    -fx-background-color: #f4f6f8;
+}
+
+.new-file-type-scroll .scroll-bar .track,
+.new-file-type-scroll .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.new-file-type-scroll .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px 0 2px 0;
+    -fx-background-radius: 3px;
+    -fx-min-height: 30px;
+}
+
+.new-file-type-scroll .scroll-bar .thumb:hover {
+    -fx-background-color: #969da6;
+}
+
+.new-file-type-scroll .scroll-bar .increment-button,
+.new-file-type-scroll .scroll-bar .decrement-button {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+
+.new-file-type-scroll .scroll-bar .increment-arrow,
+.new-file-type-scroll .scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+
+.app-root.dark .new-file-type-scroll .scroll-bar {
+    -fx-background-color: #21262f;
+}
+
+.app-root.dark .new-file-type-scroll .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+
+.app-root.dark .new-file-type-scroll .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+.in-window-modal-dark .new-file-type-scroll .scroll-bar {
+    -fx-background-color: #21262f;
+}
+.in-window-modal-dark .new-file-type-scroll .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.in-window-modal-dark .new-file-type-scroll .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+
+.java-type-popup {
+    -fx-padding: 18px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c8c8c8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.22), 18, 0.18, 0, 6);
+}
+
+.java-type-popup-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.java-type-option {
+    -fx-min-width: 96px;
+    -fx-pref-width: 96px;
+    -fx-min-height: 72px;
+    -fx-pref-height: 72px;
+    -fx-padding: 6px;
+    -fx-alignment: center;
+    -fx-background-color: transparent;
+    -fx-border-color: #c8c8c8;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+
+.java-type-option:hover {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #8a8a8a;
+}
+
+.java-type-option:selected {
+    -fx-background-color: #e8f2fb;
+    -fx-border-color: #007acc;
+    -fx-border-width: 2px;
+}
+
+.java-type-option > .radio {
+    -fx-padding: 0;
+    -fx-opacity: 0;
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+}
+
+.java-type-badge {
+    -fx-min-width: 48px;
+    -fx-pref-width: 48px;
+    -fx-padding: 4px 5px;
+    -fx-alignment: center;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+    -fx-background-radius: 4px;
+}
+
+.java-type-badge-class { -fx-background-color: #f89820; }
+.java-type-badge-interface { -fx-background-color: #008f8c; }
+.java-type-badge-enum { -fx-background-color: #6a4c93; }
+.java-type-badge-record { -fx-background-color: #2878a8; }
+.java-type-badge-annotation { -fx-background-color: #c04b78; }
+
+.java-type-name {
+    -fx-font-weight: bold;
+}
+
+.java-main-method-toggle {
+    -fx-padding: 4px 0 0 0;
+}
+
+.in-window-modal-dark .java-type-popup {
+    -fx-background-color: #242a31;
+    -fx-border-color: #555f6b;
+}
+
+.in-window-modal-dark .java-type-popup-title,
+.in-window-modal-dark .java-type-option {
+    -fx-text-fill: #f3f3f3;
+}
+
+.in-window-modal-dark .java-type-option {
+    -fx-border-color: #555f6b;
+}
+
+.in-window-modal-dark .java-type-option:hover {
+    -fx-background-color: #303943;
+}
+
+.in-window-modal-dark .java-type-option:selected {
+    -fx-background-color: #dceef5;
+    -fx-border-color: #4aa8d8;
+    -fx-text-fill: #202020;
+}
+
+.in-window-modal-dark .java-type-option:selected .java-type-name {
+    -fx-text-fill: #202020;
+}
+
+.new-file-type-choice .language-file-icon {
+    -fx-min-width: 44px;
+    -fx-pref-width: 44px;
+}
+
 .new-file-type-choice {
-    -fx-min-width: 118px;
-    -fx-pref-width: 118px;
-    -fx-min-height: 82px;
-    -fx-pref-height: 82px;
+    -fx-min-width: 138px;
+    -fx-pref-width: 138px;
+    -fx-min-height: 92px;
+    -fx-pref-height: 92px;
     -fx-padding: 7px;
     -fx-alignment: center;
     -fx-background-color: transparent;
@@ -2504,6 +2929,9 @@
     -fx-padding: 0;
     -fx-opacity: 0;
     -fx-shape: "";
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
 }
 
 .new-file-type-choice:hover {
@@ -2623,7 +3051,11 @@
     -fx-text-fill: #aeb8c4;
 }
 
-.in-window-modal-title { -fx-font-size: 18px; -fx-font-weight: bold; }
+.in-window-modal-title {
+    -fx-font-family: "Inter";
+    -fx-font-size: 18px;
+    -fx-font-weight: 600;
+}
 .in-window-modal-subtitle { -fx-text-fill: #616161; }
 .in-window-modal-validation {
     -fx-text-fill: #b42318;
@@ -2647,6 +3079,26 @@
     -fx-background-color: #dceafa;
     -fx-background-radius: 4px;
     -fx-text-fill: #17354d;
+}
+.zide-file-picker .file-picker-location .button {
+    -fx-min-width: 30px;
+    -fx-padding: 5px 8px;
+}
+.zide-file-picker .file-picker-shortcuts {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.zide-file-picker .file-picker-shortcuts .list-cell {
+    -fx-padding: 9px 10px;
+    -fx-background-color: transparent;
+}
+.zide-file-picker .file-picker-shortcuts .list-cell:filled:hover,
+.zide-file-picker .file-picker-shortcuts .list-cell:filled:selected {
+    -fx-background-color: rgba(0, 122, 204, 0.22);
+}
+.in-window-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:hover,
+.in-window-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:selected {
+    -fx-background-color: rgba(0, 153, 204, 0.42);
 }
 .in-window-modal-dark .zide-file-picker .file-picker-list {
     -fx-background-color: #20252e;
@@ -2867,6 +3319,22 @@
     -fx-text-fill: #ffffff;
 }
 
+/* Spinner arrow buttons are separate controls; style both halves so the
+   dark settings surface does not fall back to the light default skin. */
+.in-window-modal-dark .spinner .increment-arrow-button,
+.in-window-modal-dark .spinner .decrement-arrow-button {
+    -fx-background-color: #252526;
+    -fx-border-color: #454545;
+    -fx-border-width: 0 0 1px 1px;
+}
+.in-window-modal-dark .spinner .decrement-arrow-button {
+    -fx-border-width: 1px 0 0 1px;
+}
+.in-window-modal-dark .spinner .increment-arrow,
+.in-window-modal-dark .spinner .decrement-arrow {
+    -fx-background-color: #d6d6d6;
+}
+
 .in-window-modal-primary {
     -fx-background-color: #007acc;
     -fx-border-color: #007acc;
@@ -2929,8 +3397,20 @@
     -fx-text-fill: #163858;
 }
 .settings-section-content { -fx-padding: 4px 0; }
-.settings-section-title { -fx-font-size: 17px; -fx-font-weight: bold; }
-.settings-group-title { -fx-font-size: 14px; -fx-font-weight: bold; }
+.settings-section-title {
+    -fx-font-family: "Inter";
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-padding: 2px 2px 4px 0;
+    -fx-min-height: 26px;
+}
+.settings-group-title {
+    -fx-font-family: "Inter";
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-padding: 1px 1px 3px 0;
+    -fx-min-height: 22px;
+}
 .in-window-modal-dark .settings-content .list-view {
     -fx-background-color: #252a32;
     -fx-border-color: transparent;
@@ -3317,7 +3797,7 @@
 .app-root.dark .unfold-panel-toolbar { -fx-border-color: transparent transparent #30343b transparent; }
 .app-root.dark .unfold-availability-message { -fx-text-fill: #aeb8c5; }
 .bytecode-panel {
-    -fx-background-color: #f3f3f3;
+    -fx-background-color: #ffffff;
     -fx-border-color: #d4d4d4;
     -fx-border-width: 0 0 0 1px;
 }
@@ -3325,13 +3805,75 @@
 .bytecode-panel .text-area .content {
     -fx-font-family: "Menlo", "Consolas", monospace;
     -fx-font-size: 12px;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-padding: 0;
 }
-.app-root.dark .bytecode-panel { -fx-background-color: #1b1f26; -fx-border-color: #30343b; }
+.bytecode-panel .text-area .scroll-pane,
+.bytecode-panel .text-area .scroll-pane .viewport {
+    -fx-background-color: #ffffff;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+.bytecode-output .scroll-bar:vertical {
+    -fx-pref-width: 12px;
+    -fx-min-width: 12px;
+    -fx-max-width: 12px;
+    -fx-background-color: #fffaf3;
+    -fx-padding: 0 3px;
+}
+.bytecode-output .scroll-bar:horizontal {
+    -fx-pref-height: 8px;
+    -fx-min-height: 8px;
+    -fx-max-height: 8px;
+    -fx-background-color: #fffaf3;
+    -fx-padding: 1px;
+}
+.bytecode-output .scroll-bar .track,
+.bytecode-output .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.bytecode-output .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px 0;
+    -fx-background-radius: 3px;
+    -fx-min-height: 30px;
+}
+.bytecode-output .scroll-bar:horizontal .thumb {
+    -fx-min-width: 24px;
+}
+.bytecode-output .scroll-bar .increment-button,
+.bytecode-output .scroll-bar .decrement-button {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+}
+.bytecode-output .scroll-bar .increment-arrow,
+.bytecode-output .scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+.app-root.dark .bytecode-panel { -fx-background-color: #20252e; -fx-border-color: #30343b; }
 .app-root.dark .bytecode-panel .text-area,
 .app-root.dark .bytecode-panel .text-area .content {
     -fx-control-inner-background: #20252e;
     -fx-background-color: #20252e;
     -fx-text-fill: #dce2e9;
+}
+.app-root.dark .bytecode-panel .text-area .scroll-pane,
+.app-root.dark .bytecode-panel .text-area .scroll-pane .viewport,
+.app-root.dark .bytecode-output .scroll-bar:vertical,
+.app-root.dark .bytecode-output .scroll-bar:horizontal {
+    -fx-background-color: #191724;
+}
+.app-root.dark .bytecode-output .scroll-bar .thumb {
+    -fx-background-color: #59616d;
 }
 .app-root.dark .unfold-description:hover { -fx-background-color: #253c48; }
 .app-root.dark .unfold-full-description-content,
@@ -3410,6 +3952,13 @@
 }
 .app-root.dark .scratch-pad-panel .scratch-pad-editor .paragraph-box { -fx-background-color: #171a20; }
 .app-root.dark .scratch-pad-panel .scratch-pad-editor .text { -fx-fill: #e3e7ec; }
+.app-root.dark .scratch-pad-panel .scratch-pad-editor .caret {
+    -fx-stroke: #ffffff;
+    -fx-fill: #ffffff;
+}
+.app-root.dark .scratch-pad-panel .scratch-pad-editor {
+    -fx-caret-color: #ffffff;
+}
 .app-root.dark .scratch-pad-scroll-pane,
 .app-root.dark .scratch-pad-scroll-pane .viewport,
 .app-root.dark .scratch-pad-scroll-pane .content { -fx-background-color: #171a20; }
@@ -3484,4 +4033,170 @@
 .app-root .titlebar-actions .titlebar-action-button:focused {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
+}
+.browser-panel {
+    -fx-background-color: #ffffff;
+}
+.browser-panel .button {
+    -fx-min-width: 30px;
+    -fx-padding: 4px 8px;
+}
+.browser-panel .text-field {
+    -fx-padding: 5px 8px;
+}
+.browser-unavailable {
+    -fx-alignment: center;
+    -fx-text-fill: #707780;
+}
+.app-root.dark .browser-panel {
+    -fx-background-color: #1b1f26;
+}
+.app-root.dark .browser-panel .text-field {
+    -fx-background-color: #252a33;
+    -fx-control-inner-background: #252a33;
+    -fx-text-fill: #e6e9ee;
+    -fx-prompt-text-fill: #9299a5;
+}
+.app-root.dark .browser-panel .button {
+    -fx-background-color: #303640;
+    -fx-text-fill: #e6e9ee;
+}
+.pdf-panel {
+    -fx-background-color: #ffffff;
+}
+.pdf-panel .pdf-file-label {
+    -fx-text-fill: #505760;
+    -fx-padding: 0 4px;
+}
+.pdf-unavailable {
+    -fx-alignment: center;
+    -fx-text-fill: #707780;
+}
+.app-root.dark .pdf-panel {
+    -fx-background-color: #1b1f26;
+}
+.app-root.dark .pdf-panel .pdf-file-label {
+    -fx-text-fill: #cbd1da;
+}
+
+/* ContextMenu popups are separate windows, so the application root is not
+   their CSS ancestor. The explicit popup classes are therefore the source
+   of truth for the glass file/language menus in dark mode. */
+.context-menu.glass-context-menu {
+    -fx-background-color: #f8f9fb;
+    -fx-text-background-color: #202020;
+    -fx-text-base-color: #202020;
+    -fx-text-inner-color: #202020;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: rgba(82, 91, 102, 0.42);
+    -fx-border-width: 1px;
+    -fx-padding: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.30), 22, 0.14, 0, 7);
+}
+.context-menu.glass-context-menu-dark {
+    -fx-background-color: #20252e;
+    -fx-text-background-color: #e6e9ee;
+    -fx-text-base-color: #e6e9ee;
+    -fx-text-inner-color: #e6e9ee;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: #4a535f;
+    -fx-border-width: 1px;
+    -fx-padding: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.55), 22, 0.18, 0, 7);
+}
+.context-menu.glass-context-menu-dark .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8px;
+}
+.context-menu.glass-context-menu-dark .menu-item .label {
+    -fx-text-fill: #e6e9ee;
+}
+.context-menu.glass-context-menu-dark .menu-item:hover,
+.context-menu.glass-context-menu-dark .menu-item:focused {
+    -fx-background-color: #07566f;
+}
+.context-menu.glass-context-menu-dark .menu-item:hover .label,
+.context-menu.glass-context-menu-dark .menu-item:focused .label {
+    -fx-text-fill: #ffffff;
+}
+.context-menu.glass-context-menu-dark .separator:horizontal .line {
+    -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
+}
+
+/* Keep every project-tree label readable on the dark tree surface. These
+   rules come last because the tree is rebuilt when a file is opened. */
+.app-root:not(.dark) .project-tree .tree-cell,
+.app-root:not(.dark) .project-tree .project-file-name {
+    -fx-text-fill: #202020;
+}
+.app-root.dark .project-tree .tree-cell,
+.app-root.dark .project-tree .project-file-name,
+.app-root.dark .project-tree .tree-cell .label {
+    -fx-text-fill: #e6e9ee;
+}
+.app-root.dark .project-tree .language-file-icon {
+    -fx-text-fill: #ffffff;
+}
+.app-root.dark .project-tree .language-icon-js,
+.app-root.dark .project-tree .language-icon-json {
+    -fx-text-fill: #202020;
+}
+.app-root.dark .project-tree .language-file-icon.language-icon-js,
+.app-root.dark .project-tree .language-file-icon.language-icon-json {
+    -fx-text-fill: #202020;
+}
+
+/* Open files must not acquire a second visual treatment. */
+.project-tree .tree-cell.active-project-file,
+.project-tree .tree-cell.active-project-file:filled,
+.project-tree .tree-cell.active-project-file:filled {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    /* Keep the same content origin as every other tree row. */
+    -fx-border-width: 0 0 0 3px;
+}
+.project-tree .tree-cell.active-project-file .project-file-name {
+    -fx-text-fill: #202020;
+}
+.app-root.dark .project-tree .tree-cell.active-project-file .project-file-name {
+    -fx-text-fill: #e6e9ee;
+}
+
+/* Keep filled rows transparent so the tree surface remains uninterrupted. */
+.app-root:not(.dark) .project-tree .tree-cell:filled,
+.app-root:not(.dark) .project-tree .tree-cell:filled:hover,
+.app-root.dark .project-tree .tree-cell:filled,
+.app-root.dark .project-tree .tree-cell:filled:hover {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0;
+}
+
+/* Tree state is communicated by weight only; never paint a state block. */
+.app-root:not(.dark) .project-tree .tree-cell,
+.app-root:not(.dark) .project-tree .tree-cell:hover,
+.app-root:not(.dark) .project-tree .tree-cell.active-project-root,
+.app-root:not(.dark) .project-tree .tree-cell.active-project-file,
+.app-root.dark .project-tree .tree-cell,
+.app-root.dark .project-tree .tree-cell:hover,
+.app-root.dark .project-tree .tree-cell.active-project-root,
+.app-root.dark .project-tree .tree-cell.active-project-file {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+}
+.app-root:not(.dark) .project-tree .tree-cell:hover,
+.app-root:not(.dark) .project-tree .tree-cell.active-project-file,
+.app-root.dark .project-tree .tree-cell:hover,
+.app-root.dark .project-tree .tree-cell.active-project-file {
+    -fx-font-weight: bold;
+}
+.app-root:not(.dark) .project-tree .tree-cell:hover .project-file-name,
+.app-root:not(.dark) .project-tree .tree-cell.active-project-file .project-file-name,
+.app-root.dark .project-tree .tree-cell:hover .project-file-name,
+.app-root.dark .project-tree .tree-cell.active-project-file .project-file-name {
+    -fx-font-weight: bold;
 }
