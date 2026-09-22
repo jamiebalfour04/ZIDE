@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
  * Implementations supply editing rules, file identity and capabilities; ZIDE
  * supplies the common tabs, menus, diagnostics and process console.
  */
-interface ZIDELanguage {
+public interface ZIDELanguage {
   String id();
   String label();
   Set<String> extensions();
@@ -20,6 +20,7 @@ interface ZIDELanguage {
   void configure(CodeEditorViewFX editor);
   ZIDEEditor.EditorInfo information(String token);
   void run(EditorTab tab);
+  default boolean isYass() { return "yass".equals(id()); }
   boolean canRun();
   boolean canCompile();
   boolean canDebug();
