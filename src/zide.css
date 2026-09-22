@@ -4070,6 +4070,8 @@
 }
 .pdf-toolbar .button {
     -fx-min-width: 30px;
+    -fx-text-fill: #29313a;
+    -fx-padding: 6px 9px;
 }
 .pdf-toolbar .pdf-file-label {
     -fx-padding: 0 8px 0 2px;
@@ -4087,6 +4089,9 @@
 }
 .app-root.dark .pdf-panel .pdf-file-label {
     -fx-text-fill: #cbd1da;
+}
+.app-root.dark .pdf-toolbar .button {
+    -fx-text-fill: #e6e9ee;
 }
 
 /* ContextMenu popups are separate windows, so the application root is not
