@@ -4076,10 +4076,6 @@
 .pdf-toolbar .pdf-file-label {
     -fx-padding: 0 8px 0 2px;
 }
-.pdf-toolbar .pdf-page-label {
-    -fx-min-width: 76px;
-    -fx-alignment: center;
-}
 .pdf-unavailable {
     -fx-alignment: center;
     -fx-text-fill: #707780;

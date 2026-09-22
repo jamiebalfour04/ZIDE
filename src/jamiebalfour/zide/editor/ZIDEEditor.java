@@ -8080,26 +8080,20 @@ public class ZIDEEditor extends Application {
     toolbar.setAlignment(Pos.CENTER_LEFT);
     toolbar.getStyleClass().add("pdf-toolbar");
     Button open = new Button("Open PDF");
-    Button previousPage = new Button("‹");
-    Button nextPage = new Button("›");
     Button zoomOut = new Button("−");
     Button zoomReset = new Button("100%");
     Button zoomIn = new Button("+");
     Button fitWidth = new Button("Fit width");
     Label fileLabel = new Label("No document selected");
-    Label pageLabel = new Label("Page —");
     fileLabel.getStyleClass().add("pdf-file-label");
-    pageLabel.getStyleClass().add("pdf-page-label");
     HBox.setHgrow(fileLabel, Priority.ALWAYS);
-    previousPage.setTooltip(new Tooltip("Previous page"));
-    nextPage.setTooltip(new Tooltip("Next page"));
     zoomOut.setTooltip(new Tooltip("Zoom out"));
     zoomReset.setTooltip(new Tooltip("Reset zoom"));
     zoomIn.setTooltip(new Tooltip("Zoom in"));
     fitWidth.setTooltip(new Tooltip("Fit document to the viewer width"));
-    toolbar.getChildren().addAll(open, fileLabel, previousPage, pageLabel,
-        nextPage, new Separator(Orientation.VERTICAL), zoomOut, zoomReset,
-        zoomIn, fitWidth);
+    toolbar.getChildren().addAll(open, fileLabel,
+        new Separator(Orientation.VERTICAL), zoomOut, zoomReset, zoomIn,
+        fitWidth);
     try {
       pdfDisplayer = new PDFDisplayer();
       Node viewer = pdfDisplayer.toNode();
@@ -8128,17 +8122,9 @@ public class ZIDEEditor extends Application {
           statusLabel.setText("Could not open PDF: " + exception.getMessage());
         }
       });
-      previousPage.setOnAction(event -> {
-        pdfDisplayer.navigateByPage(-1);
-        updatePdfPageLabel(pageLabel);
-      });
-      nextPage.setOnAction(event -> {
-        pdfDisplayer.navigateByPage(1);
-        updatePdfPageLabel(pageLabel);
-      });
       zoomOut.setOnAction(event -> executePdfCommand("PDFViewerApplication.zoomOut();"));
       zoomReset.setOnAction(event -> executePdfCommand(
-          "PDFViewerApplication.pdfViewer.currentScaleValue = '1.0';"));
+          "PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';"));
       zoomIn.setOnAction(event -> executePdfCommand("PDFViewerApplication.zoomIn();"));
       fitWidth.setOnAction(event -> executePdfCommand(
           "PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';"));
@@ -8159,13 +8145,6 @@ public class ZIDEEditor extends Application {
     } catch (RuntimeException ignored) {
       // The PDF document may be between page loads.
     }
-  }
-
-  private void updatePdfPageLabel(Label pageLabel) {
-    if (pdfDisplayer == null) return;
-    int page = pdfDisplayer.getActualPageNumber();
-    int total = pdfDisplayer.getTotalPageCount();
-    pageLabel.setText(page > 0 && total > 0 ? "Page " + page + " / " + total : "Page —");
   }
 
   private WebView findWebView(Node node) {
