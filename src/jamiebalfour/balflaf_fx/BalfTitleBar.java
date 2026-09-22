@@ -407,8 +407,6 @@ public class BalfTitleBar extends Region {
 
 
   private void toggleMacZoom(Stage stage) {
-    if (macZoomAnimation != null) macZoomAnimation.stop();
-
     boolean zoomIn = !zoomed;
     double targetX;
     double targetY;
@@ -440,30 +438,31 @@ public class BalfTitleBar extends Region {
       targetH = oldH;
     }
 
+    // Resize the undecorated stage atomically. Animating its bounds causes
+    // macOS to leave ghosted intermediate frames behind the window.
     zoomed = zoomIn;
-    double startX = stage.getX();
-    double startY = stage.getY();
-    double startW = stage.getWidth();
-    double startH = stage.getHeight();
-    SimpleDoubleProperty progress = new SimpleDoubleProperty(0);
-    progress.addListener((obs, oldValue, newValue) -> {
-      double amount = newValue.doubleValue();
-      stage.setX(startX + (targetX - startX) * amount);
-      stage.setY(startY + (targetY - startY) * amount);
-      stage.setWidth(startW + (targetW - startW) * amount);
-      stage.setHeight(startH + (targetH - startH) * amount);
-    });
-    macZoomAnimation = new Timeline(new KeyFrame(Duration.millis(220),
-            new KeyValue(progress, 1, Interpolator.EASE_BOTH)));
-    macZoomAnimation.setOnFinished(event -> {
-      if (!zoomed) hasSavedNormalBounds = false;
-    });
-    macZoomAnimation.play();
+    stage.setX(targetX);
+    stage.setY(targetY);
+    stage.setWidth(targetW);
+    stage.setHeight(targetH);
+    if (!zoomed) hasSavedNormalBounds = false;
   }
 
   private void enterMacFullScreen() {
+    boolean entering = !stage.isFullScreen();
     stage.setFullScreenExitHint("");
-    stage.setFullScreen(!stage.isFullScreen());
+    stage.setFullScreen(entering);
+    if (entering) {
+      Platform.runLater(() -> {
+        Screen screen = Screen.getScreensForRectangle(stage.getX(), stage.getY(), 1, 1)
+                .stream().findFirst().orElse(Screen.getPrimary());
+        Rectangle2D bounds = screen.getBounds();
+        stage.setX(bounds.getMinX());
+        stage.setY(bounds.getMinY());
+        stage.setWidth(bounds.getWidth());
+        stage.setHeight(bounds.getHeight());
+      });
+    }
   }
 
   private Circle trafficLight(String styleClass, Color fill) {

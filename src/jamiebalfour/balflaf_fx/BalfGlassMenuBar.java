@@ -1,5 +1,6 @@
 package jamiebalfour.balflaf_fx;
 
+import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
@@ -137,6 +138,10 @@ public class BalfGlassMenuBar extends HBox {
 
     hideActiveMenu();
 
+    // Reapply the current theme immediately before showing a detached popup.
+    // This covers popups created before the main scene finished applying its
+    // dark stylesheet.
+    menu.setDarkMode(darkMode);
     rootCssAndLayout(menu.root);
     double popupWidth = menu.root.prefWidth(-1);
     double popupHeight = menu.root.prefHeight(popupWidth);
@@ -147,9 +152,24 @@ public class BalfGlassMenuBar extends HBox {
     if (titleTopLeft == null || titleTopRight == null || titleBottomLeft == null) return;
 
     double x = menu.opensAbove ? titleTopRight.getX() - popupWidth : titleTopLeft.getX();
-    double y = menu.opensAbove ? titleTopLeft.getY() - popupHeight + 2 : titleBottomLeft.getY() + 3;
+    double y = menu.opensAbove ? titleTopLeft.getY() - popupHeight : titleBottomLeft.getY();
     popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
-    popup.show(menu.owner, x, y);
+    // Use the window as the popup owner: passing the title node makes
+    // PopupWindow apply the node's position a second time, leaving a visible
+    // gap between the menu title and its surface.
+    popup.show(menu.owner.getScene().getWindow(), x, y);
+
+    // CSS can change the popup's measured size once it is attached to its
+    // separate popup scene. Re-anchor using the final bounds so an upward
+    // menu stays flush with the selector instead of leaving a visible gap.
+    Platform.runLater(() -> {
+      if (!popup.isShowing()) return;
+      double actualWidth = menu.root.getBoundsInParent().getWidth();
+      double actualHeight = menu.root.getBoundsInParent().getHeight();
+      if (actualWidth <= 0 || actualHeight <= 0) return;
+      popup.setX(menu.opensAbove ? titleTopRight.getX() - actualWidth : titleTopLeft.getX());
+      popup.setY(menu.opensAbove ? titleTopLeft.getY() - actualHeight : titleBottomLeft.getY());
+    });
 
     activeMenu = popup;
   }
@@ -178,7 +198,7 @@ public class BalfGlassMenuBar extends HBox {
       root = new StackPane();
       root.getStyleClass().add("glass-menu-container");
       if (BalfGlassMenuBar.this.getStyleClass().contains("language-selector-menu")) {
-        root.getStyleClass().add("language-selector-popup");
+      root.getStyleClass().add("language-selector-popup");
       }
       root.getStylesheets().add(
               getClass().getResource("/jamiebalfour/balflaf_fx/balflaf_fx.css").toExternalForm()
@@ -193,7 +213,11 @@ public class BalfGlassMenuBar extends HBox {
 // Actual menu content
       this.box = new VBox(1);
       this.box.getStyleClass().add("glass-menu-popup");
-      this.box.setPadding(new Insets(6));
+      this.box.setPadding(BalfGlassMenuBar.this.getStyleClass().contains("language-selector-menu")
+              ? new Insets(4) : new Insets(6));
+      // Apply the popup surface after the content node exists. Popup scenes
+      // can otherwise retain the light base surface despite the dark state.
+      setDarkMode(darkMode);
 
 // Stack them
       root.getChildren().addAll(shadow, box);
@@ -221,6 +245,19 @@ public class BalfGlassMenuBar extends HBox {
 
     private void setDarkMode(boolean enabled) {
       root.pseudoClassStateChanged(DARK, enabled);
+      // Popup content is hosted in its own scene, so keep an explicit class
+      // as well as the pseudo-class. This makes theme styling reliable when
+      // the popup is shown after the application scene changes theme.
+      root.getStyleClass().remove("dark-mode");
+      // The rounded shadow and popup own the surface. A background on the
+      // rectangular root leaks through the popup corners as dark squares.
+      root.setStyle("-fx-background-color: transparent;");
+      if (enabled) root.getStyleClass().add("dark-mode");
+      if (box != null) {
+        box.setStyle(enabled
+                ? "-fx-background-color: #24262b; -fx-border-color: #4a535f;"
+                : "");
+      }
       for (GlassMenu submenu : submenus) submenu.setDarkMode(enabled);
     }
 
@@ -304,6 +341,10 @@ public class BalfGlassMenuBar extends HBox {
 
       public Node createItem(String title, String shortcut, Runnable action) {
         return menu.createItem(title, shortcut, action);
+      }
+
+      public GlassCheckMenuItem checkItem(String title, boolean selected, Consumer<Boolean> action) {
+        return menu.checkItem(title, selected, action);
       }
 
       public void setVisible(boolean visible) {
@@ -413,10 +454,11 @@ public class BalfGlassMenuBar extends HBox {
       if (insertionIndex < 0 || !box.getChildren().containsAll(items)) {
         return null;
       }
-      VBox group = new VBox(1);
+      VBox group = new VBox(0);
       group.getStyleClass().add(styleClass);
-      group.setPadding(new Insets(2));
-      VBox.setMargin(group, new Insets(3, 2, 3, 2));
+      boolean compactGroup = "language-selector-group".equals(styleClass);
+      group.setPadding(compactGroup ? new Insets(1) : new Insets(2));
+      VBox.setMargin(group, compactGroup ? new Insets(1, 1, 1, 1) : new Insets(3, 2, 3, 2));
       box.getChildren().removeAll(items);
       box.getChildren().add(insertionIndex, group);
       group.getChildren().addAll(items);
@@ -520,10 +562,11 @@ public class BalfGlassMenuBar extends HBox {
     if (activeSubmenu != null) activeSubmenu.hide();
 
     rootCssAndLayout(menu.root);
-    Point2D point = owner.localToScreen(owner.getBoundsInLocal().getMaxX() - 28,
+    Point2D point = owner.localToScreen(owner.getBoundsInLocal().getMaxX() - 6,
             owner.getBoundsInLocal().getMinY());
     if (point == null) return;
     activeMenu.setAutoHide(false);
+    menu.popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
     menu.popup.show(owner.getScene().getWindow(), point.getX(), point.getY());
     activeSubmenu = menu.popup;
     installSubmenuDismissFilters(owner.getScene());

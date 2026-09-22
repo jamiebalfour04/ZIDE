@@ -284,6 +284,7 @@
 .balf-combo-popup-cell:filled:hover:not(:selected) {
     -fx-background-color: #c7e2f7;
     -fx-text-fill: #123b59;
+    -fx-font-weight: bold;
 }
 
 .balf-combo-popup-list:dark {
@@ -302,6 +303,7 @@
 .balf-combo-popup-cell:dark:filled:hover:not(:selected) {
     -fx-background-color: #164b63;
     -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
 }
 
 .balf-combo-box.balf-macro-picker {
@@ -414,6 +416,9 @@
 
 .glass-menu-popup {
     -fx-background-color: #ffffff;
+    -fx-text-background-color: #202020;
+    -fx-text-base-color: #202020;
+    -fx-text-inner-color: #202020;
     -fx-background-radius: 12;
     -fx-border-color: rgba(60,60,67,0.24);
     -fx-border-radius: 12;
@@ -427,6 +432,32 @@
 .glass-menu-container:dark .glass-menu-popup {
     -fx-background-color: #20252e;
     -fx-border-color: #4a535f;
+}
+
+/* Explicit theme class for popup windows, whose scene is separate from the
+   main application scene and may not reliably retain pseudo-class styling. */
+.glass-menu-container.dark-mode .glass-menu-popup,
+.glass-menu-container.dark-mode .glass-menu-shadow {
+    -fx-background-color: #24262b;
+}
+.glass-menu-container.dark-mode .glass-menu-popup {
+    -fx-text-background-color: #e6e9ee;
+    -fx-text-base-color: #e6e9ee;
+    -fx-text-inner-color: #e6e9ee;
+}
+.glass-menu-container.dark-mode .glass-menu-popup {
+    -fx-border-color: #4a535f;
+}
+.glass-menu-container.dark-mode .glass-menu-item-text,
+.glass-menu-container.dark-mode .glass-menu-shortcut,
+.glass-menu-container.dark-mode .glass-menu-check {
+    -fx-text-fill: #f2f2f7;
+}
+.glass-menu-container.dark-mode .glass-menu-submenu-arrow {
+    -fx-text-fill: #cbd3dc;
+}
+.glass-menu-container.dark-mode .language-selector-group {
+    -fx-background-color: #1d2025;
 }
 
 .glass-menu-container:dark .glass-menu-item:hover { -fx-background-color: #07566f; }
