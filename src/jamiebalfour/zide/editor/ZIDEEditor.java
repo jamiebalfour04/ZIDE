@@ -8083,17 +8083,14 @@ public class ZIDEEditor extends Application {
     Button zoomOut = new Button("−");
     Button zoomReset = new Button("100%");
     Button zoomIn = new Button("+");
-    Button fitWidth = new Button("Fit width");
     Label fileLabel = new Label("No document selected");
     fileLabel.getStyleClass().add("pdf-file-label");
     HBox.setHgrow(fileLabel, Priority.ALWAYS);
     zoomOut.setTooltip(new Tooltip("Zoom out"));
     zoomReset.setTooltip(new Tooltip("Reset zoom"));
     zoomIn.setTooltip(new Tooltip("Zoom in"));
-    fitWidth.setTooltip(new Tooltip("Fit document to the viewer width"));
     toolbar.getChildren().addAll(open, fileLabel,
-        new Separator(Orientation.VERTICAL), zoomOut, zoomReset, zoomIn,
-        fitWidth);
+        new Separator(Orientation.VERTICAL), zoomOut, zoomReset, zoomIn);
     try {
       pdfDisplayer = new PDFDisplayer();
       Node viewer = pdfDisplayer.toNode();
@@ -8126,8 +8123,6 @@ public class ZIDEEditor extends Application {
       zoomReset.setOnAction(event -> executePdfCommand(
           "PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';"));
       zoomIn.setOnAction(event -> executePdfCommand("PDFViewerApplication.zoomIn();"));
-      fitWidth.setOnAction(event -> executePdfCommand(
-          "PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';"));
       root.getChildren().addAll(toolbar, viewer);
     } catch (Throwable unavailable) {
       Label message = new Label("PDF viewing is unavailable in this runtime.");
