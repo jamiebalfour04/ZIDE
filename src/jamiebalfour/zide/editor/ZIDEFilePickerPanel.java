@@ -10,6 +10,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Separator;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -33,6 +35,9 @@ final class ZIDEFilePickerPanel extends VBox {
   private final CheckBox replaceExisting = new CheckBox("Replace existing file");
   private final Label validation = new Label();
   private File currentDirectory;
+  private final List<File> history = new ArrayList<>();
+  private int historyIndex = -1;
+  private boolean showHidden;
 
   ZIDEFilePickerPanel(File startDirectory, String initialFileName,
                       List<FileChooser.ExtensionFilter> filters, boolean foldersOnly) {
@@ -46,15 +51,30 @@ final class ZIDEFilePickerPanel extends VBox {
     if (starting == null || !starting.isDirectory()) starting = new File(System.getProperty("user.home"));
     navigateTo(starting);
 
-    Button up = new Button("Up");
+    Button back = new Button("‹");
+    Button forward = new Button("›");
+    Button up = new Button("↑");
+    Button refresh = new Button("↻");
+    ToggleButton hidden = new ToggleButton("Show Hidden");
+    back.setTooltip(new javafx.scene.control.Tooltip("Back"));
+    forward.setTooltip(new javafx.scene.control.Tooltip("Forward"));
+    up.setTooltip(new javafx.scene.control.Tooltip("Up one folder"));
+    refresh.setTooltip(new javafx.scene.control.Tooltip("Refresh"));
+    back.setOnAction(event -> navigateHistory(-1));
+    forward.setOnAction(event -> navigateHistory(1));
     up.setOnAction(event -> {
       File parent = currentDirectory.getParentFile();
       if (parent != null) navigateTo(parent);
     });
+    refresh.setOnAction(event -> refreshEntries());
+    hidden.selectedProperty().addListener((obs, oldValue, selected) -> {
+      showHidden = selected;
+      refreshEntries();
+    });
     Button go = new Button("Go");
     go.setOnAction(event -> navigateFromLocation());
     location.setOnAction(event -> navigateFromLocation());
-    HBox locationRow = new HBox(8, new Label("Location"), location, up, go);
+    HBox locationRow = new HBox(6, back, forward, up, refresh, hidden, new Separator(javafx.geometry.Orientation.VERTICAL), new Label("Location"), location, go);
     locationRow.setAlignment(Pos.CENTER_LEFT);
     HBox.setHgrow(location, Priority.ALWAYS);
     locationRow.getStyleClass().add("file-picker-location");
@@ -64,7 +84,15 @@ final class ZIDEFilePickerPanel extends VBox {
       @Override
       protected void updateItem(File file, boolean empty) {
         super.updateItem(file, empty);
-        setText(empty || file == null ? null : file.getName() + (file.isDirectory() ? "/" : ""));
+        if (empty || file == null) {
+          setText(null);
+          setGraphic(null);
+        } else {
+          String icon = file.isDirectory() ? "📁" : "📄";
+          String modified = new java.text.SimpleDateFormat("dd MMM yyyy HH:mm").format(new java.util.Date(file.lastModified()));
+          String size = file.isDirectory() ? "Folder" : formatSize(file.length());
+          setText(icon + "  " + file.getName() + "    " + modified + "    " + size);
+        }
       }
     });
     entries.setOnMouseClicked(event -> {
@@ -82,6 +110,30 @@ final class ZIDEFilePickerPanel extends VBox {
     entries.setMinHeight(240);
     entries.getStyleClass().add("file-picker-list");
     VBox.setVgrow(entries, Priority.ALWAYS);
+    ListView<File> shortcuts = new ListView<>();
+    shortcuts.getStyleClass().add("file-picker-shortcuts");
+    shortcuts.setPrefWidth(150);
+    List<File> shortcutFiles = new ArrayList<>();
+    addShortcut(shortcutFiles, "Home", new File(System.getProperty("user.home")));
+    addShortcut(shortcutFiles, "Desktop", new File(System.getProperty("user.home"), "Desktop"));
+    addShortcut(shortcutFiles, "Documents", new File(System.getProperty("user.home"), "Documents"));
+    addShortcut(shortcutFiles, "Downloads", new File(System.getProperty("user.home"), "Downloads"));
+    shortcuts.setItems(FXCollections.observableArrayList(shortcutFiles));
+    shortcuts.setCellFactory(list -> new ListCell<>() {
+      @Override protected void updateItem(File file, boolean empty) {
+        super.updateItem(file, empty);
+        setText(empty || file == null ? null : shortcutName(file));
+      }
+    });
+    shortcuts.setOnMouseClicked(event -> {
+      if (event.getClickCount() == 2) {
+        File selected = shortcuts.getSelectionModel().getSelectedItem();
+        if (selected != null) navigateTo(selected);
+      }
+    });
+    HBox browserBody = new HBox(10, shortcuts, entries);
+    HBox.setHgrow(entries, Priority.ALWAYS);
+    VBox.setVgrow(browserBody, Priority.ALWAYS);
 
     if (!foldersOnly) {
       fileName.setText(initialFileName == null ? "" : initialFileName);
@@ -110,11 +162,11 @@ final class ZIDEFilePickerPanel extends VBox {
       HBox typeRow = new HBox(8, new Label("File type"), fileType);
       typeRow.setAlignment(Pos.CENTER_LEFT);
       HBox.setHgrow(fileType, Priority.ALWAYS);
-      getChildren().addAll(locationRow, entries);
+      getChildren().addAll(locationRow, browserBody);
       if (this.filters.size() > 1) getChildren().add(typeRow);
       getChildren().addAll(new Label("File name"), fileName, replaceExisting);
     } else {
-      getChildren().addAll(locationRow, entries);
+      getChildren().addAll(locationRow, browserBody);
     }
 
     validation.getStyleClass().add("file-picker-validation");
@@ -158,11 +210,27 @@ final class ZIDEFilePickerPanel extends VBox {
   }
 
   private void navigateTo(File directory) {
+    navigateTo(directory, true);
+  }
+
+  private void navigateTo(File directory, boolean recordHistory) {
     if (directory == null || !directory.isDirectory()) return;
     currentDirectory = directory.toPath().toAbsolutePath().normalize().toFile();
+    if (recordHistory) {
+      while (history.size() > historyIndex + 1) history.removeLast();
+      if (history.isEmpty() || !history.getLast().equals(currentDirectory)) history.add(currentDirectory);
+      historyIndex = history.size() - 1;
+    }
     location.setText(currentDirectory.getAbsolutePath());
     entries.getSelectionModel().clearSelection();
     refreshEntries();
+  }
+
+  private void navigateHistory(int direction) {
+    int target = historyIndex + direction;
+    if (target < 0 || target >= history.size()) return;
+    historyIndex = target;
+    navigateTo(history.get(historyIndex), false);
   }
 
   private void refreshEntries() {
@@ -171,6 +239,7 @@ final class ZIDEFilePickerPanel extends VBox {
     List<File> visible = new ArrayList<>();
     if (files != null) {
       for (File file : files) {
+        if (!showHidden && file.isHidden()) continue;
         if (foldersOnly ? file.isDirectory() : file.isDirectory() || matchesSelectedFilter(file)) visible.add(file);
       }
     }
@@ -214,5 +283,32 @@ final class ZIDEFilePickerPanel extends VBox {
 
   private void clearValidation() {
     if (!validation.getText().startsWith("This file already exists.")) validation.setText("");
+  }
+
+  private static String formatSize(long bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)) + " MB";
+    return (bytes / (1024 * 1024 * 1024)) + " GB";
+  }
+
+  private static void addShortcut(List<File> shortcuts, String name, File directory) {
+    if (directory.isDirectory()) {
+      directory = new File(directory, "");
+      directory.setReadable(true);
+      shortcuts.add(new ShortcutFile(directory, name));
+    }
+  }
+
+  private static String shortcutName(File file) {
+    return file instanceof ShortcutFile shortcut ? shortcut.label : file.getName();
+  }
+
+  private static final class ShortcutFile extends File {
+    private final String label;
+    private ShortcutFile(File path, String label) {
+      super(path.getAbsolutePath());
+      this.label = label;
+    }
   }
 }
