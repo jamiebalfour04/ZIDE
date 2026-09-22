@@ -10,3 +10,4 @@
 /build/librca
 /build/ni-build
 **/.DS_Store
+build/*.jar
