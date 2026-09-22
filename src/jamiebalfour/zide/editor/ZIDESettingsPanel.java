@@ -18,6 +18,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Builds the preferences view independently from the main editor window. */
 final class ZIDESettingsPanel extends HBox {
@@ -26,9 +28,13 @@ final class ZIDESettingsPanel extends HBox {
   private final BalfComboBox<String> darkEditorTheme;
   private final BalfComboBox<String> fontFamily;
   private final Spinner<Integer> fontSize;
+  private final Spinner<Integer> indentationSpaces;
   private final CheckBox wordWrap;
   private final CheckBox useZpex;
   private final CheckBox showInputPrompt;
+  private final CheckBox groupProjectTabs;
+  private final CheckBox blockClosures;
+  private final CheckBox autoOpenCsvSpreadsheet;
   private final TextField url;
   private final PasswordField key;
   private final BalfComboBox<String> model;
@@ -37,15 +43,17 @@ final class ZIDESettingsPanel extends HBox {
   private final TextField collaborationName;
   private final PasswordField collaborationPassword;
   private final TextField collaborationAvatar;
+  private final Map<String, TextField> runtimeFields = new LinkedHashMap<>();
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
-                    String fontName, int fontSizeValue, boolean wrapLines, boolean preferZpex, boolean showInputPromptValue,
+                    String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean preferZpex, boolean showInputPromptValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
-                    String collaborationPasswordValue, String collaborationAvatarValue) {
+                    String collaborationPasswordValue, String collaborationAvatarValue,
+                    Map<String, String> runtimePaths) {
     super(18);
 
-    ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "ChatGPT", "Collaboration"));
+    ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "Runtimes & Compilers", "ChatGPT", "Collaboration", "Experimental"));
     sections.getStyleClass().add("settings-section-list");
     sections.setPrefWidth(190);
     sections.setMinWidth(190);
@@ -56,10 +64,13 @@ final class ZIDESettingsPanel extends HBox {
     theme.setValue(themeName);
     GridPane guiFields = fields();
     guiFields.addRow(0, new Label("Theme"), theme);
+    groupProjectTabs = new CheckBox("Group tabs by project");
+    groupProjectTabs.setSelected(groupProjectTabsValue);
+    guiFields.add(groupProjectTabs, 1, 1);
     GridPane.setHgrow(theme, Priority.ALWAYS);
     VBox gui = section("GUI", guiFields);
 
-    List<String> editorThemes = List.of("ZIDE", "Solarized", "GitHub", "Dracula", "Monokai", "Nord");
+    List<String> editorThemes = List.of("ZIDE", "Solarized", "GitHub", "Dracula", "Monokai", "Nord", "Purples and Greens");
     lightEditorTheme = combo(editorThemes, darkMode);
     lightEditorTheme.setValue(lightTheme);
     darkEditorTheme = combo(editorThemes, darkMode);
@@ -69,15 +80,21 @@ final class ZIDESettingsPanel extends HBox {
     fontFamily.setValue(fontName);
     fontSize = new Spinner<>(8, 32, fontSizeValue);
     fontSize.setEditable(true);
+    indentationSpaces = new Spinner<>(1, 8, indentationSpacesValue);
+    indentationSpaces.setEditable(true);
     wordWrap = new CheckBox("Wrap long lines");
     wordWrap.setSelected(wrapLines);
+    autoOpenCsvSpreadsheet = new CheckBox("Open CSV files as spreadsheets");
+    autoOpenCsvSpreadsheet.setSelected(autoOpenCsvSpreadsheetValue);
     GridPane editorFields = fields();
     editorFields.addRow(0, new Label("Light theme"), lightEditorTheme);
     editorFields.addRow(1, new Label("Dark theme"), darkEditorTheme);
     editorFields.addRow(2, new Label("Font"), fontFamily);
     editorFields.addRow(3, new Label("Font size"), fontSize);
-    editorFields.add(wordWrap, 1, 4);
-    for (Node control : List.of(lightEditorTheme, darkEditorTheme, fontFamily, fontSize)) {
+    editorFields.addRow(4, new Label("Indentation spaces"), indentationSpaces);
+    editorFields.add(wordWrap, 1, 5);
+    editorFields.add(autoOpenCsvSpreadsheet, 1, 6);
+    for (Node control : List.of(lightEditorTheme, darkEditorTheme, fontFamily, fontSize, indentationSpaces)) {
       GridPane.setHgrow(control, Priority.ALWAYS);
     }
     VBox editor = section("Editor", editorFields);
@@ -94,6 +111,30 @@ final class ZIDESettingsPanel extends HBox {
     executionTitle.getStyleClass().add("settings-section-title");
     VBox execution = new VBox(16, executionTitle, yassGroup);
     execution.getStyleClass().add("settings-section-content");
+
+    blockClosures = new CheckBox("Block closures");
+    blockClosures.setSelected(blockClosuresValue);
+    VBox experimental = section("Experimental", new VBox(10, blockClosures));
+
+    VBox runtimeContent = new VBox(10);
+    if (runtimePaths.isEmpty()) {
+      Label empty = new Label("Runtime and compiler paths will appear here after a language is run for the first time.");
+      empty.setWrapText(true);
+      empty.getStyleClass().add("settings-help-text");
+      runtimeContent.getChildren().add(empty);
+    } else {
+      GridPane runtimeFieldsGrid = fields();
+      int row = 0;
+      for (Map.Entry<String, String> entry : runtimePaths.entrySet()) {
+        TextField path = new TextField(entry.getValue());
+        path.setMaxWidth(Double.MAX_VALUE);
+        runtimeFields.put(entry.getKey(), path);
+        runtimeFieldsGrid.addRow(row++, new Label(runtimeLabel(entry.getKey())), path);
+        GridPane.setHgrow(path, Priority.ALWAYS);
+      }
+      runtimeContent.getChildren().add(runtimeFieldsGrid);
+    }
+    VBox runtimes = section("Runtimes & Compilers", runtimeContent);
 
     url = new TextField(chatGPTUrl);
     key = new PasswordField();
@@ -145,6 +186,8 @@ final class ZIDESettingsPanel extends HBox {
     sections.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, selected) -> {
       Node selectedPage = "ChatGPT".equals(selected) ? chatGPT
               : "Collaboration".equals(selected) ? collaboration
+              : "Runtimes & Compilers".equals(selected) ? runtimes
+              : "Experimental".equals(selected) ? experimental
               : "Execution".equals(selected) ? execution
               : "Editor".equals(selected) ? editor : gui;
       page.getChildren().setAll(selectedPage);
@@ -176,9 +219,13 @@ final class ZIDESettingsPanel extends HBox {
   String getDarkEditorTheme() { return darkEditorTheme.getValue(); }
   String getFontFamily() { return fontFamily.getEditor().getText().trim(); }
   int getFontSize() { return fontSize.getValue(); }
+  int getIndentationSpaces() { return indentationSpaces.getValue(); }
   boolean isWordWrapEnabled() { return wordWrap.isSelected(); }
   boolean isZpexPreferred() { return useZpex.isSelected(); }
   boolean isInputPromptEnabled() { return showInputPrompt.isSelected(); }
+  boolean isProjectTabGroupingEnabled() { return groupProjectTabs.isSelected(); }
+  boolean isBlockClosuresEnabled() { return blockClosures.isSelected(); }
+  boolean isAutoOpenCsvSpreadsheetEnabled() { return autoOpenCsvSpreadsheet.isSelected(); }
   String getChatGPTUrl() { return url.getText().trim(); }
   String getChatGPTKey() { return key.getText().trim(); }
   String getChatGPTModel() { return model.getEditor().getText().trim(); }
@@ -187,6 +234,16 @@ final class ZIDESettingsPanel extends HBox {
   String getCollaborationName() { return collaborationName.getText().trim(); }
   String getCollaborationPassword() { return collaborationPassword.getText(); }
   String getCollaborationAvatar() { return collaborationAvatar.getText().trim(); }
+  Map<String, String> getRuntimePaths() {
+    Map<String, String> values = new LinkedHashMap<>();
+    runtimeFields.forEach((key, field) -> values.put(key, field.getText().trim()));
+    return values;
+  }
+
+  private static String runtimeLabel(String key) {
+    String label = key.replace("RUNTIME_", "").replace("_PATH", "").replace('_', ' ');
+    return label.substring(0, 1).toUpperCase() + label.substring(1).toLowerCase();
+  }
 
   private static void updateAvatarPreview(ImageView preview, String path) {
     try {
