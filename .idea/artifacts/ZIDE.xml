@@ -20,6 +20,7 @@
       <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/ZPE/zpe.jar" path-in-jar="/" />
       <element id="module-output" name="ZIDE" />
       <element id="extracted-dir" path="$JARs$/slf4j-api-2.0.13.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/slf4j-simple-2.0.17.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/org.eclipse.jgit-6.10.0.202406032230-r.unsigned.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/wellbehavedfx-0.3.3.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/BalfClassLibrary.jar" path-in-jar="/" />
@@ -27,6 +28,7 @@
       <element id="extracted-dir" path="$JARs$/reactfx-2.0-M5.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/flowless-0.7.3.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/undofx-2.1.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/PDFViewerFX-0.8.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

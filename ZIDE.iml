@@ -9,6 +9,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="zpe" level="project" />
     <orderEntry type="library" name="org.eclipse.jgit-6.10.0.202406032230-r" level="project" />
+    <orderEntry type="library" name="slf4j-simple-2.0.17" level="project" />
     <orderEntry type="library" name="javafx-swt" level="project" />
     <orderEntry type="library" name="BalfClassLibrary" level="project" />
     <orderEntry type="library" name="flowless-0.7.3" level="project" />
@@ -16,5 +17,15 @@
     <orderEntry type="library" name="reactfx-2.0-M5" level="project" />
     <orderEntry type="library" name="undofx-2.1.1" level="project" />
     <orderEntry type="library" name="wellbehavedfx-0.3.3" level="project" />
+    <orderEntry type="library" name="PDFViewerFX-0.8" level="project" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/PDFViewerFX-0.8.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
