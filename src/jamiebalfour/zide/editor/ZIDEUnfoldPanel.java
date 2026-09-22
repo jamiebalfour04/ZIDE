@@ -187,13 +187,14 @@ final class ZIDEUnfoldPanel extends VBox {
       boolean located = chunk.getProgramEnd() > offset && offset >= 0 && offset <= source.length();
       int line = located ? (int) source.substring(0, offset).chars().filter(c -> c == '\n').count() : -1;
       String prefix = located ? "Line " + (line + 1) + "  " : "";
-      Label description = new Label(prefix + chunk.getLongDescription());
+      boolean declaration = isDeclarationChunk(chunk);
+      Label description = new Label(prefix + (declaration ? chunk.getShortDescription() : chunk.getLongDescription()));
       description.setWrapText(true);
       description.setMaxWidth(Double.MAX_VALUE);
       description.setMinWidth(0);
       description.setPadding(new Insets(8));
       description.getStyleClass().add("unfold-description");
-      if (!chunk.getShortDescription().equals(chunk.getLongDescription())) {
+      if (!declaration && !chunk.getShortDescription().equals(chunk.getLongDescription())) {
         MenuItem summary = new MenuItem("Show full description");
         summary.setOnAction(e -> {
           clearHighlight();
@@ -234,12 +235,18 @@ final class ZIDEUnfoldPanel extends VBox {
           if (expanded && nested.getChildren().isEmpty()) addRows(nested, children, source);
           nested.setVisible(expanded);
           nested.setManaged(expanded);
-          description.setText(prefix + (expanded ? chunk.getShortDescription() : chunk.getLongDescription()));
+          description.setText(prefix + (expanded || declaration ? chunk.getShortDescription() : chunk.getLongDescription()));
           expand.setText(expanded ? "\u25be" : "\u25b8");
           expand.getTooltip().setText(expanded ? "Collapse section" : "Expand section");
         });
       }
     }
+  }
+
+  private static boolean isDeclarationChunk(YASSUnfoldChunk chunk) {
+    String description = chunk.getShortDescription();
+    if (description == null) return false;
+    return description.matches("(?i)^(defines|declares) the (module|namespace|structure|class|interface|record|function|procedure|routine|method|object|thing)\\b.*");
   }
 
   private void highlight(int line) {

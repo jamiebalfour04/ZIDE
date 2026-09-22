@@ -27,12 +27,18 @@ import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -92,6 +98,13 @@ public class EditorTab extends Tab {
   private boolean pointerOverInfoPopup;
   private final List<DiagnosticHint> diagnosticHints = new ArrayList<>();
   private List<YASSDiagnostic> diagnostics = List.of();
+  private final Map<Integer, Integer> foldRegions = new HashMap<>();
+  private final Set<Integer> foldedRegions = new HashSet<>();
+  private IntFunction<? extends Node> originalParagraphGraphicFactory;
+  private boolean blockClosuresEnabled;
+  private final Map<String, VariableColour> variableColours = new HashMap<>();
+
+  private record VariableColour(String background, String text) { }
 
   public EditorTab(ZIDEEditor owner, String title, String path, CodeEditorViewFX editor, Node content) {
     super(title, content);
@@ -100,7 +113,15 @@ public class EditorTab extends Tab {
     this.editor = editor;
     this.editorContent = content;
     this.lastDiskContent = editor.getText();
-    editor.setLineNumberClickListener(this::toggleSpecialLine);
+    for (Map.Entry<String, String[]> entry : owner.loadVariableColours(path).entrySet()) {
+      String[] colours = entry.getValue();
+      if (colours != null && colours.length >= 2) {
+        variableColours.put(entry.getKey(), new VariableColour(colours[0], colours[1]));
+      }
+    }
+    editor.setLineNumberClickListener(this::handleLineNumberClick);
+    blockClosuresEnabled = owner.isBlockClosuresEnabled();
+    installFoldIndicators();
     installInformationPopup();
 
     Label errorIcon = new Label("❗");
@@ -146,12 +167,53 @@ public class EditorTab extends Tab {
     symbolTimer.setOnFinished(e -> owner.refreshDocumentSymbols(this));
     editor.getEditor().textProperty().addListener((observable, oldText, newText) -> {
       changes = true;
+      refreshFoldRegions(newText);
       scheduleAnalysis();
       symbolTimer.playFromStart();
       if (markdownPreview != null) markdownTimer.playFromStart();
+      Platform.runLater(this::applyVariableColours);
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
+  }
+
+  void setVariableColour(String variable, String background, String text) {
+    if (variable == null || variable.isBlank() || background == null || text == null) return;
+    variableColours.put(variable, new VariableColour(background, text));
+    applyVariableColours();
+  }
+
+  private void applyVariableColours() {
+    var area = editor.getEditor();
+    String source = area.getText();
+    if (source.isEmpty() || variableColours.isEmpty()) return;
+    for (Map.Entry<String, VariableColour> entry : variableColours.entrySet()) {
+      Pattern pattern = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(entry.getKey())
+              + "(?![A-Za-z0-9_])");
+      Matcher matcher = pattern.matcher(source);
+      while (matcher.find()) {
+        int position = matcher.start();
+        int end = matcher.end();
+        for (var span : area.getStyleSpans(position, end)) {
+          int spanEnd = position + span.getLength();
+          String style = withoutVariableColourStyle(span.getStyle())
+                  + " -rtfx-background-color: " + entry.getValue().background()
+                  + "; -rtfx-background-radius: 3px; -rtfx-background-insets: 0 2px"
+                  + "; -fx-fill: " + entry.getValue().text() + ";";
+          try { area.setStyle(position, spanEnd, style); }
+          catch (IllegalArgumentException ignored) { }
+          position = spanEnd;
+        }
+      }
+    }
+  }
+
+  private static String withoutVariableColourStyle(String style) {
+    if (style == null) return "";
+    return style.replaceAll("\\s*-rtfx-background-color\\s*:[^;]+;?", "")
+            .replaceAll("\\s*-rtfx-background-radius\\s*:[^;]+;?", "")
+            .replaceAll("\\s*-rtfx-background-insets\\s*:[^;]+;?", "")
+            .replaceAll("\\s*-fx-fill\\s*:[^;]+;?", "");
   }
 
   private void buildFindReplacePanel() {
@@ -703,11 +765,11 @@ public class EditorTab extends Tab {
   public String getPath() { return path; }
   void setTabTitleLabel(Label label) { tabTitleLabel = label; }
   void setDisplayTitle(String title) {
-    setText("");
+    setText(title);
     if (tabTitleLabel != null) tabTitleLabel.setText(title);
   }
   String getDisplayTitle() {
-    return tabTitleLabel == null ? getText() : tabTitleLabel.getText();
+    return getText();
   }
   /** Updates the backing path after a project-tree rename or move. */
   void setPath(String path) {
@@ -718,6 +780,7 @@ public class EditorTab extends Tab {
   void setLanguageId(String languageId) {
     this.languageId = languageId;
     setMarkdownPreviewEnabled("md".equals(languageId));
+    refreshFoldRegions(editor.getText());
   }
   public CodeEditorViewFX getEditor() { return editor; }
   List<YASSDiagnostic> getDiagnostics() { return diagnostics; }
@@ -726,6 +789,150 @@ public class EditorTab extends Tab {
   public void toggleSpecialLine(int line) {
     if (!breakpointLines.add(line)) breakpointLines.remove(line);
   }
+
+  private void handleLineNumberClick(int line) {
+    if (!blockClosuresEnabled) {
+      toggleSpecialLine(line);
+      return;
+    }
+    Integer start = foldRegions.containsKey(line) ? line : null;
+    if (start == null) {
+      for (Map.Entry<Integer, Integer> region : foldRegions.entrySet()) {
+        if (region.getValue() == line) {
+          start = region.getKey();
+          break;
+        }
+      }
+    }
+    Integer end = start == null ? null : foldRegions.get(start);
+    if (start != null && end != null && end > start) {
+      if (foldedRegions.remove(start)) editor.getEditor().unfoldParagraphs(start);
+      else {
+        // RichTextFX keeps the first paragraph in a fold range visible, so the
+        // opener stays visible while the complete body and closing line fold.
+        editor.getEditor().foldParagraphs(start, end - 1);
+        foldedRegions.add(start);
+      }
+      editor.getEditor().recreateParagraphGraphic(start);
+      return;
+    }
+    toggleSpecialLine(line);
+  }
+
+  private void refreshFoldRegions(String source) {
+    foldRegions.clear();
+    foldedRegions.clear();
+    if (!blockClosuresEnabled) return;
+    if (source == null || source.isEmpty()) return;
+    String[] lines = source.split("\\R", -1);
+    if ("yass".equalsIgnoreCase(languageId) || "zpeedy".equalsIgnoreCase(languageId)) {
+      detectKeywordRegions(lines);
+    }
+    detectBraceRegions(lines);
+    for (Integer line : foldRegions.keySet()) editor.getEditor().recreateParagraphGraphic(line);
+  }
+
+  private void installFoldIndicators() {
+    originalParagraphGraphicFactory = editor.getEditor().paragraphGraphicFactoryProperty().get();
+    editor.getEditor().paragraphGraphicFactoryProperty().set(line -> {
+      Node existing = originalParagraphGraphicFactory == null ? null : originalParagraphGraphicFactory.apply(line);
+      if (!blockClosuresEnabled) return existing;
+      Integer end = foldRegions.get(line);
+      Label marker = new Label(end != null && end > line ? (foldedRegions.contains(line) ? "…" : ">") : "");
+      marker.getStyleClass().add("editor-fold-marker");
+      marker.setMouseTransparent(end == null || end <= line);
+      HBox graphic = new HBox(3);
+      graphic.setAlignment(Pos.CENTER_RIGHT);
+      if (existing != null) graphic.getChildren().add(existing);
+      graphic.getChildren().add(marker);
+      marker.setOnMouseClicked(event -> {
+        handleLineNumberClick(line);
+        event.consume();
+      });
+      return graphic;
+    });
+  }
+
+  void setBlockClosuresEnabled(boolean enabled) {
+    if (blockClosuresEnabled == enabled) return;
+    blockClosuresEnabled = enabled;
+    if (!enabled) foldedRegions.clear();
+    refreshFoldRegions(editor.getText());
+    int lines = editor.getText().split("\\R", -1).length;
+    for (int line = 0; line < lines; line++) editor.getEditor().recreateParagraphGraphic(line);
+  }
+
+  private void detectKeywordRegions(String[] lines) {
+    Deque<KeywordRegion> stack = new ArrayDeque<>();
+    for (int line = 0; line < lines.length; line++) {
+      String text = lines[line].replaceFirst("//.*$", "").trim().toLowerCase(Locale.ROOT);
+      if (text.isEmpty()) continue;
+      String opener = keywordOpener(text);
+      if (opener != null) {
+        stack.push(new KeywordRegion(opener, line));
+        continue;
+      }
+      String closer = keywordCloser(text);
+      if (closer == null) continue;
+      KeywordRegion match = null;
+      while (!stack.isEmpty()) {
+        KeywordRegion candidate = stack.pop();
+        if (closer.equals(candidate.kind)) { match = candidate; break; }
+      }
+      if (match != null && line > match.line + 1) foldRegions.put(match.line, line);
+    }
+  }
+
+  private static String keywordOpener(String text) {
+    if (text.matches("^(?:(public|private|protected|static|final|abstract)\\s+)*function\\b.*")) return "function";
+    if (text.matches("^(if|for|while|loop|try|switch|function|sub|class|repeat)\\b.*")) {
+      if (text.startsWith("if ") || text.equals("if") || text.startsWith("if(")) return "if";
+      if (text.startsWith("for ") || text.startsWith("for(")) return "for";
+      if (text.startsWith("while ") || text.startsWith("while(")) return "while";
+      if (text.startsWith("loop")) return "loop";
+      if (text.startsWith("try")) return "try";
+      if (text.startsWith("switch")) return "switch";
+      if (text.startsWith("function")) return "function";
+      if (text.startsWith("sub ")) return "sub";
+      if (text.startsWith("class ")) return "class";
+      if (text.startsWith("repeat")) return "repeat";
+    }
+    return null;
+  }
+
+  private static String keywordCloser(String text) {
+    if (!text.startsWith("end")) return null;
+    String remainder = text.substring(3).trim();
+    if (remainder.isEmpty()) return "if";
+    if (remainder.startsWith("if")) return "if";
+    if (remainder.startsWith("for")) return "for";
+    if (remainder.startsWith("while")) return "while";
+    if (remainder.startsWith("loop")) return "loop";
+    if (remainder.startsWith("try")) return "try";
+    if (remainder.startsWith("switch")) return "switch";
+    if (remainder.startsWith("function")) return "function";
+    if (remainder.startsWith("sub")) return "sub";
+    if (remainder.startsWith("class")) return "class";
+    if (remainder.startsWith("repeat")) return "repeat";
+    return null;
+  }
+
+  private void detectBraceRegions(String[] lines) {
+    Deque<Integer> braces = new ArrayDeque<>();
+    for (int line = 0; line < lines.length; line++) {
+      String text = lines[line].replaceAll("\\\"(?:\\\\.|[^\\\"])*\\\"", "").replaceAll("//.*$", "");
+      for (int i = 0; i < text.length(); i++) {
+        char token = text.charAt(i);
+        if (token == '{') braces.push(line);
+        else if (token == '}' && !braces.isEmpty()) {
+          int start = braces.pop();
+          if (line > start + 1) foldRegions.putIfAbsent(start, line);
+        }
+      }
+    }
+  }
+
+  private record KeywordRegion(String kind, int line) { }
   void switchOnDarkMode() {
     if (editor.isDarkMode()) return;
     editor.setDarkMode(true);
