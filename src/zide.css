@@ -2695,6 +2695,21 @@
     -fx-background-color: #f89820;
     -fx-text-fill: white;
 }
+.language-icon-c { -fx-background-color: #283593; -fx-text-fill: white; }
+.language-icon-c-header { -fx-background-color: #607d8b; -fx-text-fill: white; }
+.language-icon-cpp { -fx-background-color: #00599c; -fx-text-fill: white; }
+.language-icon-cpp-header { -fx-background-color: #00838f; -fx-text-fill: white; }
+.native-type-badge {
+    -fx-min-width: 58px;
+    -fx-padding: 4px 6px;
+    -fx-alignment: center;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4px;
+}
+.native-type-badge-c { -fx-background-color: #283593; -fx-text-fill: white; }
+.native-type-badge-h { -fx-background-color: #607d8b; -fx-text-fill: white; }
+.native-type-badge-cpp { -fx-background-color: #00599c; -fx-text-fill: white; }
+.native-type-badge-hpp { -fx-background-color: #00838f; -fx-text-fill: white; }
 .language-icon-json { -fx-background-color: #f0c500; -fx-text-fill: #202020; }
 .language-icon-ini { -fx-background-color: #8e44ad; -fx-text-fill: white; }
 .language-icon-yaml { -fx-background-color: #cb171e; -fx-text-fill: white; }
@@ -2818,8 +2833,9 @@
 }
 
 .java-type-popup-title {
+    -fx-font-family: "Inter";
     -fx-font-size: 15px;
-    -fx-font-weight: bold;
+    -fx-font-weight: 600;
 }
 
 .java-type-option {
@@ -2946,17 +2962,30 @@
 }
 
 .new-file-type-name {
+    -fx-font-family: "Inter";
     -fx-font-weight: bold;
 }
 
 .new-file-type-extension {
+    -fx-font-family: "Inter";
     -fx-text-fill: #616161;
     -fx-font-size: 11px;
 }
 
 .new-file-type-heading {
+    -fx-font-family: "Inter";
     -fx-padding: 4px 0 0 0;
     -fx-font-weight: bold;
+}
+
+.in-window-modal-panel,
+.in-window-modal-panel .label,
+.in-window-modal-panel .text-field,
+.in-window-modal-panel .check-box,
+.java-type-option,
+.java-type-name,
+.native-type-badge {
+    -fx-font-family: "Inter";
 }
 
 .dialog-pane:dark .new-file-type-choice:hover,
@@ -3729,6 +3758,41 @@
     -fx-background-color: rgba(255, 255, 255, 0.08);
 }
 
+.status-bar .sftp-status-menu {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+    -fx-background-color: transparent;
+}
+
+.status-bar .sftp-status-menu .glass-menu-title-hitbox {
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+}
+
+.status-bar .sftp-status-menu .glass-menu-title {
+    -fx-font-family: "Inter";
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-padding: 1px 7px;
+    -fx-background-color: rgba(82, 91, 102, 0.10);
+    -fx-background-radius: 6px;
+}
+
+.status-bar .sftp-status-menu .glass-menu-title:hover {
+    -fx-background-color: rgba(82, 91, 102, 0.18);
+}
+
+.app-root.dark .status-bar .sftp-status-menu .glass-menu-title {
+    -fx-text-fill: #cbd1da;
+    -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-root.dark .status-bar .sftp-status-menu .glass-menu-title:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
 .status-bar .status-bar-brand {
     -fx-opacity: 0.8;
 }
@@ -4157,6 +4221,22 @@
 .app-root.dark .project-tree .language-file-icon.language-icon-js,
 .app-root.dark .project-tree .language-file-icon.language-icon-json {
     -fx-text-fill: #202020;
+}
+.project-tree .language-file-icon.language-icon-c {
+    -fx-background-color: #283593;
+    -fx-text-fill: #ffffff;
+}
+.project-tree .language-file-icon.language-icon-cpp {
+    -fx-background-color: #00599c;
+    -fx-text-fill: #ffffff;
+}
+.project-tree .language-file-icon.language-icon-c-header {
+    -fx-background-color: #607d8b;
+    -fx-text-fill: #ffffff;
+}
+.project-tree .language-file-icon.language-icon-cpp-header {
+    -fx-background-color: #00838f;
+    -fx-text-fill: #ffffff;
 }
 
 /* Open files must not acquire a second visual treatment. */

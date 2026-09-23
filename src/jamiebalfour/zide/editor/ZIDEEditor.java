@@ -198,7 +198,10 @@ public class ZIDEEditor extends Application {
   private Path browserPreviewPath;
   private HttpServer ywpPreviewServer;
   private BalfGlassMenuBar languageMenuBar;
+  private BalfGlassMenuBar sftpMenuBar;
   private Label caretPositionLabel;
+  private BalfGlassMenuBar.GlassMenu sftpMenu;
+  private boolean sftpConnected;
   private ZIDESystemTerminal systemTerminal;
   private Label zoomPercentageLabel;
   private boolean forwardingTabHeaderScroll;
@@ -1022,6 +1025,28 @@ public class ZIDEEditor extends Application {
     return null;
   }
 
+  private static List<String> nativeCompilerCommand(boolean cpp) {
+    String[] names = cpp
+        ? (HelperFunctions.isWindows() ? new String[]{"clang++.exe", "g++.exe"} : new String[]{"clang++", "g++"})
+        : (HelperFunctions.isWindows() ? new String[]{"clang.exe", "gcc.exe"} : new String[]{"clang", "gcc"});
+    List<Path> candidates = new ArrayList<>();
+    if (HelperFunctions.isMac()) {
+      for (String name : names) {
+        candidates.add(Path.of("/opt/homebrew/bin", name));
+        candidates.add(Path.of("/usr/local/bin", name));
+        candidates.add(Path.of("/usr/bin", name));
+      }
+    }
+    String path = System.getenv("PATH");
+    if (path != null) for (String directory : path.split(Pattern.quote(File.pathSeparator))) {
+      if (!directory.isBlank()) for (String name : names) candidates.add(Path.of(directory, name));
+    }
+    for (Path candidate : candidates) if (Files.isRegularFile(candidate) && (HelperFunctions.isWindows() || Files.isExecutable(candidate))) {
+      return new ArrayList<>(List.of(candidate.toString()));
+    }
+    return null;
+  }
+
   private List<String> configuredInterpreterCommand(String language) {
     String configured = MAIN_PROPERTIES == null ? "" : MAIN_PROPERTIES.getProperty("RUNTIME_" + language.toUpperCase(Locale.ROOT) + "_PATH", "").trim();
     if (!configured.isEmpty()) {
@@ -1043,6 +1068,13 @@ public class ZIDEEditor extends Application {
     return configuredInterpreterCommand(language) != null;
   }
 
+  public boolean hasNativeCompiler(boolean cpp) {
+    String key = cpp ? "CPP_COMPILER_PATH" : "C_COMPILER_PATH";
+    String configured = MAIN_PROPERTIES == null ? "" : MAIN_PROPERTIES.getProperty(key, "").trim();
+    if (!configured.isBlank() && Files.isExecutable(Path.of(configured))) return true;
+    return nativeCompilerCommand(cpp) != null;
+  }
+
   private Map<String, String> runtimePathsForSettings() {
     Map<String, String> paths = new LinkedHashMap<>();
     if (MAIN_PROPERTIES == null) return paths;
@@ -1051,6 +1083,8 @@ public class ZIDEEditor extends Application {
     }
     if (MAIN_PROPERTIES.containsKey("JAVA_RUNTIME_PATH")) paths.put("JAVA_RUNTIME_PATH", MAIN_PROPERTIES.getProperty("JAVA_RUNTIME_PATH", ""));
     if (MAIN_PROPERTIES.containsKey("JAVA_COMPILER_PATH")) paths.put("JAVA_COMPILER_PATH", MAIN_PROPERTIES.getProperty("JAVA_COMPILER_PATH", ""));
+    if (MAIN_PROPERTIES.containsKey("C_COMPILER_PATH")) paths.put("C_COMPILER_PATH", MAIN_PROPERTIES.getProperty("C_COMPILER_PATH", ""));
+    if (MAIN_PROPERTIES.containsKey("CPP_COMPILER_PATH")) paths.put("CPP_COMPILER_PATH", MAIN_PROPERTIES.getProperty("CPP_COMPILER_PATH", ""));
     return paths;
   }
 
@@ -2190,6 +2224,8 @@ public class ZIDEEditor extends Application {
     javaTypePopup.setScaleY(0.92);
     final Runnable[] showJavaTypePopup = new Runnable[1];
     final Runnable[] hideJavaTypePopup = new Runnable[1];
+    final String[] nativeFileKind = {"source"};
+    final ZIDELanguage[] nativeLanguage = {null};
     javafx.scene.effect.GaussianBlur javaSurfaceBlur = new javafx.scene.effect.GaussianBlur(10);
     showJavaTypePopup[0] = () -> {
       fileTypes.setEffect(javaSurfaceBlur);
@@ -2219,9 +2255,65 @@ public class ZIDEEditor extends Application {
       });
       fade.play();
     };
+
+    VBox nativeTypePopup = new VBox(8);
+    nativeTypePopup.getStyleClass().add("java-type-popup");
+    nativeTypePopup.setPrefWidth(350);
+    nativeTypePopup.setMaxWidth(350);
+    nativeTypePopup.setMaxHeight(Region.USE_PREF_SIZE);
+    nativeTypePopup.setMinHeight(Region.USE_PREF_SIZE);
+    Label nativeTypeTitle = new Label("C/C++ file type");
+    nativeTypeTitle.getStyleClass().add("java-type-popup-title");
+    ToggleGroup nativeTypeGroup = new ToggleGroup();
+    TilePane nativeTypeChoices = new TilePane(6, 6);
+    nativeTypeChoices.setPrefColumns(2);
+    nativeTypeChoices.setTileAlignment(Pos.CENTER);
+    Map<String, RadioButton> nativeTypeOptions = new LinkedHashMap<>();
+    for (String kind : List.of("c", "h", "cpp", "hpp")) {
+      String label = switch (kind) { case "c" -> "C source"; case "h" -> "C header"; case "cpp" -> "C++ source"; default -> "C++ header"; };
+      String badgeText = switch (kind) { case "c" -> "C"; case "h" -> "H"; case "cpp" -> "C++"; default -> "HPP"; };
+      Label badge = new Label(badgeText);
+      badge.getStyleClass().addAll("native-type-badge", "native-type-badge-" + kind);
+      Label name = new Label(label);
+      name.getStyleClass().add("java-type-name");
+      VBox card = new VBox(5, badge, name);
+      card.setAlignment(Pos.CENTER);
+      RadioButton option = new RadioButton();
+      option.setToggleGroup(nativeTypeGroup); option.setUserData(kind); option.setGraphic(card);
+      option.setContentDisplay(ContentDisplay.GRAPHIC_ONLY); option.setAccessibleText(label);
+      option.getStyleClass().addAll("java-type-option", "java-type-choice");
+      if ("c".equals(kind) || "cpp".equals(kind)) option.setSelected(true);
+      option.setOnAction(event -> nativeFileKind[0] = (String) option.getUserData());
+      nativeTypeOptions.put(kind, option); nativeTypeChoices.getChildren().add(option);
+    }
+    Button closeNativeTypePopup = new Button("Cancel");
+    closeNativeTypePopup.getStyleClass().add("in-window-modal-secondary");
+    HBox nativeTypeActions = new HBox(closeNativeTypePopup);
+    nativeTypeActions.setAlignment(Pos.CENTER_RIGHT); nativeTypeActions.setPadding(new Insets(8, 0, 0, 0));
+    nativeTypePopup.getChildren().addAll(nativeTypeTitle, nativeTypeChoices, nativeTypeActions);
+    nativeTypePopup.setVisible(false); nativeTypePopup.setManaged(false); nativeTypePopup.setOpacity(0); nativeTypePopup.setScaleX(0.92); nativeTypePopup.setScaleY(0.92);
+    final Runnable[] showNativeTypePopup = new Runnable[1];
+    final Runnable[] hideNativeTypePopup = new Runnable[1];
+    javafx.scene.effect.GaussianBlur nativeSurfaceBlur = new javafx.scene.effect.GaussianBlur(10);
+    showNativeTypePopup[0] = () -> {
+      boolean cpp = nativeLanguage[0] != null && "cpp".equals(nativeLanguage[0].id());
+      for (Map.Entry<String, RadioButton> entry : nativeTypeOptions.entrySet()) {
+        boolean visible = cpp ? Set.of("cpp", "hpp").contains(entry.getKey()) : Set.of("c", "h").contains(entry.getKey());
+        entry.getValue().setVisible(visible); entry.getValue().setManaged(visible);
+      }
+      nativeFileKind[0] = cpp ? "cpp" : "c";
+      nativeTypeOptions.get(nativeFileKind[0]).setSelected(true);
+      fileTypes.setEffect(nativeSurfaceBlur); fileTypes.setOpacity(0.16);
+      nativeTypePopup.setManaged(true); nativeTypePopup.setVisible(true);
+      FadeTransition fade = new FadeTransition(Duration.millis(160), nativeTypePopup); fade.setFromValue(0); fade.setToValue(1); fade.play();
+      ScaleTransition scale = new ScaleTransition(Duration.millis(180), nativeTypePopup); scale.setFromX(0.92); scale.setFromY(0.92); scale.setToX(1); scale.setToY(1); scale.play();
+    };
+    hideNativeTypePopup[0] = () -> {
+      FadeTransition fade = new FadeTransition(Duration.millis(120), nativeTypePopup); fade.setFromValue(nativeTypePopup.getOpacity()); fade.setToValue(0);
+      fade.setOnFinished(event -> { nativeTypePopup.setVisible(false); nativeTypePopup.setManaged(false); fileTypes.setEffect(null); fileTypes.setOpacity(1); }); fade.play();
+    };
+    closeNativeTypePopup.setOnAction(event -> hideNativeTypePopup[0].run());
     closeJavaTypePopup.setOnAction(event -> hideJavaTypePopup[0].run());
-    StackPane.setAlignment(javaTypePopup, Pos.CENTER);
-    fileTypeSurface.getChildren().add(javaTypePopup);
     for (Map.Entry<String, List<ZIDELanguage>> group : fileTypeGroups.entrySet()) {
       if (group.getValue().isEmpty()) continue;
       Label heading = new Label(group.getKey());
@@ -2247,6 +2339,8 @@ public class ZIDEEditor extends Application {
         choice.getStyleClass().add("new-file-type-choice");
         if ("java".equals(language.id())) {
           choice.setOnAction(event -> showJavaTypePopup[0].run());
+        } else if (Set.of("c", "cpp").contains(language.id())) {
+          choice.setOnAction(event -> { nativeLanguage[0] = language; showNativeTypePopup[0].run(); });
         }
         tiles.getChildren().add(choice);
         if ("yass".equals(language.id())) choice.setSelected(true);
@@ -2261,13 +2355,17 @@ public class ZIDEEditor extends Application {
     fileTypeScroll.setPrefViewportHeight(420);
     fileTypeScroll.setMaxHeight(420);
     fileTypeScroll.getStyleClass().add("new-file-type-scroll");
+    StackPane fileTypeOverlay = new StackPane(fileTypeScroll);
+    StackPane.setAlignment(javaTypePopup, Pos.CENTER);
+    StackPane.setAlignment(nativeTypePopup, Pos.CENTER);
+    fileTypeOverlay.getChildren().addAll(javaTypePopup, nativeTypePopup);
 
     VBox form = new VBox(9);
     Label nameLabel = new Label("File name");
     nameLabel.getStyleClass().add("new-file-type-heading");
     Label typeLabel = new Label("File type");
     typeLabel.getStyleClass().add("new-file-type-heading");
-    form.getChildren().addAll(nameLabel, nameField, typeLabel, fileTypeScroll);
+    form.getChildren().addAll(nameLabel, nameField, typeLabel, fileTypeOverlay);
 
     showInWindowModal("New File", "Create a file in " + targetDir.getName(), form, "Create", () -> {
       String baseName = nameField.getText().trim();
@@ -2275,12 +2373,19 @@ public class ZIDEEditor extends Application {
       if (baseName.isEmpty() || selected == null) {
         return false;
       }
-      String ext = ((ZIDELanguage) selected.getUserData()).defaultExtension();
+      ZIDELanguage selectedLanguage = (ZIDELanguage) selected.getUserData();
+      String ext = Set.of("c", "cpp").contains(selectedLanguage.id()) ? nativeFileKind[0] : selectedLanguage.defaultExtension();
       String extensionSuffix = "." + ext;
       String fullName = baseName.toLowerCase(Locale.ROOT).endsWith(extensionSuffix.toLowerCase(Locale.ROOT))
           ? baseName : baseName + extensionSuffix;
       String javaTypeName = baseName.endsWith(".java") ? baseName.substring(0, baseName.length() - 5) : baseName;
-      ZIDELanguage selectedLanguage = (ZIDELanguage) selected.getUserData();
+      String nativeTypeName = baseName;
+      for (String nativeExtension : List.of(".c", ".h", ".cpp", ".hpp")) {
+        if (nativeTypeName.toLowerCase(Locale.ROOT).endsWith(nativeExtension)) {
+          nativeTypeName = nativeTypeName.substring(0, nativeTypeName.length() - nativeExtension.length());
+          break;
+        }
+      }
       if ("java".equals(selectedLanguage.id()) && !javaTypeName.matches("[A-Za-z_$][A-Za-z0-9_$]*")) {
         showProjectFileError("Java type names must be valid identifiers.");
         return false;
@@ -2296,6 +2401,8 @@ public class ZIDEEditor extends Application {
         }
         if ("java".equals(selectedLanguage.id())) {
           Files.writeString(newFile.toPath(), javaSource(javaFileKind[0], javaTypeName, javaMainMethod.isSelected()), StandardCharsets.UTF_8);
+        } else if (Set.of("c", "cpp").contains(selectedLanguage.id())) {
+          Files.writeString(newFile.toPath(), nativeSource(nativeFileKind[0], nativeTypeName), StandardCharsets.UTF_8);
         }
         buildProjectTree(currentProjectRoot);
         openTab(newFile.getName(), newFile.getAbsolutePath());
@@ -2309,6 +2416,16 @@ public class ZIDEEditor extends Application {
       nameField.requestFocus();
       nameField.selectAll();
     });
+  }
+
+  private String nativeSource(String kind, String typeName) {
+    boolean cpp = "cpp".equals(kind) || "hpp".equals(kind);
+    if ("h".equals(kind) || "hpp".equals(kind)) {
+      return "#pragma once" + System.lineSeparator() + System.lineSeparator() + (cpp ? "class " : "struct ") + typeName + " {" + System.lineSeparator() + "};" + System.lineSeparator();
+    }
+    return cpp
+        ? "#include <iostream>" + System.lineSeparator() + System.lineSeparator() + "int main() {" + System.lineSeparator() + "  std::cout << \"Hello, C++!\\n\";" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator()
+        : "#include <stdio.h>" + System.lineSeparator() + System.lineSeparator() + "int main(void) {" + System.lineSeparator() + "  printf(\"Hello, C!\\n\");" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator();
   }
 
   private String javaSource(String kind, String typeName, boolean includeMainMethod) {
@@ -2880,6 +2997,7 @@ public class ZIDEEditor extends Application {
     }
     if (titleBar != null) titleBar.setDarkMode(enabled);
     if (languageMenuBar != null) languageMenuBar.setDarkMode(enabled);
+    if (sftpMenuBar != null) sftpMenuBar.setDarkMode(enabled);
     if (layoutBuilder != null) layoutBuilder.setDarkMode(enabled);
     if (languageBuilder != null) languageBuilder.setDarkMode(enabled);
     if (activeModalOverlay != null) {
@@ -3762,13 +3880,15 @@ public class ZIDEEditor extends Application {
       return;
     }
 
+    File creationRoot = projectCreationDirectory();
+
     TextField name = new TextField();
     name.setPromptText("Project name");
     name.setMaxWidth(Double.MAX_VALUE);
     Label validation = modalValidationLabel();
     VBox content = new VBox(8, new Label("Project name"), name, validation);
     content.setPrefWidth(440);
-    showInWindowModal("New Project", "Create a folder in " + currentProjectRoot.getName(), content, "Create", () -> {
+    showInWindowModal("New Project", "Create a folder in " + creationRoot.getName(), content, "Create", () -> {
       String trimmed = name.getText().trim();
 
       if (trimmed.isEmpty()) {
@@ -3776,7 +3896,7 @@ public class ZIDEEditor extends Application {
         return false;
       }
 
-      File newDir = new File(currentProjectRoot, trimmed);
+      File newDir = new File(creationRoot, trimmed);
 
       if (newDir.exists()) {
         showModalValidation(validation, "A folder with that name already exists.");
@@ -3794,11 +3914,26 @@ public class ZIDEEditor extends Application {
         return false;
       }
 
-      buildProjectTree(currentProjectRoot);
+      if (!normalisedProjectPath(creationRoot).equals(normalisedProjectPath(currentProjectRoot))) {
+        currentProjectRoot = creationRoot;
+        projectDir = creationRoot;
+        rememberProjectRoot(creationRoot);
+      }
+      buildProjectTree(creationRoot);
       return true;
     });
     setActiveModalWidth(520);
     Platform.runLater(name::requestFocus);
+  }
+
+  private File projectCreationDirectory() {
+    File workspace = defaultProjectsFolder();
+    Path workspacePath = normalisedProjectPath(workspace);
+    TreeItem<File> selected = projectTree == null ? null : projectTree.getSelectionModel().getSelectedItem();
+    File selectedFile = selected == null ? null : selected.getValue();
+    File active = selectedFile != null ? selectedFile : currentProjectRoot;
+    if (active != null && normalisedProjectPath(active).startsWith(workspacePath)) return workspace;
+    return currentProjectRoot;
   }
 
   /**
@@ -6310,7 +6445,7 @@ public class ZIDEEditor extends Application {
 
           setOnDragDetected(event -> {
             File source = getItem();
-            if (source == null || isProjectRoot(source)) return;
+            if (source == null || isProjectRoot(source) || isWorkspaceProject(source)) return;
             Dragboard board = startDragAndDrop(TransferMode.MOVE);
             ClipboardContent content = new ClipboardContent();
             content.putFiles(List.of(source));
@@ -6623,6 +6758,26 @@ public class ZIDEEditor extends Application {
         case "java":
           abbreviation = "JAVA";
           category = "java";
+          break;
+        case "c":
+          abbreviation = "C";
+          category = "c";
+          break;
+        case "h":
+          abbreviation = "H";
+          category = "c-header";
+          break;
+        case "cpp":
+        case "cc":
+        case "cxx":
+          abbreviation = "CPP";
+          category = "cpp";
+          break;
+        case "hpp":
+        case "hh":
+        case "hxx":
+          abbreviation = "HPP";
+          category = "cpp-header";
           break;
         case "json":
         case "jsonc":
@@ -7019,6 +7174,8 @@ public class ZIDEEditor extends Application {
       case "typescript" -> "TS";
       case "jsx" -> "JSX";
       case "java" -> "JAVA";
+      case "c" -> "C";
+      case "cpp" -> "C++";
       case "json" -> "JSON";
       case "ini" -> "INI";
       case "yaml" -> "YAML";
@@ -7131,12 +7288,8 @@ public class ZIDEEditor extends Application {
         if (source.equals(destination)) {
           continue;
         }
-        if (isInsideProject(source)) {
-          Files.move(source, destination);
-          updateOpenTabPaths(source, destination);
-        } else {
-          Files.copy(source, destination);
-        }
+        Files.move(source, destination);
+        updateOpenTabPaths(source, destination);
       }
       refreshTree();
       return true;
@@ -7156,6 +7309,9 @@ public class ZIDEEditor extends Application {
     }
     for (File sourceFile : sources) {
       Path source = sourceFile.toPath().toAbsolutePath().normalize();
+      if (isWorkspaceProject(sourceFile)) {
+        return false;
+      }
       if (source.equals(targetDirectory) || (Files.isDirectory(source) && targetDirectory.startsWith(source)))
         return false;
       if (Files.exists(targetDirectory.resolve(source.getFileName()))) {
@@ -7170,10 +7326,6 @@ public class ZIDEEditor extends Application {
     Path path = file.toPath().toAbsolutePath().normalize();
     Path workspace = defaultProjectsFolder().toPath().toAbsolutePath().normalize();
     return path.equals(workspace) || (currentProjectRoot != null && path.equals(currentProjectRoot.toPath().toAbsolutePath().normalize()));
-  }
-
-  private boolean isInsideProject(Path path) {
-    return currentProjectRoot != null && path.startsWith(currentProjectRoot.toPath().toAbsolutePath().normalize());
   }
 
   private void updateOpenTabPaths(Path source, Path destination) {
@@ -9080,6 +9232,8 @@ public class ZIDEEditor extends Application {
     if (languageSupportsRegistered) return;
     languageSupportsRegistered = true;
     registerLanguage(new JavaLanguage(this));
+    registerLanguage(new CLanguage(this));
+    registerLanguage(new CppLanguage(this));
     registerLanguage(new JavaScriptLanguage(this));
     registerLanguage(new TypeScriptLanguage(this));
     registerLanguage(new JsxLanguage(this));
@@ -9451,6 +9605,70 @@ public class ZIDEEditor extends Application {
       runBtn.getStyleClass().remove("running");
       statusLabel.setText("Ready");
       consoleOutputTextArea.append("Python could not be started. Install Python 3 and ensure its command is available: " + exception.getMessage() + "\n", InteractiveConsoleFX.OutputKind.ERROR);
+    }
+  }
+
+  /** Compiles a C or C++ source file into a private temporary directory, then runs it. */
+  public void runNativeCode(EditorTab tab, boolean cpp) {
+    if (tab == null) return;
+    String languageName = cpp ? "C++" : "C";
+    Path buildDirectory = null;
+    try {
+      String extension = cpp ? ".cpp" : ".c";
+      String fileName = tab.getPath() == null ? (cpp ? "main.cpp" : "main.c") : Path.of(tab.getPath()).getFileName().toString();
+      if (!fileName.toLowerCase(Locale.ROOT).endsWith(extension)) fileName = "main" + extension;
+      String key = cpp ? "CPP_COMPILER_PATH" : "C_COMPILER_PATH";
+      String configured = MAIN_PROPERTIES == null ? "" : MAIN_PROPERTIES.getProperty(key, "").trim();
+      Path compilerPath = configured.isBlank() ? null : Path.of(configured);
+      if (compilerPath == null || !Files.isExecutable(compilerPath)) {
+        List<String> discovered = nativeCompilerCommand(cpp);
+        if (discovered == null) throw new FileNotFoundException(languageName + " compiler was not found (install clang or gcc)");
+        compilerPath = Path.of(discovered.getFirst());
+      }
+      rememberRuntimePath(key, compilerPath);
+      buildDirectory = Files.createTempDirectory(cpp ? "zide-cpp-" : "zide-c-");
+      buildDirectory.toFile().deleteOnExit();
+      Path sourceFile = buildDirectory.resolve(fileName);
+      Path outputFile = buildDirectory.resolve(HelperFunctions.isWindows() ? "program.exe" : "program");
+      Files.writeString(sourceFile, tab.getEditor().getText(), StandardCharsets.UTF_8);
+      sourceFile.toFile().deleteOnExit(); outputFile.toFile().deleteOnExit();
+      List<String> compileCommand = new ArrayList<>(List.of(compilerPath.toString(), cpp ? "-std=c++17" : "-std=c17", sourceFile.toString(), "-o", outputFile.toString()));
+      ProcessBuilder compiler = new ProcessBuilder(compileCommand);
+      Path workingDirectory = resourceDirectoryFor(tab);
+      if (workingDirectory != null && Files.isDirectory(workingDirectory)) compiler.directory(workingDirectory.toFile());
+      consoleOutputTextArea.clear();
+      consoleOutputTextArea.append(languageName + " compiler\n\n", InteractiveConsoleFX.OutputKind.KEY);
+      consoleOutputTextArea.append("$ " + displayCommand(compiler) + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
+      consoleTab.setSelected(true); showBottomPanel(consoleView); runBtn.getStyleClass().add("running"); statusLabel.setText("Compiling " + languageName);
+      Path executable = outputFile;
+      Thread thread = new Thread(() -> {
+        try {
+          Process process = compiler.redirectErrorStream(true).start();
+          String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+          int exit = process.waitFor();
+          Platform.runLater(() -> {
+            if (exit != 0) {
+              consoleOutputTextArea.append(output.isBlank() ? languageName + " compilation failed.\n" : output + "\n", InteractiveConsoleFX.OutputKind.ERROR);
+              runBtn.getStyleClass().remove("running"); statusLabel.setText("Ready"); return;
+            }
+            if (!output.isBlank()) consoleOutputTextArea.append(output + "\n", InteractiveConsoleFX.OutputKind.OUTPUT);
+            ProcessBuilder runner = new ProcessBuilder(executable.toString());
+            if (workingDirectory != null && Files.isDirectory(workingDirectory)) runner.directory(workingDirectory.toFile());
+            consoleOutputTextArea.append(languageName + " runtime\n\n", InteractiveConsoleFX.OutputKind.KEY);
+            consoleOutputTextArea.append("$ " + displayCommand(runner) + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
+            statusLabel.setText("Executing " + languageName);
+            consoleOutputTextArea.addProcessFinishedListener(() -> Platform.runLater(() -> { runBtn.getStyleClass().remove("running"); statusLabel.setText("Ready"); }));
+            try { runConsoleProcess((cpp ? "cpp" : "c") + " > ", runner); }
+            catch (IOException exception) { consoleOutputTextArea.append(languageName + " could not be started: " + exception.getMessage() + "\n", InteractiveConsoleFX.OutputKind.ERROR); runBtn.getStyleClass().remove("running"); statusLabel.setText("Ready"); }
+          });
+        } catch (Exception exception) {
+          Platform.runLater(() -> { consoleOutputTextArea.append(languageName + " compilation could not be started: " + exception.getMessage() + "\n", InteractiveConsoleFX.OutputKind.ERROR); runBtn.getStyleClass().remove("running"); statusLabel.setText("Ready"); });
+        }
+      }, cpp ? "zide-cpp-compiler" : "zide-c-compiler");
+      thread.setDaemon(true); thread.start();
+    } catch (Exception exception) {
+      runBtn.getStyleClass().remove("running"); statusLabel.setText("Ready");
+      consoleOutputTextArea.append(languageName + " could not be prepared: " + exception.getMessage() + "\n", InteractiveConsoleFX.OutputKind.ERROR);
     }
   }
 
@@ -11526,6 +11744,189 @@ public class ZIDEEditor extends Application {
     Platform.runLater(() -> varRows.clear());
   }
 
+  private BalfGlassMenuBar buildSftpMenu() {
+    sftpMenuBar = new BalfGlassMenuBar();
+    sftpMenuBar.getStyleClass().add("sftp-status-menu");
+    sftpMenuBar.setDarkMode(darkThemeEnabled);
+    sftpMenu = sftpMenuBar.menuAbove("SFTP");
+    sftpMenu.createItem("Connect…", "", this::showSftpConnectionDialog);
+    sftpMenu.createItem("Sync current project", "", this::syncCurrentProjectOverSftp);
+    sftpMenu.createItem("Pull remote files…", "", this::showSftpPullDialog);
+    sftpMenu.createItem("Disconnect", "", () -> {
+      sftpConnected = false;
+      sftpMenu.setText("SFTP");
+      statusLabel.setText("SFTP disconnected");
+    });
+    return sftpMenuBar;
+  }
+
+  private void showSftpConnectionDialog() {
+    TextField host = new TextField(sftpSetting("SFTP_HOST", ""));
+    TextField user = new TextField(sftpSetting("SFTP_USER", ""));
+    TextField port = new TextField(sftpSetting("SFTP_PORT", "22"));
+    TextField remote = new TextField(sftpSetting("SFTP_REMOTE_PATH", ""));
+    TextField identity = new TextField(sftpSetting("SFTP_IDENTITY_FILE", ""));
+    CheckBox activeMode = new CheckBox("Active Mode (save this profile in .project.sftp)");
+    activeMode.setSelected(Files.isRegularFile(projectSftpFile()));
+    host.setPromptText("example.com"); user.setPromptText("Username"); port.setPromptText("22");
+    remote.setPromptText("Optional remote folder"); identity.setPromptText("Optional private key path");
+    GridPane fields = new GridPane(); fields.setHgap(10); fields.setVgap(8);
+    fields.addRow(0, new Label("Host"), host); fields.addRow(1, new Label("Username"), user);
+    fields.addRow(2, new Label("Port"), port); fields.addRow(3, new Label("Remote folder"), remote);
+    fields.addRow(4, new Label("Private key"), identity);
+    for (Node node : List.of(host, user, port, remote, identity)) GridPane.setHgrow(node, Priority.ALWAYS);
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(10, fields, activeMode, validation); content.setPrefWidth(560);
+    showInWindowModal("SFTP connection", "Connect the current project to a remote server", content, List.of(
+        new ModalAction("Cancel", false, () -> true),
+        new ModalAction("Connect", true, () -> {
+          if (host.getText().isBlank() || user.getText().isBlank()) { showModalValidation(validation, "Host and username are required."); return false; }
+          int parsedPort;
+          try { parsedPort = Integer.parseInt(port.getText().trim()); if (parsedPort < 1 || parsedPort > 65535) throw new NumberFormatException(); }
+          catch (NumberFormatException exception) { showModalValidation(validation, "Enter a valid port number."); return false; }
+          MAIN_PROPERTIES.setProperty("SFTP_HOST", host.getText().trim());
+          MAIN_PROPERTIES.setProperty("SFTP_USER", user.getText().trim());
+          MAIN_PROPERTIES.setProperty("SFTP_PORT", Integer.toString(parsedPort));
+          MAIN_PROPERTIES.setProperty("SFTP_REMOTE_PATH", remote.getText().trim());
+          MAIN_PROPERTIES.setProperty("SFTP_IDENTITY_FILE", identity.getText().trim());
+          saveProps();
+          if (activeMode.isSelected()) saveProjectSftpSettings(host.getText().trim(), user.getText().trim(), parsedPort, remote.getText().trim(), identity.getText().trim());
+          connectSftp(host.getText().trim(), user.getText().trim(), parsedPort, identity.getText().trim());
+          return true;
+        })));
+    setActiveModalWidth(640);
+  }
+
+  private void connectSftp(String host, String user, int port, String identity) {
+    runSftpBatch(host, user, port, identity, "pwd\nbye\n", true);
+  }
+
+  private void syncCurrentProjectOverSftp() {
+    if (currentProjectRoot == null || isWorkspaceContainerRoot(currentProjectRoot)) {
+      showProjectFileError("Open a project folder before synchronising over SFTP."); return;
+    }
+    if (!sftpConnected) { showProjectFileError("Connect to an SFTP server first."); return; }
+    String host = sftpSetting("SFTP_HOST", "").trim();
+    String user = sftpSetting("SFTP_USER", "").trim();
+    int port = Integer.parseInt(sftpSetting("SFTP_PORT", "22"));
+    String identity = sftpSetting("SFTP_IDENTITY_FILE", "").trim();
+    String remote = sftpSetting("SFTP_REMOTE_PATH", "").trim();
+    Path project = currentProjectRoot.toPath().toAbsolutePath().normalize();
+    StringBuilder batch = new StringBuilder();
+    if (!remote.isBlank()) batch.append("cd \"").append(sftpQuote(remote)).append("\"\n");
+    batch.append("lcd \"").append(sftpQuote(project.getParent().toString())).append("\"\n");
+    batch.append("put -r \"").append(sftpQuote(project.getFileName().toString())).append("\"\nbye\n");
+    runSftpBatch(host, user, port, identity, batch.toString(), false);
+  }
+
+  private void showSftpPullDialog() {
+    if (currentProjectRoot == null || isWorkspaceContainerRoot(currentProjectRoot)) {
+      showProjectFileError("Open a project folder before pulling remote files."); return;
+    }
+    if (!sftpConnected) { showProjectFileError("Connect to an SFTP server first."); return; }
+    TextField remote = new TextField(sftpSetting("SFTP_REMOTE_PATH", ""));
+    Spinner<Integer> depth = new Spinner<>(0, 8, 1);
+    depth.setEditable(true);
+    Label note = new Label("0 downloads the selected item; higher values include deeper folders.");
+    note.setWrapText(true); note.getStyleClass().add("settings-help-text");
+    GridPane fields = new GridPane(); fields.setHgap(10); fields.setVgap(8);
+    fields.addRow(0, new Label("Remote path"), remote); fields.addRow(1, new Label("Copy depth"), depth);
+    GridPane.setHgrow(remote, Priority.ALWAYS);
+    VBox content = new VBox(10, fields, note); content.setPrefWidth(560);
+    showInWindowModal("Pull from SFTP", "Copy remote files into the current project", content, List.of(
+        new ModalAction("Cancel", false, () -> true),
+        new ModalAction("Pull", true, () -> {
+          if (remote.getText().isBlank()) return false;
+          pullRemoteFiles(remote.getText().trim(), depth.getValue()); return true;
+        })));
+    setActiveModalWidth(640);
+  }
+
+  private void pullRemoteFiles(String remotePath, int depth) {
+    String host = sftpSetting("SFTP_HOST", "").trim();
+    String user = sftpSetting("SFTP_USER", "").trim();
+    int port = Integer.parseInt(sftpSetting("SFTP_PORT", "22"));
+    String identity = sftpSetting("SFTP_IDENTITY_FILE", "").trim();
+    Path project = currentProjectRoot.toPath().toAbsolutePath().normalize();
+    String name = Path.of(remotePath).getFileName() == null ? "remote" : Path.of(remotePath).getFileName().toString();
+    Path destination = project.resolve(name);
+    String batch = "lcd \"" + sftpQuote(project.toString()) + "\"\nget -r \"" + sftpQuote(remotePath) + "\"\nbye\n";
+    runSftpBatch(host, user, port, identity, batch, false, () -> {
+      pruneSftpDepth(destination, depth);
+      refreshTree();
+    });
+  }
+
+  private void pruneSftpDepth(Path root, int depth) {
+    if (!Files.isDirectory(root) || depth < 0) return;
+    try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
+      paths.sorted(Comparator.reverseOrder()).filter(path -> !path.equals(root) && root.relativize(path).getNameCount() > depth).forEach(path -> {
+        try { Files.deleteIfExists(path); } catch (IOException ignored) { }
+      });
+    } catch (IOException ignored) { }
+  }
+
+  private Path projectSftpFile() {
+    return currentProjectRoot == null ? Path.of(".project.sftp") : currentProjectRoot.toPath().resolve(".project.sftp");
+  }
+
+  private String sftpSetting(String key, String fallback) {
+    Path profile = projectSftpFile();
+    if (Files.isRegularFile(profile)) {
+      Properties properties = new Properties();
+      try (InputStream input = Files.newInputStream(profile)) { properties.load(input); return properties.getProperty(key, fallback); }
+      catch (IOException ignored) { }
+    }
+    return MAIN_PROPERTIES.getProperty(key, fallback);
+  }
+
+  private void saveProjectSftpSettings(String host, String user, int port, String remote, String identity) {
+    if (currentProjectRoot == null || isWorkspaceContainerRoot(currentProjectRoot)) return;
+    Properties properties = new Properties();
+    properties.setProperty("SFTP_HOST", host); properties.setProperty("SFTP_USER", user);
+    properties.setProperty("SFTP_PORT", Integer.toString(port)); properties.setProperty("SFTP_REMOTE_PATH", remote);
+    properties.setProperty("SFTP_IDENTITY_FILE", identity);
+    try (OutputStream output = Files.newOutputStream(projectSftpFile(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) { properties.store(output, "ZIDE SFTP project profile"); }
+    catch (IOException exception) { showProjectFileError("Could not save .project.sftp: " + exception.getMessage()); }
+  }
+
+  private void runSftpBatch(String host, String user, int port, String identity, String batch, boolean connectionOnly) {
+    runSftpBatch(host, user, port, identity, batch, connectionOnly, null);
+  }
+
+  private void runSftpBatch(String host, String user, int port, String identity, String batch, boolean connectionOnly, Runnable onSuccess) {
+    try {
+      List<String> command = new ArrayList<>(List.of("sftp", "-oBatchMode=yes", "-P", Integer.toString(port)));
+      if (!identity.isBlank()) command.addAll(List.of("-i", identity));
+      command.add(user + "@" + host);
+      ProcessBuilder process = new ProcessBuilder(command).redirectErrorStream(true);
+      consoleOutputTextArea.clear(); consoleOutputTextArea.append("SFTP\n\n", InteractiveConsoleFX.OutputKind.KEY);
+      consoleOutputTextArea.append("$ " + displayCommand(process) + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
+      consoleTab.setSelected(true); showBottomPanel(consoleView); statusLabel.setText(connectionOnly ? "Connecting SFTP" : "Synchronising SFTP");
+      Thread thread = new Thread(() -> {
+        try {
+          Process child = process.start();
+          try (OutputStream input = child.getOutputStream()) { input.write(batch.getBytes(StandardCharsets.UTF_8)); }
+          String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+          int exit = child.waitFor();
+          Platform.runLater(() -> {
+            if (!output.isBlank()) consoleOutputTextArea.append(output + "\n", exit == 0 ? InteractiveConsoleFX.OutputKind.OUTPUT : InteractiveConsoleFX.OutputKind.ERROR);
+            if (exit == 0 && connectionOnly) { sftpConnected = true; sftpMenu.setText("SFTP ✓"); statusLabel.setText("SFTP connected"); }
+            else if (exit == 0) { statusLabel.setText("SFTP synchronised"); if (onSuccess != null) onSuccess.run(); }
+            else { sftpConnected = false; statusLabel.setText("SFTP connection failed"); }
+          });
+        } catch (Exception exception) {
+          Platform.runLater(() -> { sftpConnected = false; statusLabel.setText("SFTP failed"); consoleOutputTextArea.append("SFTP could not be started: " + exception.getMessage() + "\n", InteractiveConsoleFX.OutputKind.ERROR); });
+        }
+      }, "zide-sftp");
+      thread.setDaemon(true); thread.start();
+    } catch (RuntimeException exception) {
+      statusLabel.setText("SFTP failed: " + exception.getMessage());
+    }
+  }
+
+  private static String sftpQuote(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\""); }
+
   private Node buildStatusBar() {
     var centre = new Label("ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion());
     centre.getStyleClass().addAll("status-text", "status-version");
@@ -11551,6 +11952,7 @@ public class ZIDEEditor extends Application {
     statusLabel.getStyleClass().add("status-text");
     caretPositionLabel = new Label("1/1");
     caretPositionLabel.getStyleClass().addAll("status-text", "caret-position");
+    sftpMenuBar = buildSftpMenu();
 
     ImageView jbLogo = new ImageView(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png"))));
     jbLogo.setPreserveRatio(true);
@@ -11563,7 +11965,7 @@ public class ZIDEEditor extends Application {
       appMenu.setTooltip(new Tooltip("ZIDE menu"));
       appMenu.getStyleClass().add("status-bar-menu-button");
     }
-    HBox rightItems = new HBox(8, caretPositionLabel, languageMenuBar);
+    HBox rightItems = new HBox(8, caretPositionLabel, sftpMenuBar, languageMenuBar);
     if (appMenu != null) rightItems.getChildren().add(appMenu);
     rightItems.setAlignment(Pos.CENTER_RIGHT);
 
@@ -11577,6 +11979,9 @@ public class ZIDEEditor extends Application {
     languageMenuBar.setMinHeight(24);
     languageMenuBar.setPrefHeight(24);
     languageMenuBar.setMaxHeight(24);
+    sftpMenuBar.setMinHeight(24);
+    sftpMenuBar.setPrefHeight(24);
+    sftpMenuBar.setMaxHeight(24);
     HBox.setHgrow(sides.getChildren().get(1), Priority.ALWAYS);
     updateCaretPosition();
 

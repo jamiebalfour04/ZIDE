@@ -52,6 +52,8 @@ public class LanguageSupport implements ZIDELanguage {
       case "js" -> "js";
       case "typescript" -> "ts";
       case "jsx" -> "jsx";
+      case "c" -> "c";
+      case "cpp" -> "cpp";
       case "json" -> "json";
       case "xml" -> "xml";
       case "html" -> "html";

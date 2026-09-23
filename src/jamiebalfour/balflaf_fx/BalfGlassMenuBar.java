@@ -23,6 +23,8 @@ import java.util.function.Consumer;
 
 public class BalfGlassMenuBar extends HBox {
 
+  private static final double POPUP_UPWARD_OVERLAP = 20;
+
   private Popup activeMenu;
   private Popup activeSubmenu;
   private Label activeMenuOwner;
@@ -145,14 +147,20 @@ public class BalfGlassMenuBar extends HBox {
     rootCssAndLayout(menu.root);
     double popupWidth = menu.root.prefWidth(-1);
     double popupHeight = menu.root.prefHeight(popupWidth);
-    Bounds titleBounds = menu.owner.getBoundsInLocal();
-    Point2D titleTopLeft = menu.owner.localToScreen(titleBounds.getMinX(), titleBounds.getMinY());
-    Point2D titleTopRight = menu.owner.localToScreen(titleBounds.getMaxX(), titleBounds.getMinY());
-    Point2D titleBottomLeft = menu.owner.localToScreen(titleBounds.getMinX(), titleBounds.getMaxY());
+    // Anchor to the complete hit box rather than the centered label. This
+    // keeps every popup flush with its button, including compact status-bar
+    // menus whose label is smaller than the clickable area.
+    Node anchor = menu.owner.getParent() == null ? menu.owner : menu.owner.getParent();
+    Bounds titleBounds = anchor.getBoundsInLocal();
+    Point2D titleTopLeft = anchor.localToScreen(titleBounds.getMinX(), titleBounds.getMinY());
+    Point2D titleTopRight = anchor.localToScreen(titleBounds.getMaxX(), titleBounds.getMinY());
+    Point2D titleBottomLeft = anchor.localToScreen(titleBounds.getMinX(), titleBounds.getMaxY());
     if (titleTopLeft == null || titleTopRight == null || titleBottomLeft == null) return;
 
     double x = menu.opensAbove ? titleTopRight.getX() - popupWidth : titleTopLeft.getX();
-    double y = menu.opensAbove ? titleTopLeft.getY() - popupHeight : titleBottomLeft.getY();
+    double y = menu.opensAbove
+            ? titleTopLeft.getY() - popupHeight + POPUP_UPWARD_OVERLAP
+            : titleBottomLeft.getY();
     popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
     // Use the window as the popup owner: passing the title node makes
     // PopupWindow apply the node's position a second time, leaving a visible
@@ -164,11 +172,15 @@ public class BalfGlassMenuBar extends HBox {
     // menu stays flush with the selector instead of leaving a visible gap.
     Platform.runLater(() -> {
       if (!popup.isShowing()) return;
-      double actualWidth = menu.root.getBoundsInParent().getWidth();
-      double actualHeight = menu.root.getBoundsInParent().getHeight();
-      if (actualWidth <= 0 || actualHeight <= 0) return;
-      popup.setX(menu.opensAbove ? titleTopRight.getX() - actualWidth : titleTopLeft.getX());
-      popup.setY(menu.opensAbove ? titleTopLeft.getY() - actualHeight : titleBottomLeft.getY());
+      Bounds boxScreen = menu.box.localToScreen(menu.box.getBoundsInLocal());
+      if (boxScreen == null || boxScreen.getWidth() <= 0 || boxScreen.getHeight() <= 0) return;
+      double targetLeft = menu.opensAbove ? titleTopRight.getX() - boxScreen.getWidth() : titleTopLeft.getX();
+      double targetEdgeY = menu.opensAbove
+              ? titleTopLeft.getY() + POPUP_UPWARD_OVERLAP
+              : titleBottomLeft.getY();
+      double currentEdgeY = menu.opensAbove ? boxScreen.getMaxY() : boxScreen.getMinY();
+      popup.setX(popup.getX() + targetLeft - boxScreen.getMinX());
+      popup.setY(popup.getY() + targetEdgeY - currentEdgeY);
     });
 
     activeMenu = popup;
