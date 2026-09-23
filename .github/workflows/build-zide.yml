@@ -61,7 +61,13 @@ jobs:
           app="build/native/ZIDE.app"
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp build/native/zide-aarch64 "$app/Contents/MacOS/ZIDE"
-          cp ZIDE.icns "$app/Contents/Resources/ZIDE.icns"
+          iconset="build/native/ZIDE.iconset"
+          mkdir -p "$iconset"
+          for size in 16 32 128 256 512 1024; do
+            sips -z "$size" "$size" src/files/zide_macos.png --out "$iconset/icon_${size}x${size}.png" >/dev/null
+          done
+          iconutil -c icns "$iconset" -o build/native/ZIDE.icns
+          cp build/native/ZIDE.icns "$app/Contents/Resources/ZIDE.icns"
           major="$(sed -n 's/.*MAJOR_VERSION = "\([^"]*\)".*/\1/p' src/jamiebalfour/zide/core/ZIDE.java)"
           minor="$(sed -n 's/.*MINOR_VERSION = "\([^"]*\)".*/\1/p' src/jamiebalfour/zide/core/ZIDE.java)"
           version="$major.$minor.${GITHUB_RUN_NUMBER}"
