@@ -42,7 +42,6 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.embed.swing.SwingNode;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -75,10 +74,10 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
-import javax.swing.*;
-import javax.swing.text.JTextComponent;
-import java.awt.*;
 import java.io.*;
+import java.awt.Desktop;
+import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.net.URLDecoder;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -208,6 +207,7 @@ public class ZIDEEditor extends Application {
   private boolean tabHeaderScrollInstalled;
   private BalfGlassMenuBar applicationMenuBar;
   private BalfTitleBar titleBar;
+  private Node titleBarActions;
   private BalfGlassMenuBar.GlassMenu scriptMenu;
   private BalfGlassMenuBar.GlassCheckMenuItem unfoldMenuItem;
   private BalfGlassMenuBar.GlassCheckMenuItem byteCodeMenuItem;
@@ -229,7 +229,6 @@ public class ZIDEEditor extends Application {
   private BalfGlassMenuBar.GlassMenu projectMenu;
   private BalfGlassMenuBar.GlassMenu zpeOnlineMenu;
   private BalfGlassMenuBar.GlassMenu gitMenu;
-  private BalfGlassMenuBar.GlassCheckMenuItem titleBarOpacityMenuItem;
   private TextField editorSearchField;
   private boolean darkThemeEnabled;
   private boolean darkIconsApplied;
@@ -256,6 +255,8 @@ public class ZIDEEditor extends Application {
   private Node runYassScriptMenuItem;
   private BalfGlassMenuBar.GlassCheckMenuItem scratchPadMenuItem;
   private Node toolsMsiSeparator;
+  private Node regexBuilderMenuItem;
+  private Node toolsLayoutSeparator;
   private Node toolsAiSeparator;
   private Node layoutBuilderMenuItem;
   private Node aiBuilderMenuItem;
@@ -263,6 +264,9 @@ public class ZIDEEditor extends Application {
   private Node aiValidateMenuItem;
   private Node githubSignInMenuItem;
   private Node githubSignOutMenuItem;
+  private Node githubAuthSeparator;
+  private Node githubCloneSeparator;
+  private Node githubCommitSeparator;
   private Node githubCommitButton;
   private Node githubStatusMenuItem;
   private Node githubPullMenuItem;
@@ -290,6 +294,8 @@ public class ZIDEEditor extends Application {
   private ZUILayoutBuilder layoutBuilder;
   private Node languageBuilderOverlay;
   private ZIDELanguageBuilder languageBuilder;
+  private Node regexBuilderOverlay;
+  private ZIDERegexBuilder regexBuilder;
   private volatile boolean watchingProjectDirectory;
   private PauseTransition externalFileChangeTimer;
   private String cloudFileName = "";
@@ -1085,15 +1091,39 @@ public class ZIDEEditor extends Application {
     if (MAIN_PROPERTIES.containsKey("JAVA_COMPILER_PATH")) paths.put("JAVA_COMPILER_PATH", MAIN_PROPERTIES.getProperty("JAVA_COMPILER_PATH", ""));
     if (MAIN_PROPERTIES.containsKey("C_COMPILER_PATH")) paths.put("C_COMPILER_PATH", MAIN_PROPERTIES.getProperty("C_COMPILER_PATH", ""));
     if (MAIN_PROPERTIES.containsKey("CPP_COMPILER_PATH")) paths.put("CPP_COMPILER_PATH", MAIN_PROPERTIES.getProperty("CPP_COMPILER_PATH", ""));
+    paths.put("YASS_RUNTIME_PATH", zideRuntimes.path(ZIDERuntimeManager.RuntimeKind.ZPE).toString());
     return paths;
   }
 
   private void rememberRuntimePath(String key, Path path) {
     if (MAIN_PROPERTIES == null || path == null || !Files.isRegularFile(path)) return;
-    if (!MAIN_PROPERTIES.containsKey(key)) {
+    String existing = MAIN_PROPERTIES.getProperty(key, "").trim();
+    if (existing.isEmpty() || !Files.isRegularFile(Path.of(existing))) {
       MAIN_PROPERTIES.setProperty(key, path.toAbsolutePath().normalize().toString());
       saveProps();
     }
+  }
+
+  /** Finds installed external tools before the user tries to run a file. */
+  private void discoverRuntimePaths() {
+    for (String language : List.of("python", "php", "javascript", "typescript", "lua", "zpeedy")) {
+      List<String> command = interpreterCommand(language);
+      if (command != null && !command.isEmpty()) {
+        rememberRuntimePath("RUNTIME_" + language.toUpperCase(Locale.ROOT) + "_PATH", Path.of(command.getFirst()));
+      }
+    }
+
+    Path java = Path.of(javaCommand());
+    rememberRuntimePath("JAVA_RUNTIME_PATH", java);
+    if (Files.isRegularFile(java)) {
+      Path javac = java.getParent() == null ? null : java.getParent().resolve(HelperFunctions.isWindows() ? "javac.exe" : "javac");
+      rememberRuntimePath("JAVA_COMPILER_PATH", javac);
+    }
+
+    List<String> c = nativeCompilerCommand(false);
+    if (c != null && !c.isEmpty()) rememberRuntimePath("C_COMPILER_PATH", Path.of(c.getFirst()));
+    List<String> cpp = nativeCompilerCommand(true);
+    if (cpp != null && !cpp.isEmpty()) rememberRuntimePath("CPP_COMPILER_PATH", Path.of(cpp.getFirst()));
   }
 
   private static boolean isHoverTokenCharacter(char character) {
@@ -1469,6 +1499,7 @@ public class ZIDEEditor extends Application {
       saveProps();
 
     }
+    discoverRuntimePaths();
     layoutPersistenceTimer = new PauseTransition(Duration.millis(500));
     layoutPersistenceTimer.setOnFinished(event -> {
       saveEditorLayout();
@@ -2058,7 +2089,7 @@ public class ZIDEEditor extends Application {
       MacApplicationMenuJNA.setAllowMenuMutation(true);
       // The helper inserts at a fixed Cocoa index, so calls are in reverse display order.
       MacApplicationMenuJNA.addApplicationMenuSeparator();
-      MacApplicationMenuJNA.addApplicationMenuItem("Settings...", () -> Platform.runLater(this::openSettings));
+      MacApplicationMenuJNA.addApplicationMenuItem("Settings", () -> Platform.runLater(this::openSettings));
       MacApplicationMenuJNA.addApplicationMenuSeparator();
       MacApplicationMenuJNA.addApplicationMenuItem("About ZIDE", () -> Platform.runLater(this::showAboutPanel));
       PauseTransition renamedMenuReady = new PauseTransition(Duration.millis(250));
@@ -2268,6 +2299,9 @@ public class ZIDEEditor extends Application {
     TilePane nativeTypeChoices = new TilePane(6, 6);
     nativeTypeChoices.setPrefColumns(2);
     nativeTypeChoices.setTileAlignment(Pos.CENTER);
+    CheckBox nativeMainFunction = new CheckBox("Add main function");
+    nativeMainFunction.setSelected(true);
+    nativeMainFunction.getStyleClass().add("java-main-method-toggle");
     Map<String, RadioButton> nativeTypeOptions = new LinkedHashMap<>();
     for (String kind : List.of("c", "h", "cpp", "hpp")) {
       String label = switch (kind) { case "c" -> "C source"; case "h" -> "C header"; case "cpp" -> "C++ source"; default -> "C++ header"; };
@@ -2283,14 +2317,19 @@ public class ZIDEEditor extends Application {
       option.setContentDisplay(ContentDisplay.GRAPHIC_ONLY); option.setAccessibleText(label);
       option.getStyleClass().addAll("java-type-option", "java-type-choice");
       if ("c".equals(kind) || "cpp".equals(kind)) option.setSelected(true);
-      option.setOnAction(event -> nativeFileKind[0] = (String) option.getUserData());
+      option.setOnAction(event -> {
+        nativeFileKind[0] = (String) option.getUserData();
+        boolean isSource = Set.of("c", "cpp").contains(nativeFileKind[0]);
+        nativeMainFunction.setVisible(isSource);
+        nativeMainFunction.setManaged(isSource);
+      });
       nativeTypeOptions.put(kind, option); nativeTypeChoices.getChildren().add(option);
     }
     Button closeNativeTypePopup = new Button("Cancel");
     closeNativeTypePopup.getStyleClass().add("in-window-modal-secondary");
     HBox nativeTypeActions = new HBox(closeNativeTypePopup);
     nativeTypeActions.setAlignment(Pos.CENTER_RIGHT); nativeTypeActions.setPadding(new Insets(8, 0, 0, 0));
-    nativeTypePopup.getChildren().addAll(nativeTypeTitle, nativeTypeChoices, nativeTypeActions);
+    nativeTypePopup.getChildren().addAll(nativeTypeTitle, nativeTypeChoices, nativeMainFunction, nativeTypeActions);
     nativeTypePopup.setVisible(false); nativeTypePopup.setManaged(false); nativeTypePopup.setOpacity(0); nativeTypePopup.setScaleX(0.92); nativeTypePopup.setScaleY(0.92);
     final Runnable[] showNativeTypePopup = new Runnable[1];
     final Runnable[] hideNativeTypePopup = new Runnable[1];
@@ -2303,6 +2342,9 @@ public class ZIDEEditor extends Application {
       }
       nativeFileKind[0] = cpp ? "cpp" : "c";
       nativeTypeOptions.get(nativeFileKind[0]).setSelected(true);
+      nativeMainFunction.setSelected(true);
+      nativeMainFunction.setVisible(true);
+      nativeMainFunction.setManaged(true);
       fileTypes.setEffect(nativeSurfaceBlur); fileTypes.setOpacity(0.16);
       nativeTypePopup.setManaged(true); nativeTypePopup.setVisible(true);
       FadeTransition fade = new FadeTransition(Duration.millis(160), nativeTypePopup); fade.setFromValue(0); fade.setToValue(1); fade.play();
@@ -2402,7 +2444,7 @@ public class ZIDEEditor extends Application {
         if ("java".equals(selectedLanguage.id())) {
           Files.writeString(newFile.toPath(), javaSource(javaFileKind[0], javaTypeName, javaMainMethod.isSelected()), StandardCharsets.UTF_8);
         } else if (Set.of("c", "cpp").contains(selectedLanguage.id())) {
-          Files.writeString(newFile.toPath(), nativeSource(nativeFileKind[0], nativeTypeName), StandardCharsets.UTF_8);
+          Files.writeString(newFile.toPath(), nativeSource(nativeFileKind[0], nativeTypeName, nativeMainFunction.isSelected()), StandardCharsets.UTF_8);
         }
         buildProjectTree(currentProjectRoot);
         openTab(newFile.getName(), newFile.getAbsolutePath());
@@ -2418,14 +2460,16 @@ public class ZIDEEditor extends Application {
     });
   }
 
-  private String nativeSource(String kind, String typeName) {
+  private String nativeSource(String kind, String typeName, boolean includeMainFunction) {
     boolean cpp = "cpp".equals(kind) || "hpp".equals(kind);
     if ("h".equals(kind) || "hpp".equals(kind)) {
       return "#pragma once" + System.lineSeparator() + System.lineSeparator() + (cpp ? "class " : "struct ") + typeName + " {" + System.lineSeparator() + "};" + System.lineSeparator();
     }
+    String include = cpp ? "#include <iostream>" : "#include <stdio.h>";
+    if (!includeMainFunction) return include + System.lineSeparator();
     return cpp
-        ? "#include <iostream>" + System.lineSeparator() + System.lineSeparator() + "int main() {" + System.lineSeparator() + "  std::cout << \"Hello, C++!\\n\";" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator()
-        : "#include <stdio.h>" + System.lineSeparator() + System.lineSeparator() + "int main(void) {" + System.lineSeparator() + "  printf(\"Hello, C!\\n\");" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator();
+        ? include + System.lineSeparator() + System.lineSeparator() + "int main() {" + System.lineSeparator() + "  std::cout << \"Hello, C++!\\n\";" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator()
+        : include + System.lineSeparator() + System.lineSeparator() + "int main(void) {" + System.lineSeparator() + "  printf(\"Hello, C!\\n\");" + System.lineSeparator() + "  return 0;" + System.lineSeparator() + "}" + System.lineSeparator();
   }
 
   private String javaSource(String kind, String typeName, boolean includeMainMethod) {
@@ -2696,7 +2740,7 @@ public class ZIDEEditor extends Application {
     file.createItem("Collaborate", "", this::openCollaboration, true);
     file.separator();
     file.createItem("Save", "⌘S", this::saveCurrentFile, true);
-    file.createItem("Save As...", "", this::saveCurrentFileAs, true);
+    file.createItem("Save As", "", this::saveCurrentFileAs, true);
     file.separator();
     file.submenu("Export").createItem("HTML", "", this::exportCurrentFileAsHtml);
     file.separator();
@@ -2739,6 +2783,8 @@ public class ZIDEEditor extends Application {
       EditorTab tab = getCurrentTab();
       if (tab != null) tab.showFindReplace(true);
     });
+
+    edit.createItem("Word Colours", "", this::showProjectWordColours);
 
     formatDocumentMenuItem = edit.createItem("Format document", "", this::beautifyCurrentDocument);
 
@@ -2853,6 +2899,8 @@ public class ZIDEEditor extends Application {
 
     tools.createItem("Open Macro Scripting Interface", "", this::openMSI);
     toolsMsiSeparator = tools.separatorNode();
+    regexBuilderMenuItem = tools.createItem("Open RegExp Builder", "", this::openRegexBuilder);
+    toolsLayoutSeparator = tools.separatorNode();
     layoutBuilderMenuItem = tools.createItem("Open ZUI Layout Builder", "", this::openLayoutBuilder);
     toolsAiSeparator = tools.separatorNode();
     aiBuilderMenuItem = tools.createItem("Build with AI Assistant", "", this::openAIBuilder);
@@ -2863,9 +2911,8 @@ public class ZIDEEditor extends Application {
 
     githubSignInMenuItem = git.createItem("Sign in to GitHub", "", this::signInToGitHub);
     githubSignOutMenuItem = git.createItem("Sign out of GitHub", "", this::signOutOfGitHub);
-    updateGitHubAuthMenu();
-    git.separator();
-    git.createItem("Create GitHub project from selection…", "", () -> {
+    githubAuthSeparator = git.separatorNode();
+    git.createItem("Create GitHub project from selection", "", () -> {
       TreeItem<File> selected = projectTree == null ? null : projectTree.getSelectionModel().getSelectedItem();
       File target = selected == null ? null : selected.getValue();
       if (target == null) {
@@ -2875,12 +2922,15 @@ public class ZIDEEditor extends Application {
       createGitHubProject(target);
     });
     git.createItem("Clone", "", this::cloneRepo);
-    git.separator();
+    githubCloneSeparator = git.separatorNode();
     githubStatusMenuItem = git.createItem("Repository Status", "", this::showGitStatus);
     githubCommitMenuItem = git.createItem("Commit All Changes", "", this::commitGitChanges);
-    git.separator();
+    githubCommitSeparator = git.separatorNode();
     githubPullMenuItem = git.createItem("Pull", "", this::pullGitChanges);
     githubPushMenuItem = git.createItem("Push", "", this::pushGitChanges);
+    git.separator();
+    git.createItem("Git Help", "", this::showGitHelp);
+    updateGitHubAuthMenu();
 
 
     zpeOnlineMenu = bar.menu("ZPE Online");
@@ -2912,11 +2962,6 @@ public class ZIDEEditor extends Application {
     help.createItem("Download ZPE Runtime Environment", "", this::downloadZPERuntime);
     help.createItem("Download ZPE Native", "", this::downloadZPENative);
     help.createItem("Log", "", this::showLanguageLog);
-    help.createItem("Git Help", "", this::showGitHelp);
-    help.separator();
-    titleBarOpacityMenuItem = help.checkItem("Transparent title bar", false, transparent -> {
-      if (titleBar != null) titleBar.setOpacity(transparent ? 0.0 : 1.0);
-    });
 
     updateLanguageCommands(null);
     bar.setDarkMode(darkThemeEnabled);
@@ -3000,6 +3045,7 @@ public class ZIDEEditor extends Application {
     if (sftpMenuBar != null) sftpMenuBar.setDarkMode(enabled);
     if (layoutBuilder != null) layoutBuilder.setDarkMode(enabled);
     if (languageBuilder != null) languageBuilder.setDarkMode(enabled);
+    if (regexBuilder != null) regexBuilder.setDarkMode(enabled);
     if (activeModalOverlay != null) {
       if (enabled && !activeModalOverlay.getStyleClass().contains("in-window-modal-dark")) {
         activeModalOverlay.getStyleClass().add("in-window-modal-dark");
@@ -3462,12 +3508,15 @@ public class ZIDEEditor extends Application {
       boolean authorised = githubToken != null;
       setMenuItemAvailable(githubSignInMenuItem, !authorised);
       setMenuItemAvailable(githubSignOutMenuItem, authorised);
+      setMenuItemAvailable(githubAuthSeparator, authorised);
       boolean gitContext = authorised && hasGitContext();
       if (githubCommitButton != null) setMenuItemAvailable(githubCommitButton, gitContext);
       setMenuItemAvailable(githubStatusMenuItem, gitContext);
       setMenuItemAvailable(githubPullMenuItem, gitContext);
       setMenuItemAvailable(githubPushMenuItem, gitContext);
       setMenuItemAvailable(githubCommitMenuItem, gitContext);
+      setMenuItemAvailable(githubCloneSeparator, gitContext);
+      setMenuItemAvailable(githubCommitSeparator, gitContext);
     });
   }
 
@@ -5838,6 +5887,33 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  private void openRegexBuilder() {
+    if (regexBuilderOverlay != null) workspaceStack.getChildren().remove(regexBuilderOverlay);
+    setRegexBuilderModal(true);
+    Path storage = Path.of(INSTALL_PATH, "regexps");
+    regexBuilder = new ZIDERegexBuilder(storage, () -> {
+      workspaceStack.getChildren().remove(regexBuilderOverlay);
+      regexBuilderOverlay = null;
+      regexBuilder = null;
+      setRegexBuilderModal(false);
+    });
+    regexBuilder.setDarkMode(darkThemeEnabled);
+    regexBuilderOverlay = regexBuilder.getView();
+    workspaceStack.getChildren().add(regexBuilderOverlay);
+    regexBuilderOverlay.toFront();
+  }
+
+  private void setRegexBuilderModal(boolean open) {
+    if (applicationMenuBar != null) {
+      applicationMenuBar.setDisable(open);
+      applicationMenuBar.setOpacity(open ? 0.42 : 1.0);
+    }
+    if (titleBarActions != null) {
+      titleBarActions.setDisable(open);
+      titleBarActions.setOpacity(open ? 0.42 : 1.0);
+    }
+  }
+
   private void openLayoutBuilder() {
     EditorTab tab = getCurrentTab();
     if (tab == null || tab.getPath() == null || !tab.getPath().toLowerCase(Locale.ROOT).endsWith(".yas")) {
@@ -6055,49 +6131,6 @@ public class ZIDEEditor extends Application {
     if (root instanceof Parent parent) {
       for (Node child : parent.getChildrenUnmodifiable()) applyMacroEditorTheme(child, dark);
     }
-    if (root instanceof SwingNode swingNode) {
-      JComponent content = swingNode.getContent();
-      if (content != null) {
-        Color background = dark ? new Color(40, 45, 55) : Color.WHITE;
-        Color foreground = dark ? new Color(230, 233, 238) : new Color(32, 32, 32);
-        SwingUtilities.invokeLater(() -> styleMacroSwingComponent(content, background, foreground));
-      } else {
-        styleMacroSwingNodeWhenReady(swingNode, 40);
-      }
-    }
-  }
-
-  private void styleMacroSwingNodeWhenReady(SwingNode swingNode, int attemptsRemaining) {
-    JComponent content = swingNode.getContent();
-    if (content != null) {
-      boolean dark = isDarkThemeEnabled();
-      Color background = dark ? new Color(40, 45, 55) : Color.WHITE;
-      Color foreground = dark ? new Color(230, 233, 238) : new Color(32, 32, 32);
-      SwingUtilities.invokeLater(() -> styleMacroSwingComponent(content, background, foreground));
-      return;
-    }
-    if (attemptsRemaining <= 0) return;
-    PauseTransition retry = new PauseTransition(Duration.millis(50));
-    retry.setOnFinished(event -> styleMacroSwingNodeWhenReady(swingNode, attemptsRemaining - 1));
-    retry.play();
-  }
-
-  private void styleMacroSwingComponent(Component component, Color background, Color foreground) {
-    if (component instanceof JComponent swingComponent) {
-      swingComponent.setOpaque(true);
-      swingComponent.setBackground(background);
-      swingComponent.setForeground(foreground);
-      if (swingComponent instanceof javax.swing.JScrollPane scrollPane) {
-        scrollPane.setBorder(javax.swing.BorderFactory.createEmptyBorder());
-      }
-    }
-    if (component instanceof JTextComponent textComponent) {
-      textComponent.setCaretColor(foreground);
-      textComponent.setBorder(javax.swing.BorderFactory.createEmptyBorder());
-    }
-    if (component instanceof Container container) {
-      for (Component child : container.getComponents()) styleMacroSwingComponent(child, background, foreground);
-    }
   }
 
   private boolean getZPE(Runnable retry) {
@@ -6305,6 +6338,7 @@ public class ZIDEEditor extends Application {
     HBox actions = new HBox(8, collaborationAvatars, collaborationModeButton, focusModeExitButton, githubCommitButton, runBtn, buildBtn, debugBtn, debugSeparator, stopExecutionBtn, stepOverButton, continueButton);
     actions.getStyleClass().add("titlebar-actions");
     actions.setAlignment(Pos.CENTER_RIGHT);
+    titleBarActions = actions;
     return actions;
   }
 
@@ -6928,10 +6962,10 @@ public class ZIDEEditor extends Application {
     MenuItem openAsText = new MenuItem("Open with Text Editor");
     openAsText.setOnAction(event -> openTab(file.getName(), file.getAbsolutePath(), false));
 
-    MenuItem rename = new MenuItem(regularFile ? "Rename File…" : "Rename Folder…");
+    MenuItem rename = new MenuItem(regularFile ? "Rename File" : "Rename Folder");
     rename.setOnAction(event -> renameProjectFile(file));
 
-    MenuItem delete = new MenuItem(regularFile ? "Delete File…" : "Delete Folder…");
+    MenuItem delete = new MenuItem(regularFile ? "Delete File" : "Delete Folder");
     delete.setOnAction(event -> {
       ContextMenu parent = delete.getParentPopup();
       if (parent != null) parent.hide();
@@ -6965,7 +6999,7 @@ public class ZIDEEditor extends Application {
     MenuItem initializeGit = new MenuItem("Initialize Git repository");
     initializeGit.setDisable(repositoryFolder == null || existingRepository != null);
     initializeGit.setOnAction(event -> initializeGitRepository(file));
-    MenuItem createGitHub = new MenuItem("Create GitHub project…");
+    MenuItem createGitHub = new MenuItem("Create GitHub project");
     createGitHub.setDisable(repositoryFolder == null);
     createGitHub.setOnAction(event -> createGitHubProject(file));
     menu.getItems().addAll(new SeparatorMenuItem(), initializeGit, createGitHub);
@@ -7000,7 +7034,10 @@ public class ZIDEEditor extends Application {
       MenuItem newFile = new MenuItem("New File");
       newFile.setOnAction(event -> newFile());
       menu.getItems().addAll(new SeparatorMenuItem(), refreshFolder, newFolder, colourMenu);
-      menu.getItems().add(newFile);
+      // Keep the most common folder action at the top, with a clear visual
+      // break before the folder/file navigation actions.
+      menu.getItems().add(0, newFile);
+      menu.getItems().add(1, new SeparatorMenuItem());
       long yassCount = Arrays.stream(file.listFiles() == null ? new File[0] : file.listFiles()).filter(f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".yas") && !f.getName().equalsIgnoreCase(".project.yas")).count();
       File manifest = new File(file, ".project.yas");
       if (manifest.isFile()) {
@@ -7870,7 +7907,8 @@ public class ZIDEEditor extends Application {
     Map<String, String[]> colours = new LinkedHashMap<>();
     Path project = projectMetadataRootForPath(filePath);
     if (project == null) return colours;
-    Path config = project.resolve(".zide.project.json");
+    Path config = projectMetadataFile(project);
+    if (!Files.isRegularFile(config)) config = project.resolve(".zide.project.json");
     try {
       if (!Files.isRegularFile(config)) return colours;
       String json = Files.readString(config, StandardCharsets.UTF_8);
@@ -7919,7 +7957,11 @@ public class ZIDEEditor extends Application {
     }
     if (!colours.isEmpty()) json.append('\n');
     json.append("  }\n}\n");
-    Files.writeString(project.resolve(".zide.project.json"), json.toString(), StandardCharsets.UTF_8);
+    Files.writeString(projectMetadataFile(project), json.toString(), StandardCharsets.UTF_8);
+  }
+
+  private Path projectMetadataFile(Path project) {
+    return project.resolve(".zide.project");
   }
 
   private String projectColourForFile(File file) {
@@ -7935,7 +7977,8 @@ public class ZIDEEditor extends Application {
   }
 
   private String loadOrAssignProjectColour(Path projectPath) {
-    Path config = projectPath.resolve(".zide.project.json");
+    Path config = projectMetadataFile(projectPath);
+    if (!Files.isRegularFile(config)) config = projectPath.resolve(".zide.project.json");
     try {
       if (Files.isRegularFile(config)) {
         String json = Files.readString(config, StandardCharsets.UTF_8);
@@ -8511,7 +8554,7 @@ public class ZIDEEditor extends Application {
     unfold.setOnAction(event -> explainCodeSnippet(tab, selectedCodeOrCurrentLine(codeEditor)));
     MenuItem spreadsheet = new MenuItem("Open as Spreadsheet");
     spreadsheet.setOnAction(event -> showCsvSpreadsheet(tab));
-    MenuItem variableColour = new MenuItem("Set Word Colours…");
+    MenuItem variableColour = new MenuItem("Set Word Colours");
     variableColour.setOnAction(event -> showVariableColourDialog(tab, variableTokenAt(codeEditor)));
     menu.getItems().addAll(cut, copy, paste, new SeparatorMenuItem(), format, unfold, spreadsheet, new SeparatorMenuItem(), variableColour);
 
@@ -8580,6 +8623,67 @@ public class ZIDEEditor extends Application {
       return true;
     });
     setActiveModalWidth(420);
+  }
+
+  private void showProjectWordColours() {
+    EditorTab tab = getCurrentTab();
+    Path project = tab == null || tab.getPath() == null
+            ? currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize()
+            : projectMetadataRootForPath(tab.getPath());
+    if (project == null || !Files.isDirectory(project) || isWorkspaceContainerRoot(project.toFile())) {
+      showMessage("Word Colours", "Open a project before viewing its word colours.");
+      return;
+    }
+
+    Map<String, String[]> saved = loadVariableColours(project.toString());
+    if (saved.isEmpty()) {
+      showMessage("Word Colours", "No custom word colours have been saved for this project yet.");
+      return;
+    }
+
+    GridPane fields = new GridPane();
+    fields.setHgap(12);
+    fields.setVgap(8);
+    fields.addRow(0, new Label("Word"), new Label("Background"), new Label("Text"));
+    Map<String, ColorPicker[]> pickers = new LinkedHashMap<>();
+    int row = 1;
+    for (Map.Entry<String, String[]> entry : saved.entrySet()) {
+      javafx.scene.paint.Color background = javafx.scene.paint.Color.web(entry.getValue()[0]);
+      javafx.scene.paint.Color foreground = javafx.scene.paint.Color.web(entry.getValue()[1]);
+      ColorPicker backgroundPicker = new ColorPicker(background);
+      ColorPicker foregroundPicker = new ColorPicker(foreground);
+      pickers.put(entry.getKey(), new ColorPicker[]{backgroundPicker, foregroundPicker});
+      fields.addRow(row++, new Label(entry.getKey()), backgroundPicker, foregroundPicker);
+    }
+    ScrollPane scroll = new ScrollPane(fields);
+    scroll.setFitToWidth(true);
+    scroll.setPrefViewportHeight(Math.min(360, 64 + pickers.size() * 48));
+    scroll.getStyleClass().add("code-editor-scroll-pane");
+    VBox content = new VBox(8, scroll);
+    content.setPrefWidth(520);
+    showInWindowModal("Word Colours", "View and change this project's custom word colours", content, "Apply", () -> {
+      Map<String, String[]> updated = new LinkedHashMap<>();
+      for (Map.Entry<String, ColorPicker[]> entry : pickers.entrySet()) {
+        updated.put(entry.getKey(), new String[]{toHex(entry.getValue()[0].getValue()), toHex(entry.getValue()[1].getValue())});
+      }
+      try {
+        writeProjectMetadata(project, projectColourForFile(project.toFile()), updated);
+        for (Tab openTab : allEditorTabs) {
+          if (!(openTab instanceof EditorTab editorTab) || editorTab.getPath() == null) continue;
+          Path tabProject = projectMetadataRootForPath(editorTab.getPath());
+          if (tabProject != null && tabProject.toAbsolutePath().normalize().equals(project)) {
+            for (Map.Entry<String, String[]> colour : updated.entrySet()) {
+              editorTab.setVariableColour(colour.getKey(), colour.getValue()[0], colour.getValue()[1]);
+            }
+          }
+        }
+        return true;
+      } catch (IOException exception) {
+        showError("Word Colours", "Could not save the word colours: " + exception.getMessage());
+        return false;
+      }
+    }, true);
+    setActiveModalWidth(600);
   }
 
   private void copyEditorTextOrLine(CodeEditorViewFX codeEditor) {
@@ -9110,6 +9214,7 @@ public class ZIDEEditor extends Application {
     setMenuItemAvailable(formatDocumentMenuItem, yass);
     setMenuItemAvailable(toolsMsiSeparator, yass);
     setMenuItemAvailable(layoutBuilderMenuItem, yass);
+    setMenuItemAvailable(toolsLayoutSeparator, yass);
     setMenuItemAvailable(toolsAiSeparator, yass);
     setMenuItemAvailable(aiBuilderMenuItem, yass);
     setMenuItemAvailable(aiProblemMenuItem, yass);
@@ -11749,9 +11854,9 @@ public class ZIDEEditor extends Application {
     sftpMenuBar.getStyleClass().add("sftp-status-menu");
     sftpMenuBar.setDarkMode(darkThemeEnabled);
     sftpMenu = sftpMenuBar.menuAbove("SFTP");
-    sftpMenu.createItem("Connect…", "", this::showSftpConnectionDialog);
+    sftpMenu.createItem("Connect", "", this::showSftpConnectionDialog);
     sftpMenu.createItem("Sync current project", "", this::syncCurrentProjectOverSftp);
-    sftpMenu.createItem("Pull remote files…", "", this::showSftpPullDialog);
+    sftpMenu.createItem("Pull remote files", "", this::showSftpPullDialog);
     sftpMenu.createItem("Disconnect", "", () -> {
       sftpConnected = false;
       sftpMenu.setText("SFTP");

@@ -23,7 +23,7 @@ public final class PythonLanguage extends LanguageSupport {
     editor.setBlockCommentMarkers("", "");
     editor.setQuoteDelimiters("\"'");
     editor.setVariableDelimiters("");
-    editor.setContextSeparator("");
+    editor.setContextSeparator(".");
     editor.clearKeywords();
     editor.clearContextualKeywords();
     editor.clearAutoCompleteItems();
@@ -35,8 +35,17 @@ public final class PythonLanguage extends LanguageSupport {
     for (String type : types) { editor.addKeyword(type, CodeSyntaxModel.Style.TYPE); editor.addAutoCompleteItem(type, CodeEditorViewFX.AutoCompleteItemType.Type); }
     for (String function : functions) { editor.addKeyword(function, CodeSyntaxModel.Style.FUNCTION); editor.addAutoCompleteItem(function, CodeEditorViewFX.AutoCompleteItemType.Function); }
     for (String method : methods) editor.addAutoCompleteItem(method, CodeEditorViewFX.AutoCompleteItemType.Function);
+    addContext(editor, "math", "ceil", "comb", "copysign", "degrees", "e", "exp", "fabs", "factorial", "floor", "fmod", "gcd", "hypot", "inf", "isclose", "isfinite", "isinf", "isnan", "lcm", "log", "log10", "log1p", "log2", "modf", "nan", "pi", "pow", "radians", "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sinh", "cosh", "tanh", "tau", "sqrt");
+    addContext(editor, "random", "choice", "choices", "getrandbits", "randint", "randrange", "random", "sample", "seed", "shuffle", "uniform");
+    addContext(editor, "datetime", "date", "datetime", "time", "timedelta", "timezone", "today", "now", "strptime", "strftime");
     editor.addKeyword("True", CodeSyntaxModel.Style.BOOLEAN);
     editor.addKeyword("False", CodeSyntaxModel.Style.BOOLEAN);
     editor.addKeyword("None", CodeSyntaxModel.Style.NULL);
+  }
+
+  private static void addContext(CodeEditorViewFX editor, String context, String... members) {
+    for (String member : members) {
+      editor.addContextualKeyword(context, member, CodeSyntaxModel.Style.FUNCTION);
+    }
   }
 }

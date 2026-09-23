@@ -32,6 +32,10 @@ public final class JavaLanguage extends LanguageSupport {
     for (String keyword : keywords) add(editor, keyword, CodeSyntaxModel.Style.KEYWORD, CodeEditorViewFX.AutoCompleteItemType.Keyword);
     for (String type : types) add(editor, type, CodeSyntaxModel.Style.TYPE, CodeEditorViewFX.AutoCompleteItemType.Type);
     for (String function : functions) add(editor, function, CodeSyntaxModel.Style.FUNCTION, CodeEditorViewFX.AutoCompleteItemType.Function);
+    addContext(editor, "Math", "abs", "acos", "asin", "atan", "atan2", "cbrt", "ceil", "cos", "exp", "floor", "log", "log10", "max", "min", "pow", "random", "round", "sin", "sqrt", "tan", "toDegrees", "toRadians");
+    addContext(editor, "System", "arraycopy", "currentTimeMillis", "err", "exit", "gc", "in", "lineSeparator", "nanoTime", "out", "setProperty", "getProperty");
+    addContext(editor, "Arrays", "asList", "binarySearch", "copyOf", "equals", "fill", "sort", "stream", "toString");
+    addContext(editor, "Collections", "binarySearch", "copy", "emptyList", "max", "min", "reverse", "rotate", "shuffle", "sort", "unmodifiableList");
     editor.addKeyword("true", CodeSyntaxModel.Style.BOOLEAN);
     editor.addKeyword("false", CodeSyntaxModel.Style.BOOLEAN);
     editor.addKeyword("null", CodeSyntaxModel.Style.NULL);
@@ -46,5 +50,9 @@ public final class JavaLanguage extends LanguageSupport {
   private static void add(CodeEditorViewFX editor, String value, CodeSyntaxModel.Style style, CodeEditorViewFX.AutoCompleteItemType type) {
     editor.addKeyword(value, style);
     editor.addAutoCompleteItem(value, type);
+  }
+
+  private static void addContext(CodeEditorViewFX editor, String context, String... members) {
+    for (String member : members) editor.addContextualKeyword(context, member, CodeSyntaxModel.Style.FUNCTION);
   }
 }

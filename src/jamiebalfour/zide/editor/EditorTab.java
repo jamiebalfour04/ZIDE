@@ -5,6 +5,7 @@ import jamiebalfour.zpe.core.YASSDiagnostic;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
@@ -20,6 +21,7 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Popup;
 import javafx.scene.text.Text;
@@ -86,7 +88,7 @@ public class EditorTab extends Tab {
   private final ToggleButton highlightAll = new ToggleButton("All");
   private final Label findResult = new Label();
   private final Node editorContent;
-  private final VBox editorContainer;
+  private final StackPane editorContainer;
   private SplitPane markdownSplit;
   private ScrollPane markdownPreview;
   private VBox markdownPreviewContent;
@@ -153,13 +155,15 @@ public class EditorTab extends Tab {
 
     buildFindReplacePanel();
     editorTopRight.getChildren().addAll(diagnosticOverlay, findReplacePanel);
-    editorTopRight.setAlignment(Pos.BOTTOM_CENTER);
+    editorTopRight.setAlignment(Pos.TOP_RIGHT);
     editorTopRight.setMaxWidth(Double.MAX_VALUE);
+    editorTopRight.setMaxHeight(Region.USE_PREF_SIZE);
     editorTopRight.setPickOnBounds(false);
     editorTopRight.setMouseTransparent(true);
 
-    editorContainer = new VBox(content, editorTopRight);
-    VBox.setVgrow(content, Priority.ALWAYS);
+    editorContainer = new StackPane(content, editorTopRight);
+    StackPane.setAlignment(editorTopRight, Pos.TOP_RIGHT);
+    StackPane.setMargin(editorTopRight, new Insets(8, 10, 0, 0));
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
@@ -171,7 +175,7 @@ public class EditorTab extends Tab {
       scheduleAnalysis();
       symbolTimer.playFromStart();
       if (markdownPreview != null) markdownTimer.playFromStart();
-      Platform.runLater(this::applyVariableColours);
+      scheduleVariableColours();
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
@@ -181,6 +185,18 @@ public class EditorTab extends Tab {
     if (variable == null || variable.isBlank() || background == null || text == null) return;
     variableColours.put(variable, new VariableColour(background, text));
     applyVariableColours();
+  }
+
+  /**
+   * Syntax highlighting is asynchronous and can replace the style spans after
+   * the text listener runs. Apply custom word colours on the following pulse
+   * as well, after the highlighter has installed its spans.
+   */
+  private void scheduleVariableColours() {
+    Platform.runLater(() -> {
+      applyVariableColours();
+      Platform.runLater(this::applyVariableColours);
+    });
   }
 
   private void applyVariableColours() {
@@ -354,6 +370,7 @@ public class EditorTab extends Tab {
             : Pattern.compile(Pattern.quote(query), Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
                     .matcher(source).replaceAll(Matcher.quoteReplacement(replacement));
     editor.setText(updated);
+    scheduleVariableColours();
     updateFindResult();
   }
 
@@ -760,6 +777,7 @@ public class EditorTab extends Tab {
     warningIndicator.setManaged(warnings > 0);
     diagnosticOverlay.setVisible(errors > 0 || warnings > 0);
     diagnosticOverlay.setManaged(errors > 0 || warnings > 0);
+    editorTopRight.setMouseTransparent(errors <= 0 && warnings <= 0 && !findReplacePanel.isManaged());
   }
 
   public String getPath() { return path; }
@@ -958,7 +976,6 @@ public class EditorTab extends Tab {
         markdownPreview.getStyleClass().addAll("markdown-preview", "code-editor-scroll-pane");
         markdownSplit = new SplitPane();
         markdownSplit.setDividerPositions(0.52);
-        VBox.setVgrow(markdownSplit, Priority.ALWAYS);
       }
       if (editorContainer.getChildren().get(0) != markdownSplit) {
         editorContainer.getChildren().remove(editorContent);
