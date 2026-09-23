@@ -8,6 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -134,7 +135,14 @@ final class ZIDESettingsPanel extends HBox {
       }
       runtimeContent.getChildren().add(runtimeFieldsGrid);
     }
-    VBox runtimes = section("Runtimes & Compilers", runtimeContent);
+    ScrollPane runtimeScroll = new ScrollPane(runtimeContent);
+    runtimeScroll.setFitToWidth(true);
+    runtimeScroll.setFitToHeight(true);
+    runtimeScroll.setPrefViewportHeight(500);
+    runtimeScroll.setMinHeight(0);
+    runtimeScroll.getStyleClass().add("code-editor-scroll-pane");
+    VBox.setVgrow(runtimeScroll, Priority.ALWAYS);
+    VBox runtimes = section("Runtimes & Compilers", runtimeScroll);
 
     url = new TextField(chatGPTUrl);
     key = new PasswordField();
@@ -241,6 +249,7 @@ final class ZIDESettingsPanel extends HBox {
   }
 
   private static String runtimeLabel(String key) {
+    if ("YASS_RUNTIME_PATH".equals(key)) return "YASS (ZPE)";
     String label = key.replace("RUNTIME_", "").replace("_PATH", "").replace('_', ' ');
     return label.substring(0, 1).toUpperCase() + label.substring(1).toLowerCase();
   }

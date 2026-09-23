@@ -24,6 +24,8 @@ import java.util.function.Consumer;
 public class BalfGlassMenuBar extends HBox {
 
   private static final double POPUP_UPWARD_OVERLAP = 20;
+  private static final double POPUP_DOWNWARD_OVERLAP = 12;
+  private static final double POPUP_LEFT_OVERHANG = 22;
 
   private Popup activeMenu;
   private Popup activeSubmenu;
@@ -157,10 +159,12 @@ public class BalfGlassMenuBar extends HBox {
     Point2D titleBottomLeft = anchor.localToScreen(titleBounds.getMinX(), titleBounds.getMaxY());
     if (titleTopLeft == null || titleTopRight == null || titleBottomLeft == null) return;
 
-    double x = menu.opensAbove ? titleTopRight.getX() - popupWidth : titleTopLeft.getX();
+    double x = menu.opensAbove
+            ? titleTopRight.getX() - popupWidth
+            : titleTopLeft.getX() - POPUP_LEFT_OVERHANG;
     double y = menu.opensAbove
             ? titleTopLeft.getY() - popupHeight + POPUP_UPWARD_OVERLAP
-            : titleBottomLeft.getY();
+            : titleBottomLeft.getY() - POPUP_DOWNWARD_OVERLAP;
     popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
     // Use the window as the popup owner: passing the title node makes
     // PopupWindow apply the node's position a second time, leaving a visible
@@ -174,10 +178,12 @@ public class BalfGlassMenuBar extends HBox {
       if (!popup.isShowing()) return;
       Bounds boxScreen = menu.box.localToScreen(menu.box.getBoundsInLocal());
       if (boxScreen == null || boxScreen.getWidth() <= 0 || boxScreen.getHeight() <= 0) return;
-      double targetLeft = menu.opensAbove ? titleTopRight.getX() - boxScreen.getWidth() : titleTopLeft.getX();
+      double targetLeft = menu.opensAbove
+              ? titleTopRight.getX() - boxScreen.getWidth()
+              : titleTopLeft.getX() - POPUP_LEFT_OVERHANG;
       double targetEdgeY = menu.opensAbove
               ? titleTopLeft.getY() + POPUP_UPWARD_OVERLAP
-              : titleBottomLeft.getY();
+              : titleBottomLeft.getY() - POPUP_DOWNWARD_OVERLAP;
       double currentEdgeY = menu.opensAbove ? boxScreen.getMaxY() : boxScreen.getMinY();
       popup.setX(popup.getX() + targetLeft - boxScreen.getMinX());
       popup.setY(popup.getY() + targetEdgeY - currentEdgeY);
@@ -581,7 +587,9 @@ public class BalfGlassMenuBar extends HBox {
     menu.popup.setAnchorLocation(javafx.stage.PopupWindow.AnchorLocation.CONTENT_TOP_LEFT);
     menu.popup.show(owner.getScene().getWindow(), point.getX(), point.getY());
     activeSubmenu = menu.popup;
-    installSubmenuDismissFilters(owner.getScene());
+    // Submenu rows live in the detached popup scene. Click-away events happen
+    // in the main application scene, so install the filter there instead.
+    installSubmenuDismissFilters(BalfGlassMenuBar.this.getScene());
   }
 
 

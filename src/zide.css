@@ -149,7 +149,7 @@
 }
 
 .context-menu .separator-menu-item {
-    -fx-padding: 1px 0;
+    -fx-padding: 6px 0;
 }
 
 .context-menu .separator:horizontal {
@@ -769,6 +769,54 @@
 .app-root.dark .zpe-code-area .caret,
 .app-root.dark .console-output .caret {
     -fx-stroke: #e6e9ee;
+}
+
+/* RichTextFX draws editor selections as child shapes. Keep their colour tied
+   to the syntax palette instead of inheriting one bright blue for every theme. */
+.zpe-code-area .selection {
+    -fx-fill: #008fdd;
+}
+.zpe-code-area.syntax-theme-zide-light .selection {
+    -fx-fill: #008fdd;
+}
+.zpe-code-area.syntax-theme-zide-dark .selection {
+    -fx-fill: #355c91;
+}
+.zpe-code-area.syntax-theme-solarized-light .selection {
+    -fx-fill: #c9dfd9;
+}
+.zpe-code-area.syntax-theme-solarized-dark .selection {
+    -fx-fill: #315e67;
+}
+.zpe-code-area.syntax-theme-github-light .selection {
+    -fx-fill: #c9ddf5;
+}
+.zpe-code-area.syntax-theme-github-dark .selection {
+    -fx-fill: #264f78;
+}
+.zpe-code-area.syntax-theme-dracula-light .selection {
+    -fx-fill: #d8c9eb;
+}
+.zpe-code-area.syntax-theme-dracula-dark .selection {
+    -fx-fill: #5b477d;
+}
+.zpe-code-area.syntax-theme-monokai-light .selection {
+    -fx-fill: #d9e6b8;
+}
+.zpe-code-area.syntax-theme-monokai-dark .selection {
+    -fx-fill: #53652d;
+}
+.zpe-code-area.syntax-theme-nord-light .selection {
+    -fx-fill: #cfdfef;
+}
+.zpe-code-area.syntax-theme-nord-dark .selection {
+    -fx-fill: #43516b;
+}
+.zpe-code-area.syntax-theme-purples-and-greens-light .selection {
+    -fx-fill: #d8c9eb;
+}
+.zpe-code-area.syntax-theme-purples-and-greens-dark .selection {
+    -fx-fill: #574574;
 }
 
 /* Low-profile editor scrollbars matching the desktop ZPE code editor. */
@@ -2055,6 +2103,12 @@
     -fx-text-fill: white;
 }
 
+.app-root .main-menu-bar .glass-menu-title:hover,
+.app-root .main-menu-bar .glass-menu-title.active {
+    -fx-background-color: rgba(255,255,255,0.16);
+    -fx-background-radius: 7px;
+}
+
 .app-root .app-toolbar {
     -fx-background-insets: 0;
     -fx-border-color: transparent transparent #d4d4d4 transparent;
@@ -2261,6 +2315,7 @@
 
 .zpe-online-file-name {
     -fx-font-size: 13px;
+    -fx-text-fill: #30353d;
 }
 
 .zpe-online-open-button {
@@ -2277,6 +2332,15 @@
 .zpe-online-empty {
     -fx-padding: 18px 10px;
     -fx-opacity: 0.7;
+    -fx-text-fill: #4b5158;
+}
+
+.in-window-modal-dark .zpe-online-file-name {
+    -fx-text-fill: #e6e9ee;
+}
+
+.in-window-modal-dark .zpe-online-empty {
+    -fx-text-fill: #b9c1cb;
 }
 
 .in-window-modal-dark .zpe-online-scroll {
@@ -3426,6 +3490,12 @@
     -fx-text-fill: #163858;
 }
 .settings-section-content { -fx-padding: 4px 0; }
+.settings-content .code-editor-scroll-pane,
+.settings-content .code-editor-scroll-pane .viewport,
+.settings-content .code-editor-scroll-pane .content {
+    -fx-background-color: #ffffff;
+    -fx-background: #ffffff;
+}
 .settings-section-title {
     -fx-font-family: "Inter";
     -fx-font-size: 16px;
@@ -3451,6 +3521,12 @@
 .in-window-modal-dark .settings-content .list-cell:selected {
     -fx-background-color: #094771;
     -fx-text-fill: #f3f7fb;
+}
+.in-window-modal-dark .settings-content .code-editor-scroll-pane,
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .viewport,
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .content {
+    -fx-background-color: #1f1f1f;
+    -fx-background: #1f1f1f;
 }
 
 .markdown-preview,
@@ -3585,6 +3661,113 @@
     -fx-border-color: #c9cdd2 transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
 }
+
+/* RegExp workbench */
+.regex-builder {
+    -fx-background-color: #f4f5f7;
+}
+.regex-builder-toolbar {
+    -fx-padding: 8px 12px;
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: transparent transparent #d4d4d4 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+.regex-builder-title,
+.regex-builder-section-title {
+    -fx-font-weight: bold;
+}
+.regex-builder-sidebar {
+    -fx-padding: 12px;
+    -fx-background-color: #eef0f2;
+    -fx-border-color: transparent #d2d5d8 transparent transparent;
+    -fx-border-width: 0 1px 0 0;
+}
+.regex-builder-expression-pane,
+.regex-builder-sample-pane,
+.regex-builder-matches-pane {
+    -fx-padding: 12px;
+    -fx-background-color: white;
+    -fx-border-color: #d2d5d8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+    -fx-background-radius: 4px;
+}
+.regex-builder-expression {
+    -fx-font-family: "JetBrains Mono";
+    -fx-font-size: 15px;
+}
+.regex-builder-tokens,
+.regex-builder-options {
+    -fx-padding: 2px 0;
+}
+.regex-builder-result {
+    -fx-text-fill: #087f8c;
+}
+.regex-builder-status {
+    -fx-padding: 6px 12px;
+    -fx-border-color: #c9cdd2 transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.regex-builder.dark {
+    -fx-background-color: #20252e;
+}
+.regex-builder.dark .regex-builder-toolbar,
+.regex-builder.dark .regex-builder-sidebar {
+    -fx-background-color: #292f39;
+}
+.regex-builder.dark .regex-builder-toolbar,
+.regex-builder.dark .regex-builder-sidebar,
+.regex-builder.dark .regex-builder-status {
+    -fx-border-color: transparent #454d59 transparent transparent;
+}
+.regex-builder.dark .regex-builder-expression-pane,
+.regex-builder.dark .regex-builder-sample-pane,
+.regex-builder.dark .regex-builder-matches-pane {
+    -fx-background-color: #252b34;
+    -fx-border-color: #454d59;
+}
+.regex-builder.dark .label,
+.regex-builder.dark .check-box {
+    -fx-text-fill: #e7eaee;
+}
+.regex-builder.dark .regex-builder-status {
+    -fx-border-color: #454d59 transparent transparent transparent;
+}
+
+/* Keep builder scrollbars as quiet and compact as the main editor scrollbars. */
+.language-builder .scroll-bar:vertical {
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
+    -fx-max-width: 18px;
+    -fx-background-color: #f4f6f8;
+    -fx-padding: 0 6px;
+}
+.language-builder .scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-background-color: #f4f6f8;
+    -fx-padding: 1px;
+}
+.language-builder .scroll-bar .track,
+.language-builder .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.language-builder .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px 0;
+    -fx-background-radius: 3px;
+    -fx-min-height: 30px;
+}
+.language-builder .scroll-bar:horizontal .thumb { -fx-min-width: 24px; }
+.language-builder .scroll-bar .thumb:hover { -fx-background-color: #969da6; }
+
+.app-root.dark .language-builder .scroll-bar:vertical,
+.app-root.dark .language-builder .scroll-bar:horizontal { -fx-background-color: #20252e; }
+.app-root.dark .language-builder .scroll-bar .thumb { -fx-background-color: #59616d; }
+.app-root.dark .language-builder .scroll-bar .thumb:hover { -fx-background-color: #737d89; }
+
 .language-builder-primary {
     -fx-background-color: #0788d1;
     -fx-text-fill: white;
@@ -3814,13 +3997,15 @@
 }
 
 .unfold-panel {
-    -fx-background-color: #f3f3f3;
-    -fx-border-color: #d4d4d4;
-    -fx-border-width: 0 0 0 1px;
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 .unfold-panel-toolbar {
     -fx-padding: 10px 12px 4px 12px;
-    -fx-border-color: transparent transparent #d4d4d4 transparent;
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 .unfold-action-button {
     -fx-background-color: #871094;
@@ -3857,13 +4042,13 @@
 .app-root.dark .unfold-children {
     -fx-border-color: transparent transparent transparent #78858f;
 }
-.app-root.dark .unfold-panel { -fx-background-color: #1b1f26; -fx-border-color: #30343b; }
-.app-root.dark .unfold-panel-toolbar { -fx-border-color: transparent transparent #30343b transparent; }
+.app-root.dark .unfold-panel { -fx-background-color: #1b1f26; -fx-border-color: transparent; }
+.app-root.dark .unfold-panel-toolbar { -fx-border-color: transparent; -fx-background-color: #1b1f26; }
 .app-root.dark .unfold-availability-message { -fx-text-fill: #aeb8c5; }
 .bytecode-panel {
     -fx-background-color: #ffffff;
-    -fx-border-color: #d4d4d4;
-    -fx-border-width: 0 0 0 1px;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 .bytecode-panel .text-area,
 .bytecode-panel .text-area .content {
@@ -3923,7 +4108,7 @@
     -fx-shape: "";
     -fx-padding: 0;
 }
-.app-root.dark .bytecode-panel { -fx-background-color: #20252e; -fx-border-color: #30343b; }
+.app-root.dark .bytecode-panel { -fx-background-color: #20252e; -fx-border-color: transparent; }
 .app-root.dark .bytecode-panel .text-area,
 .app-root.dark .bytecode-panel .text-area .content {
     -fx-control-inner-background: #20252e;

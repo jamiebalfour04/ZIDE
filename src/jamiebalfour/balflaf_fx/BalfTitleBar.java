@@ -648,7 +648,7 @@ public class BalfTitleBar extends Region {
       }
     });
 
-    MenuItem github = new MenuItem("Visit the ZIDE GitHub page");
+    MenuItem github = new MenuItem("Go to the ZIDE GitHub repository");
 
     github.setOnAction(e -> {
       try {
@@ -675,6 +675,7 @@ public class BalfTitleBar extends Region {
             quit
     );
     jbContextMenu.getStyleClass().add("glass-context-menu");
+    jbContextMenu.getStyleClass().add("jb-glass-menu");
     jbContextMenu.pseudoClassStateChanged(PseudoClass.getPseudoClass("dark"), darkMode);
     if (darkMode) jbContextMenu.getStyleClass().add("glass-context-menu-dark");
 
@@ -683,7 +684,7 @@ public class BalfTitleBar extends Region {
       if (jbContextMenu.isShowing()) {
         jbContextMenu.hide();
       } else {
-        jbContextMenu.show(jb, Side.BOTTOM, 0, 6);
+        jbContextMenu.show(jb, Side.BOTTOM, 0, 2);
       }
     });
 
