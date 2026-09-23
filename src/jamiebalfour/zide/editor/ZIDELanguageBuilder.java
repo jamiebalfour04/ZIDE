@@ -53,7 +53,6 @@ public final class ZIDELanguageBuilder {
   private final TextField parameters = new TextField();
   private final Label parameterHint = new Label();
   private final Label status = new Label("Ready");
-  private final TextArea preview = new TextArea();
   private Path file;
   private Rule selected;
   private boolean updating;
@@ -77,7 +76,6 @@ public final class ZIDELanguageBuilder {
         if (Files.size(initialFile) == 0) {
           file = initialFile.toAbsolutePath().normalize();
           languageName.setText(languageNameFor(initialFile));
-          refreshPreview();
           save(false);
           status.setText("Created " + initialFile.getFileName());
         } else {
@@ -101,13 +99,13 @@ public final class ZIDELanguageBuilder {
     glassMenuBar = new BalfGlassMenuBar();
     BalfGlassMenuBar.GlassMenu fileMenu = glassMenuBar.menu("File");
     fileMenu.createItem("New", "", this::newDefinition);
-    fileMenu.createItem("Open...", "", this::open);
+    fileMenu.createItem("Open", "", this::open);
     fileMenu.separator();
     fileMenu.createItem("Save", "", () -> save(false));
 
     BalfGlassMenuBar.GlassMenu languageMenu = glassMenuBar.menu("Language");
-    languageMenu.createItem("Test Script...", "", this::testScript);
-    languageMenu.createItem("Train...", "", this::train);
+    languageMenu.createItem("Test Script", "", this::testScript);
+    languageMenu.createItem("Train", "", this::train);
     return glassMenuBar;
   }
 
@@ -116,7 +114,6 @@ public final class ZIDELanguageBuilder {
     heading.getStyleClass().add("language-builder-heading");
     languageName.setPromptText("Language name");
     languageName.setPrefWidth(190);
-    languageName.textProperty().addListener((observable, oldValue, newValue) -> refreshPreview());
     Region spacer = new Region();
     HBox.setHgrow(spacer, Priority.ALWAYS);
     Button close = new Button("✕");
@@ -134,8 +131,8 @@ public final class ZIDELanguageBuilder {
   }
 
   private Node buildWorkspace() {
-    SplitPane split = new SplitPane(buildRuleList(), buildRuleEditor(), buildPreview());
-    split.setDividerPositions(0.23, 0.69);
+    SplitPane split = new SplitPane(buildRuleList(), buildRuleEditor());
+    split.setDividerPositions(0.23);
     return split;
   }
 
@@ -276,18 +273,6 @@ public final class ZIDELanguageBuilder {
     return box;
   }
 
-  private Node buildPreview() {
-    Label title = new Label("Definition");
-    title.getStyleClass().add("language-builder-section-title");
-    preview.setEditable(false);
-    preview.setWrapText(false);
-    preview.getStyleClass().add("language-builder-preview");
-    VBox box = new VBox(8, title, preview);
-    box.getStyleClass().add("language-builder-preview-pane");
-    VBox.setVgrow(preview, Priority.ALWAYS);
-    return box;
-  }
-
   private void bindEditor() {
     ruleName.textProperty().addListener((observable, oldValue, newValue) -> updateSelected());
     friendlySyntax.textProperty().addListener((observable, oldValue, newValue) -> updateFriendlySyntax());
@@ -311,7 +296,6 @@ public final class ZIDELanguageBuilder {
     rules.add(RULE_TEMPLATES.get(1).create(uniqueRuleName(RULE_TEMPLATES.get(1).name)));
     ruleList.getSelectionModel().selectFirst();
     status.setText("New language definition");
-    refreshPreview();
   }
 
   private void addRule() {
@@ -329,7 +313,6 @@ public final class ZIDELanguageBuilder {
     Rule rule = template.create(uniqueRuleName(template.name));
     rules.add(Math.max(0, Math.min(insertion, rules.size())), rule);
     ruleList.getSelectionModel().select(rule);
-    refreshPreview();
   }
 
   private boolean handleRuleDrop(String value, int destination) {
@@ -350,7 +333,6 @@ public final class ZIDELanguageBuilder {
         if (source < destination) destination--;
         rules.add(Math.max(0, Math.min(destination, rules.size())), rule);
         ruleList.getSelectionModel().select(rule);
-        refreshPreview();
         return true;
       }
     } catch (NumberFormatException ignored) {
@@ -376,7 +358,6 @@ public final class ZIDELanguageBuilder {
     if (index < 0) return;
     rules.remove(index);
     if (!rules.isEmpty()) ruleList.getSelectionModel().select(Math.min(index, rules.size() - 1));
-    refreshPreview();
   }
 
   private void moveRule(int direction) {
@@ -386,7 +367,6 @@ public final class ZIDELanguageBuilder {
     Rule rule = rules.remove(index);
     rules.add(destination, rule);
     ruleList.getSelectionModel().select(destination);
-    refreshPreview();
   }
 
   private void select(Rule rule) {
@@ -417,7 +397,6 @@ public final class ZIDELanguageBuilder {
     selected.description = describe(selected.pattern, selected.action);
     syntaxSummary.setText(selected.description);
     ruleList.refresh();
-    refreshPreview();
   }
 
   private void updateFriendlySyntax() {
@@ -432,7 +411,6 @@ public final class ZIDELanguageBuilder {
     } catch (IllegalArgumentException exception) {
       status.setText(exception.getMessage());
     }
-    refreshPreview();
   }
 
   private void updateParameterHint() {
@@ -511,7 +489,7 @@ public final class ZIDELanguageBuilder {
   }
 
   private void load(Path source) throws Exception {
-    Object decoded = new ZenithJSONParser().jsonDecode(Files.readString(source), false);
+    Object decoded = new ZenithJSONParser().jsonDecode(normalizeDefinitionJson(Files.readString(source)), false);
     if (!(decoded instanceof ZPEMap rootMap)) {
       throw new IllegalArgumentException("Definition must be a JSON object.");
     }
@@ -529,12 +507,12 @@ public final class ZIDELanguageBuilder {
       String patternText = value(map, "pattern");
       String actionName = value(map, "action");
       String syntaxText = value(map, "syntax");
+      if (syntaxText.isBlank()) syntaxText = syntaxForPattern(patternText, actionName);
       rules.add(new Rule(value(map, "name"), syntaxText, patternText, actionName,
               parameters(map.get("parameters")), describe(patternText, actionName)));
     }
     file = source.toAbsolutePath().normalize();
     ruleList.getSelectionModel().selectFirst();
-    refreshPreview();
   }
 
   private Path save(boolean training) {
@@ -582,8 +560,6 @@ public final class ZIDELanguageBuilder {
     }
     return null;
   }
-
-  private void refreshPreview() { preview.setText(definitionJson()); }
 
   private String definitionJson() {
     StringBuilder json = new StringBuilder();
@@ -658,6 +634,33 @@ public final class ZIDELanguageBuilder {
             .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
   }
 
+  /** Allows regex backslashes such as \s and \d to be written once in a definition file. */
+  private static String normalizeDefinitionJson(String source) {
+    StringBuilder normalized = new StringBuilder(source.length() + 16);
+    boolean inString = false;
+    for (int index = 0; index < source.length(); index++) {
+      char current = source.charAt(index);
+      if (current == '"') {
+        normalized.append(current);
+        boolean escapedQuote = index > 0 && source.charAt(index - 1) == '\\';
+        if (!escapedQuote) inString = !inString;
+        continue;
+      }
+      if (inString && current == '\\') {
+        if (index + 1 >= source.length()) {
+          normalized.append("\\\\");
+          continue;
+        }
+        char next = source.charAt(++index);
+        if ("\"\\/bfnrtu".indexOf(next) >= 0) normalized.append('\\').append(next);
+        else normalized.append("\\\\").append(next);
+        continue;
+      }
+      normalized.append(current);
+    }
+    return normalized.toString();
+  }
+
   private static String decode(String value) {
     StringBuilder decoded = new StringBuilder();
     for (int i = 0; i < value.length(); i++) {
@@ -676,6 +679,13 @@ public final class ZIDELanguageBuilder {
       }
     }
     return "Custom pattern. Open Advanced pattern to edit it.";
+  }
+
+  private static String syntaxForPattern(String pattern, String action) {
+    for (RuleTemplate template : RULE_TEMPLATES) {
+      if (template.pattern.equals(pattern) && template.action.equals(action)) return template.syntax;
+    }
+    return "";
   }
 
   private static String friendlyDescription(String syntax) {
@@ -704,8 +714,11 @@ public final class ZIDELanguageBuilder {
       }
       char current = syntax.charAt(index);
       if (Character.isWhitespace(current)) {
+        int whitespaceStart = index;
         while (index < syntax.length() && Character.isWhitespace(syntax.charAt(index))) index++;
-        result.append("\\s+");
+        char previous = whitespaceStart == 0 ? 0 : syntax.charAt(whitespaceStart - 1);
+        char next = index == syntax.length() ? 0 : syntax.charAt(index);
+        result.append(isSyntaxDelimiter(previous) || isSyntaxDelimiter(next) ? "\\s*" : "\\s+");
         continue;
       }
       if ("\\.^$|?*+()[]{}".indexOf(current) >= 0) result.append('\\');
@@ -713,6 +726,11 @@ public final class ZIDELanguageBuilder {
       index++;
     }
     return result.toString();
+  }
+
+  private static boolean isSyntaxDelimiter(char value) {
+    return value == '(' || value == ')' || value == '[' || value == ']' || value == '{'
+            || value == '}' || value == ',' || value == ';';
   }
 
   private static String capturePattern(String type) {
