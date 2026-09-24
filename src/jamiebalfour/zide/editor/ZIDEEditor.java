@@ -5746,7 +5746,9 @@ public class ZIDEEditor extends Application {
 
     EditorTab currentTab = getCurrentTab();
     ZIDELanguage language = currentTab == null ? null : languageSupports.get(currentTab.getLanguageId());
-    if (language != null && language.canRun()) {
+    // YASS uses the embedded ZPE runner below. Other language runners are
+    // dispatched here so they can use their own configured runtimes.
+    if (language != null && language.canRun() && !language.isYass()) {
       language.run(currentTab);
       return;
     }
@@ -5788,6 +5790,12 @@ public class ZIDEEditor extends Application {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /** Runs the current YASS tab through ZPE's embedded execution path. */
+  public void runYassCode(EditorTab tab) {
+    if (tab == null) return;
+    runCode(true);
   }
 
   private Path projectManifestFor(EditorTab tab) {

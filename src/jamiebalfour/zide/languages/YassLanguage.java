@@ -2,6 +2,7 @@ package jamiebalfour.zide.languages;
 
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
+import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
 import jamiebalfour.zpe.core.ZPEInstance;
 import jamiebalfour.zpe.core.ZPEKit;
@@ -15,7 +16,11 @@ import java.util.Set;
 public final class YassLanguage extends LanguageSupport {
   public YassLanguage(ZIDEEditor editor) {
     super("yass", "YASS", Set.of("yas"));
+
+    this.editor = editor;
   }
+
+  private final ZIDEEditor editor;
 
   @Override
   public void configure(CodeEditorViewFX editor) {
@@ -71,4 +76,6 @@ public final class YassLanguage extends LanguageSupport {
     String category = ZPEKit.getFunctionCategory(token);
     return new ZIDEEditor.EditorInfo((header == null || header.isBlank() ? token + "()" : header), entry == null || entry.isBlank() ? "Built-in YASS function" : entry, "Function version " + ZPEKit.getFunctionVersion(token), category == null ? null : "Category: " + category, null);
   }
+
+  @Override public void run(EditorTab tab) { editor.runYassCode(tab); }
 }
