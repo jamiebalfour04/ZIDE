@@ -31,6 +31,7 @@ final class ZIDESettingsPanel extends HBox {
   private final Spinner<Integer> fontSize;
   private final Spinner<Integer> indentationSpaces;
   private final CheckBox wordWrap;
+  private final CheckBox codeMap;
   private final CheckBox useZpex;
   private final CheckBox showInputPrompt;
   private final CheckBox groupProjectTabs;
@@ -47,7 +48,7 @@ final class ZIDESettingsPanel extends HBox {
   private final Map<String, TextField> runtimeFields = new LinkedHashMap<>();
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
-                    String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean preferZpex, boolean showInputPromptValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
+                    String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean codeMapValue, boolean preferZpex, boolean showInputPromptValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
                     String collaborationPasswordValue, String collaborationAvatarValue,
@@ -85,6 +86,8 @@ final class ZIDESettingsPanel extends HBox {
     indentationSpaces.setEditable(true);
     wordWrap = new CheckBox("Wrap long lines");
     wordWrap.setSelected(wrapLines);
+    codeMap = new CheckBox("Show code map");
+    codeMap.setSelected(codeMapValue);
     autoOpenCsvSpreadsheet = new CheckBox("Open CSV files as spreadsheets");
     autoOpenCsvSpreadsheet.setSelected(autoOpenCsvSpreadsheetValue);
     GridPane editorFields = fields();
@@ -94,7 +97,8 @@ final class ZIDESettingsPanel extends HBox {
     editorFields.addRow(3, new Label("Font size"), fontSize);
     editorFields.addRow(4, new Label("Indentation spaces"), indentationSpaces);
     editorFields.add(wordWrap, 1, 5);
-    editorFields.add(autoOpenCsvSpreadsheet, 1, 6);
+    editorFields.add(codeMap, 1, 6);
+    editorFields.add(autoOpenCsvSpreadsheet, 1, 7);
     for (Node control : List.of(lightEditorTheme, darkEditorTheme, fontFamily, fontSize, indentationSpaces)) {
       GridPane.setHgrow(control, Priority.ALWAYS);
     }
@@ -137,8 +141,10 @@ final class ZIDESettingsPanel extends HBox {
     }
     ScrollPane runtimeScroll = new ScrollPane(runtimeContent);
     runtimeScroll.setFitToWidth(true);
-    runtimeScroll.setFitToHeight(true);
-    runtimeScroll.setPrefViewportHeight(500);
+    runtimeScroll.setFitToHeight(false);
+    runtimeScroll.setPrefViewportHeight(420);
+    runtimeScroll.setPrefHeight(420);
+    runtimeScroll.setMaxHeight(420);
     runtimeScroll.setMinHeight(0);
     runtimeScroll.getStyleClass().add("code-editor-scroll-pane");
     VBox.setVgrow(runtimeScroll, Priority.ALWAYS);
@@ -229,6 +235,7 @@ final class ZIDESettingsPanel extends HBox {
   int getFontSize() { return fontSize.getValue(); }
   int getIndentationSpaces() { return indentationSpaces.getValue(); }
   boolean isWordWrapEnabled() { return wordWrap.isSelected(); }
+  boolean isCodeMapEnabled() { return codeMap.isSelected(); }
   boolean isZpexPreferred() { return useZpex.isSelected(); }
   boolean isInputPromptEnabled() { return showInputPrompt.isSelected(); }
   boolean isProjectTabGroupingEnabled() { return groupProjectTabs.isSelected(); }

@@ -164,6 +164,7 @@ public class ZIDEEditor extends Application {
   File projectDir;
   Properties MAIN_PROPERTIES;
   boolean USE_WORD_WRAP = false;
+  boolean codeMapEnabled = false;
   Node loadFromOnline;
   Node saveToOnline;
   Node loginToZPEOnlineMenuItem;
@@ -1511,6 +1512,7 @@ public class ZIDEEditor extends Application {
 
 
     USE_WORD_WRAP = Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("USE_WORD_WRAP", "false"));
+    codeMapEnabled = Boolean.parseBoolean(MAIN_PROPERTIES.getProperty("EDITOR_CODE_MAP", "false"));
     editorLightTheme = MAIN_PROPERTIES.getProperty("EDITOR_LIGHT_THEME", "ZIDE");
     editorDarkTheme = MAIN_PROPERTIES.getProperty("EDITOR_DARK_THEME", "Purples and Greens");
     editorFontFamily = MAIN_PROPERTIES.getProperty("EDITOR_FONT_FAMILY", "Menlo");
@@ -5497,7 +5499,7 @@ public class ZIDEEditor extends Application {
    */
   private void openSettings() {
     if (applicationMenuBar != null) applicationMenuBar.hideMenus();
-    ZIDESettingsPanel settings = new ZIDESettingsPanel(darkThemeEnabled, isDarkThemeEnabled() ? "Dark" : "Light", editorLightTheme, editorDarkTheme, editorFontFamily, editorFontSize, indentationSpaces, USE_WORD_WRAP, preferZpex, showInputPrompt, groupProjectTabs, blockClosuresEnabled, autoOpenCsvSpreadsheet, MAIN_PROPERTIES.getProperty("CHATGPT_URL", "https://api.openai.com/v1/responses"), MAIN_PROPERTIES.getProperty("CHATGPT_KEY", ""), MAIN_PROPERTIES.getProperty("CHATGPT_MODEL", "gpt-5-mini"), MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"), MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"), MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")), MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""), MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", ""), runtimePathsForSettings());
+    ZIDESettingsPanel settings = new ZIDESettingsPanel(darkThemeEnabled, isDarkThemeEnabled() ? "Dark" : "Light", editorLightTheme, editorDarkTheme, editorFontFamily, editorFontSize, indentationSpaces, USE_WORD_WRAP, codeMapEnabled, preferZpex, showInputPrompt, groupProjectTabs, blockClosuresEnabled, autoOpenCsvSpreadsheet, MAIN_PROPERTIES.getProperty("CHATGPT_URL", "https://api.openai.com/v1/responses"), MAIN_PROPERTIES.getProperty("CHATGPT_KEY", ""), MAIN_PROPERTIES.getProperty("CHATGPT_MODEL", "gpt-5-mini"), MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"), MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"), MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")), MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""), MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", ""), runtimePathsForSettings());
 
     showInWindowModal("Settings", "Configure ZIDE", settings, "Save", () -> {
       if (!settings.hasValidChatGPTSettings()) {
@@ -5528,6 +5530,8 @@ public class ZIDEEditor extends Application {
       MAIN_PROPERTIES.setProperty("EDITOR_FONT_FAMILY", editorFontFamily);
       MAIN_PROPERTIES.setProperty("EDITOR_FONT_SIZE", Integer.toString(editorFontSize));
       MAIN_PROPERTIES.setProperty("EDITOR_INDENT_SPACES", Integer.toString(indentationSpaces));
+      codeMapEnabled = settings.isCodeMapEnabled();
+      MAIN_PROPERTIES.setProperty("EDITOR_CODE_MAP", Boolean.toString(codeMapEnabled));
       preferZpex = settings.isZpexPreferred();
       MAIN_PROPERTIES.setProperty("PREFER_ZPEX", Boolean.toString(preferZpex));
       showInputPrompt = settings.isInputPromptEnabled();
@@ -5543,7 +5547,10 @@ public class ZIDEEditor extends Application {
         else MAIN_PROPERTIES.setProperty(entry.getKey(), entry.getValue());
       }
       for (Tab item : allEditorTabs) {
-        if (item instanceof EditorTab editorTab) editorTab.setBlockClosuresEnabled(blockClosuresEnabled);
+        if (item instanceof EditorTab editorTab) {
+          editorTab.setBlockClosuresEnabled(blockClosuresEnabled);
+          editorTab.setCodeMapEnabled(codeMapEnabled);
+        }
       }
       refreshEditorTabGroups();
       applyEditorPreferences();
@@ -10788,6 +10795,7 @@ public class ZIDEEditor extends Application {
 
   private Tab createEditorTab(String title, CodeEditorViewFX editor, String path, Node content) {
     EditorTab tab = new EditorTab(this, title, path, editor, content);
+    tab.setCodeMapEnabled(codeMapEnabled);
 
     // Disable JavaFX built-in close button
     tab.setClosable(false);

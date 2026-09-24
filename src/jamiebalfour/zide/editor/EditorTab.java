@@ -113,7 +113,6 @@ public class EditorTab extends Tab {
     this.owner = owner;
     this.path = path;
     this.editor = editor;
-    this.editorContent = content;
     this.lastDiskContent = editor.getText();
     for (Map.Entry<String, String[]> entry : owner.loadVariableColours(path).entrySet()) {
       String[] colours = entry.getValue();
@@ -161,7 +160,11 @@ public class EditorTab extends Tab {
     editorTopRight.setPickOnBounds(false);
     editorTopRight.setMouseTransparent(true);
 
-    editorContainer = new StackPane(content, editorTopRight);
+    HBox editorSurface = new HBox(0, content, editor.getMinimapView());
+    HBox.setHgrow(content, Priority.ALWAYS);
+    editorSurface.setFillHeight(true);
+    this.editorContent = editorSurface;
+    editorContainer = new StackPane(editorSurface, editorTopRight);
     StackPane.setAlignment(editorTopRight, Pos.TOP_RIGHT);
     StackPane.setMargin(editorTopRight, new Insets(8, 10, 0, 0));
     setContent(editorContainer);
@@ -179,6 +182,14 @@ public class EditorTab extends Tab {
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
+  }
+
+  public void setCodeMapEnabled(boolean enabled) {
+    editor.setMinimapEnabled(enabled);
+  }
+
+  public boolean isCodeMapEnabled() {
+    return editor.isMinimapEnabled();
   }
 
   void setVariableColour(String variable, String background, String text) {
