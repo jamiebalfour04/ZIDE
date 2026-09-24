@@ -4385,6 +4385,19 @@
     -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
 }
 
+/* The bottom-right JB menu needs room around its section dividers and a
+   slightly quieter line inset than the ordinary application menus. */
+.context-menu.jb-glass-menu .separator-menu-item {
+    -fx-padding: 8px 0;
+}
+.context-menu.jb-glass-menu .separator:horizontal .line {
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(82, 91, 102, 0.22) transparent transparent transparent;
+}
+.context-menu.jb-glass-menu.glass-context-menu-dark .separator:horizontal .line {
+    -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
+}
+
 /* Keep every project-tree label readable on the dark tree surface. These
    rules come last because the tree is rebuilt when a file is opened. */
 .app-root:not(.dark) .project-tree .tree-cell,

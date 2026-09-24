@@ -684,7 +684,7 @@ public class BalfTitleBar extends Region {
       if (jbContextMenu.isShowing()) {
         jbContextMenu.hide();
       } else {
-        jbContextMenu.show(jb, Side.BOTTOM, 0, 2);
+        jbContextMenu.show(jb, Side.BOTTOM, 0, -8);
       }
     });
 

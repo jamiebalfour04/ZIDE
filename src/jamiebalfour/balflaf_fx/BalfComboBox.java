@@ -34,6 +34,9 @@ public class BalfComboBox<T> extends ComboBox<T> {
         list.getStyleClass().add("balf-combo-popup-list");
       }
       list.pseudoClassStateChanged(DARK, darkMode);
+      // Combo-box popups use their own scene; install the shared stylesheet
+      // there as well so hover and selected-cell states are not lost.
+      list.sceneProperty().addListener((observable, oldScene, newScene) -> installStylesheet(newScene));
       return new ListCell<T>() {
         {
           getStyleClass().add("balf-combo-popup-cell");
