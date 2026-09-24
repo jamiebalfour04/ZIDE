@@ -9,14 +9,11 @@ import java.util.Set;
 /** Python language definition supplied to ZIDE's language registry. */
 public final class PythonLanguage extends LanguageSupport {
   public PythonLanguage(ZIDEEditor editor) {
-    super("python", "Python", Set.of("py"), null, null, null);
-    this.editor = editor;
+    super(editor, "python", "Python", Set.of("py"));
   }
 
-  private final ZIDEEditor editor;
-
-  @Override public void run(EditorTab tab) { editor.runExternalScript(tab, "python", "Python", ".py"); }
-  @Override public boolean canRun() { return editor.hasInterpreter("python"); }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "python", "Python", ".py"); }
+  @Override public boolean canRun() { return host.hasInterpreter("python"); }
 
   @Override public void configure(CodeEditorViewFX editor) {
     editor.setLineCommentMarkers("#");

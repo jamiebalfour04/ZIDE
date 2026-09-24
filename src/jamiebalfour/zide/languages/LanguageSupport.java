@@ -5,6 +5,13 @@ import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
 import jamiebalfour.zide.editor.ZIDELanguage;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -22,6 +29,7 @@ public class LanguageSupport implements ZIDELanguage {
   final Consumer<CodeEditorViewFX> configure;
   final Function<String, ZIDEEditor.EditorInfo> information;
   final Consumer<EditorTab> runner;
+  protected ZIDEEditor host;
 
   protected LanguageSupport(String id, String label, Set<String> extensions,
                   Consumer<CodeEditorViewFX> configure,
@@ -33,10 +41,16 @@ public class LanguageSupport implements ZIDELanguage {
     this.configure = configure;
     this.information = information;
     this.runner = runner;
+    this.host = null;
   }
 
   protected LanguageSupport(String id, String label, Set<String> extensions) {
     this(id, label, extensions, null, null, null);
+  }
+
+  protected LanguageSupport(ZIDEEditor host, String id, String label, Set<String> extensions) {
+    this(id, label, extensions);
+    this.host = host;
   }
 
   @Override public String id() { return id; }
@@ -81,6 +95,38 @@ public class LanguageSupport implements ZIDELanguage {
     return information == null ? null : information.apply(token);
   }
   @Override public void run(EditorTab tab) { if (runner != null) runner.accept(tab); }
+
+  /** Runs a source file through an interpreter owned by this language. */
+  protected final void runExternalScript(EditorTab tab, String runtime, String displayName, String suffix) {
+    runExternalScript(tab, runtime, displayName, suffix, List.of());
+  }
+
+  protected final void runExternalScript(EditorTab tab, String runtime, String displayName, String suffix, List<String> prefixArguments) {
+    if (tab == null || host == null) return;
+    Path source = null;
+    try {
+      Path workingDirectory = host.languageResourceDirectory(tab);
+      source = workingDirectory != null && Files.isDirectory(workingDirectory)
+          ? Files.createTempFile(workingDirectory, ".zide-", suffix)
+          : Files.createTempFile("zide-" + runtime + "-", suffix);
+      Files.writeString(source, tab.getEditor().getText(), StandardCharsets.UTF_8);
+      source.toFile().deleteOnExit();
+      List<String> command = host.languageInterpreterCommand(runtime);
+      if (command == null) throw new FileNotFoundException(displayName + " runtime was not found");
+      host.languageRememberRuntimePath("RUNTIME_" + runtime.toUpperCase(Locale.ROOT) + "_PATH", Path.of(command.getFirst()));
+      if (prefixArguments != null) command.addAll(prefixArguments);
+      command.add(source.toString());
+      ProcessBuilder process = new ProcessBuilder(command);
+      if (workingDirectory != null && Files.isDirectory(workingDirectory)) process.directory(workingDirectory.toFile());
+      Path executionSource = source;
+      host.runLanguageProcess(runtime + " > ", displayName, process, () -> {
+        try { Files.deleteIfExists(executionSource); } catch (IOException ignored) { }
+      });
+    } catch (IOException exception) {
+      if (source != null) try { Files.deleteIfExists(source); } catch (IOException ignored) { }
+      host.reportLanguageFailure(displayName, exception.getMessage());
+    }
+  }
 
   @Override public boolean isYass() { return "yass".equals(id); }
   @Override public boolean canRun() {

@@ -1,6 +1,24 @@
 package jamiebalfour.zide.languages;
-import jamiebalfour.zide.editor.ZIDEEditor;
+
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
+import jamiebalfour.zide.editor.EditorTab;
+import jamiebalfour.zide.editor.ZIDEEditor;
+
+import java.util.List;
 import java.util.Set;
-public final class SqarlLanguage extends LanguageSupport { private final ZIDEEditor host; public SqarlLanguage(ZIDEEditor e) { super("sqarl", "SQARL", Set.of("sqarl")); host = e; } @Override public void configure(CodeEditorViewFX editor) { editor.setLineCommentMarkers("//"); editor.setBlockCommentMarkers("/*", "*/"); editor.setQuoteDelimiters("\"'"); editor.setVariableDelimiters(""); editor.setContextSeparator(""); editor.clearKeywords(); editor.clearContextualKeywords(); editor.clearAutoCompleteItems(); for (String keyword : new String[]{"DECLARE", "INITIALLY", "WHILE", "RECEIVE", "FROM", "KEYBOARD", "END", "SEND", "FOR", "EACH", "DO", "IF", "THEN", "SET", "TO", "DISPLAY", "ARRAY", "STRING", "RECORD", "CLASS", "INTEGER", "REAL", "BOOLEAN", "CHARACTER", "FUNCTION", "RETURN", "PROCEDURE", "AND", "OR", "NOT", "MOD", "OPEN", "CLOSE", "CREATE", "METHODS", "THIS", "WITH", "OVERRIDE", "INHERITS", "CONSTRUCTOR", "IS", "AS", "ELSE"}) { editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD); editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword); } } @Override public void run(jamiebalfour.zide.editor.EditorTab tab) { host.runSqarlCode(tab); } }
+
+public final class SqarlLanguage extends LanguageSupport {
+  public SqarlLanguage(ZIDEEditor editor) { super(editor, "sqarl", "SQARL", Set.of("sqarl")); }
+  @Override public void configure(CodeEditorViewFX editor) {
+    editor.setLineCommentMarkers("//"); editor.setBlockCommentMarkers("/*", "*/");
+    editor.setQuoteDelimiters("\"'"); editor.setVariableDelimiters(""); editor.setContextSeparator("");
+    editor.clearKeywords(); editor.clearContextualKeywords(); editor.clearAutoCompleteItems();
+    for (String keyword : new String[]{"DECLARE", "INITIALLY", "WHILE", "RECEIVE", "FROM", "KEYBOARD", "END", "SEND", "FOR", "EACH", "DO", "IF", "THEN", "SET", "TO", "DISPLAY", "ARRAY", "STRING", "RECORD", "CLASS", "INTEGER", "REAL", "BOOLEAN", "CHARACTER", "FUNCTION", "RETURN", "PROCEDURE", "AND", "OR", "NOT", "MOD", "OPEN", "CLOSE", "CREATE", "METHODS", "THIS", "WITH", "OVERRIDE", "INHERITS", "CONSTRUCTOR", "IS", "AS", "ELSE"}) {
+      editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
+      editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);
+    }
+  }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "sqarl", "SQARL", ".sqarl", List.of("-r")); }
+  @Override public boolean canRun() { return host.hasInterpreter("sqarl"); }
+}

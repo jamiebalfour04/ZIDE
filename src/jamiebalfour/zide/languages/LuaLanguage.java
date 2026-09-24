@@ -1,4 +1,14 @@
 package jamiebalfour.zide.languages;
+
+import jamiebalfour.codeeditor.CodeEditorViewFX;
+import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
+
 import java.util.Set;
-public final class LuaLanguage extends LanguageSupport { private final ZIDEEditor host; public LuaLanguage(ZIDEEditor e) { super("lua", "Lua", Set.of("lua")); host = e; } @Override public void configure(jamiebalfour.codeeditor.CodeEditorViewFX editor) { host.configureLua(editor); } @Override public void run(jamiebalfour.zide.editor.EditorTab tab) { host.runLuaCode(tab); } @Override public boolean canRun() { return ZIDEEditor.interpreterCommand("lua") != null; } }
+
+public final class LuaLanguage extends LanguageSupport {
+  public LuaLanguage(ZIDEEditor editor) { super(editor, "lua", "Lua", Set.of("lua")); }
+  @Override public void configure(CodeEditorViewFX editor) { host.configureLua(editor); }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "lua", "Lua", ".lua"); }
+  @Override public boolean canRun() { return ZIDEEditor.interpreterCommand("lua") != null; }
+}

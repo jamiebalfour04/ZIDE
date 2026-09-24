@@ -10,10 +10,8 @@ import java.util.Set;
 
 /** TypeScript language definition with JavaScript and type-system keywords. */
 public final class TypeScriptLanguage extends LanguageSupport {
-  private final ZIDEEditor editor;
-  public TypeScriptLanguage(ZIDEEditor ignored) {
-    super("typescript", "TypeScript", Set.of("ts", "mts", "cts"));
-    editor = ignored;
+  public TypeScriptLanguage(ZIDEEditor editor) {
+    super(editor, "typescript", "TypeScript", Set.of("ts", "mts", "cts"));
   }
 
   @Override public void configure(CodeEditorViewFX editor) {
@@ -40,6 +38,6 @@ public final class TypeScriptLanguage extends LanguageSupport {
     editor.addKeyword("null", CodeSyntaxModel.Style.NULL);
   }
 
-  @Override public void run(EditorTab tab) { editor.runExternalScript(tab, "typescript", "TypeScript", ".ts"); }
-  @Override public boolean canRun() { return editor.hasInterpreter("typescript"); }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "typescript", "TypeScript", ".ts"); }
+  @Override public boolean canRun() { return host.hasInterpreter("typescript"); }
 }

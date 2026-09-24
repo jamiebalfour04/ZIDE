@@ -10,10 +10,8 @@ import java.util.Set;
 
 /** JSX/React language definition: markup tags plus embedded JavaScript terms. */
 public final class JsxLanguage extends LanguageSupport {
-  private final ZIDEEditor editor;
-  public JsxLanguage(ZIDEEditor ignored) {
-    super("jsx", "JSX / React", Set.of("jsx", "tsx"));
-    editor = ignored;
+  public JsxLanguage(ZIDEEditor editor) {
+    super(editor, "jsx", "JSX / React", Set.of("jsx", "tsx"));
   }
 
   @Override public void configure(CodeEditorViewFX editor) {
@@ -43,7 +41,7 @@ public final class JsxLanguage extends LanguageSupport {
 
   @Override public void run(EditorTab tab) {
     String suffix = tab != null && tab.getPath() != null && tab.getPath().toLowerCase(java.util.Locale.ROOT).endsWith(".tsx") ? ".tsx" : ".jsx";
-    editor.runExternalScript(tab, "jsx", "JSX / React", suffix);
+    runExternalScript(tab, "jsx", "JSX / React", suffix);
   }
-  @Override public boolean canRun() { return editor.hasInterpreter("jsx"); }
+  @Override public boolean canRun() { return host.hasInterpreter("jsx"); }
 }

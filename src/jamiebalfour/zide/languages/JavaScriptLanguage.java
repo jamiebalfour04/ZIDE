@@ -9,11 +9,8 @@ import java.util.Set;
 
 /** JavaScript language definition supplied to ZIDE's language registry. */
 public final class JavaScriptLanguage extends LanguageSupport {
-  private final ZIDEEditor editor;
-
   public JavaScriptLanguage(ZIDEEditor editor) {
-    super("js", "JavaScript", Set.of("js", "mjs", "cjs"), null, null, null);
-    this.editor = editor;
+    super(editor, "js", "JavaScript", Set.of("js", "mjs", "cjs"));
   }
 
   @Override public void configure(CodeEditorViewFX editor) {
@@ -42,7 +39,7 @@ public final class JavaScriptLanguage extends LanguageSupport {
     editor.addKeyword("undefined", CodeSyntaxModel.Style.NULL);
   }
 
-  @Override public void run(EditorTab tab) { editor.runExternalScript(tab, "javascript", "JavaScript", ".js"); }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "javascript", "JavaScript", ".js"); }
 
-  @Override public boolean canRun() { return editor.hasInterpreter("javascript"); }
+  @Override public boolean canRun() { return host.hasInterpreter("javascript"); }
 }

@@ -9,14 +9,11 @@ import java.util.Set;
 /** PHP language definition supplied to ZIDE's language registry. */
 public final class PHPLanguage extends LanguageSupport {
   public PHPLanguage(ZIDEEditor editor) {
-    super("php", "PHP", Set.of("php"), null, null, null);
-    this.editor = editor;
+    super(editor, "php", "PHP", Set.of("php"));
   }
 
-  private final ZIDEEditor editor;
-
-  @Override public void run(EditorTab tab) { editor.runExternalScript(tab, "php", "PHP", ".php"); }
-  @Override public boolean canRun() { return editor.hasInterpreter("php"); }
+  @Override public void run(EditorTab tab) { runExternalScript(tab, "php", "PHP", ".php"); }
+  @Override public boolean canRun() { return host.hasInterpreter("php"); }
 
   @Override public void configure(CodeEditorViewFX editor) {
     editor.setLineCommentMarkers("#", "//");

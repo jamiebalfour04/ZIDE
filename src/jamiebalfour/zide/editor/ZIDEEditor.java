@@ -5674,6 +5674,33 @@ public class ZIDEEditor extends Application {
     }
   }
 
+  /** Services exposed to language implementations; execution policy stays in the language. */
+  public Path languageResourceDirectory(EditorTab tab) { return resourceDirectoryFor(tab); }
+  public List<String> languageInterpreterCommand(String language) { return configuredInterpreterCommand(language); }
+  public void languageRememberRuntimePath(String key, Path path) { rememberRuntimePath(key, path); }
+
+  public void runLanguageProcess(String prompt, String displayName, ProcessBuilder process, Runnable finished) throws IOException {
+    consoleOutputTextArea.clear();
+    consoleOutputTextArea.append(displayName + " runtime\n\n", InteractiveConsoleFX.OutputKind.KEY);
+    consoleOutputTextArea.append("$ " + displayCommand(process) + "\n\n", InteractiveConsoleFX.OutputKind.ADDITIONAL);
+    consoleTab.setSelected(true);
+    showBottomPanel(consoleView);
+    runBtn.getStyleClass().add("running");
+    statusLabel.setText("Executing " + displayName);
+    consoleOutputTextArea.addProcessFinishedListener(() -> Platform.runLater(() -> {
+      runBtn.getStyleClass().remove("running");
+      statusLabel.setText("Ready");
+      if (finished != null) finished.run();
+    }));
+    runConsoleProcess(prompt, process);
+  }
+
+  public void reportLanguageFailure(String displayName, String message) {
+    runBtn.getStyleClass().remove("running");
+    statusLabel.setText("Ready");
+    consoleOutputTextArea.append(displayName + " could not be started: " + message + "\n", InteractiveConsoleFX.OutputKind.ERROR);
+  }
+
   void updateProblems(EditorTab tab, List<YASSDiagnostic> diagnostics) {
     int errorCount = 0;
     int warningCount = 0;
@@ -5746,14 +5773,17 @@ public class ZIDEEditor extends Application {
 
     EditorTab currentTab = getCurrentTab();
     ZIDELanguage language = currentTab == null ? null : languageSupports.get(currentTab.getLanguageId());
-    // YASS uses the embedded ZPE runner below. Other language runners are
-    // dispatched here so they can use their own configured runtimes.
-    if (language != null && language.canRun() && !language.isYass()) {
+    if (language != null && language.canRun()) {
       language.run(currentTab);
       return;
     }
 
-    if (!getZPE(() -> runCode(runYassProgram))) return;
+    runYassExecution(runYassProgram);
+  }
+
+  private void runYassExecution(boolean runYassProgram) {
+
+    if (!getZPE(() -> runYassExecution(runYassProgram))) return;
 
     if (!verifyCode()) return;
 
@@ -5795,7 +5825,7 @@ public class ZIDEEditor extends Application {
   /** Runs the current YASS tab through ZPE's embedded execution path. */
   public void runYassCode(EditorTab tab) {
     if (tab == null) return;
-    runCode(true);
+    runYassExecution(true);
   }
 
   private Path projectManifestFor(EditorTab tab) {
