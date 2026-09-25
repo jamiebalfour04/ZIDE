@@ -77,7 +77,7 @@ public class EditorTab extends Tab {
   private final HBox warningIndicator = new HBox(4);
   private final Label warningCountLabel = new Label();
   private final HBox diagnosticOverlay = new HBox(7);
-  private final VBox editorTopRight = new VBox(6);
+  private final StackPane editorTopRight = new StackPane();
   private final VBox findReplacePanel = new VBox(6);
   private final TextField findField = new TextField();
   private final TextField replaceField = new TextField();
@@ -154,9 +154,11 @@ public class EditorTab extends Tab {
 
     buildFindReplacePanel();
     editorTopRight.getChildren().addAll(diagnosticOverlay, findReplacePanel);
-    editorTopRight.setAlignment(Pos.TOP_RIGHT);
-    editorTopRight.setMaxWidth(Double.MAX_VALUE);
-    editorTopRight.setMaxHeight(Region.USE_PREF_SIZE);
+    StackPane.setAlignment(diagnosticOverlay, Pos.TOP_RIGHT);
+    StackPane.setMargin(diagnosticOverlay, new Insets(8, 10, 0, 0));
+    StackPane.setAlignment(findReplacePanel, Pos.BOTTOM_RIGHT);
+    StackPane.setMargin(findReplacePanel, new Insets(0, 10, 8, 0));
+    editorTopRight.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
     editorTopRight.setPickOnBounds(false);
     editorTopRight.setMouseTransparent(true);
 
@@ -165,8 +167,8 @@ public class EditorTab extends Tab {
     editorSurface.setFillHeight(true);
     this.editorContent = editorSurface;
     editorContainer = new StackPane(editorSurface, editorTopRight);
-    StackPane.setAlignment(editorTopRight, Pos.TOP_RIGHT);
-    StackPane.setMargin(editorTopRight, new Insets(8, 10, 0, 0));
+    StackPane.setAlignment(editorTopRight, Pos.TOP_LEFT);
+    StackPane.setMargin(editorTopRight, new Insets(0));
     setContent(editorContainer);
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());

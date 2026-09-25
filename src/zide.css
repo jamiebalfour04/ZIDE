@@ -384,6 +384,10 @@
     -fx-background-color: transparent;
     -fx-font-weight: bold;
 }
+.project-browser-row.active-project-file {
+    -fx-background-color: #e5f3fb;
+    -fx-font-weight: bold;
+}
 .project-browser-arrow {
     -fx-text-fill: #4a535f;
     -fx-font-size: 14px;
@@ -414,6 +418,9 @@
 .app-root.dark .project-browser-row,
 .app-root.dark .project-browser-row:hover {
     -fx-background-color: transparent;
+}
+.app-root.dark .project-browser-row.active-project-file {
+    -fx-background-color: #164766;
 }
 .app-root.dark .project-browser-arrow {
     -fx-text-fill: #cbd3dc;
@@ -1230,12 +1237,12 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
 
-    -fx-min-width: 10px;
-    -fx-min-height: 10px;
-    -fx-pref-width: 10px;
-    -fx-pref-height: 10px;
-    -fx-max-width: 10px;
-    -fx-max-height: 10px;
+    -fx-min-width: 8px;
+    -fx-min-height: 8px;
+    -fx-pref-width: 8px;
+    -fx-pref-height: 8px;
+    -fx-max-width: 8px;
+    -fx-max-height: 8px;
 
     /* Thin X (JetBrains-style) */
     -fx-shape: "M 2 2 L 3 1 L 5 3 L 7 1 L 8 2 L 6 4 L 8 6 L 7 7 L 5 5 L 3 7 L 2 6 L 4 4 Z";
@@ -3528,6 +3535,20 @@
     -fx-background-color: #1f1f1f;
     -fx-background: #1f1f1f;
 }
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar:vertical,
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar .track,
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar .track-background {
+    -fx-background-color: transparent;
+}
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
 
 .markdown-preview,
 .markdown-preview > .viewport,
@@ -3729,6 +3750,11 @@
 .regex-builder.dark .label,
 .regex-builder.dark .check-box {
     -fx-text-fill: #e7eaee;
+}
+.regex-builder.dark .text-field,
+.regex-builder.dark .text-area,
+.regex-builder.dark .text-area .content {
+    -fx-prompt-text-fill: #9aa6b3;
 }
 .regex-builder.dark .regex-builder-status {
     -fx-border-color: #454d59 transparent transparent transparent;
@@ -4150,8 +4176,7 @@
 }
 .scratch-pad-panel {
     -fx-background-color: #f3f3f3;
-    -fx-border-color: #d4d4d4;
-    -fx-border-width: 0 0 0 1px;
+    -fx-border-width: 0;
     -fx-pref-width: 340px;
 }
 .scratch-pad-panel .label { -fx-text-fill: #292d33; }
@@ -4191,7 +4216,6 @@
 .scratch-pad-scroll-pane .content { -fx-background-color: #ffffff; }
 .app-root.dark .scratch-pad-panel {
     -fx-background-color: #1b1f26;
-    -fx-border-color: #30343b;
 }
 .app-root.dark .scratch-pad-panel .label { -fx-text-fill: #e3e7ec; }
 .app-root.dark .scratch-pad-panel .scratch-pad-editor {
