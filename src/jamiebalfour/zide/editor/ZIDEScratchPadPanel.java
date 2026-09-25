@@ -245,12 +245,30 @@ final class ZIDEScratchPadPanel extends VBox {
     loadTarget(targetFile);
   }
 
+  /** Switches to a project with no pad without creating a new file on disk. */
+  void clearForProject() {
+    if (!opened) return;
+    saveDelay.stop();
+    if (file != null && (Files.isRegularFile(file) || notes.getLength() > 0)) save();
+    file = null;
+    loading = true;
+    try {
+      notes.clear();
+      saveStatus.setText("Saved");
+    } finally {
+      loading = false;
+      typingStyle = "";
+      notes.setTextInsertionStyle("");
+      refreshToolbarState();
+    }
+  }
+
   private void loadTarget(Path targetFile) {
     if (targetFile == null) return;
     Path normalized = targetFile.toAbsolutePath().normalize();
     if (normalized.equals(file)) return;
     saveDelay.stop();
-    if (file != null) save();
+    if (file != null && (Files.isRegularFile(file) || notes.getLength() > 0)) save();
     file = normalized;
     loading = true;
     try {

@@ -3,6 +3,7 @@ package jamiebalfour.zide.editor;
 import jamiebalfour.balflaf_fx.BalfComboBox;
 import javafx.collections.FXCollections;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -21,6 +22,7 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 /** Builds the preferences view independently from the main editor window. */
 final class ZIDESettingsPanel extends HBox {
@@ -52,7 +54,7 @@ final class ZIDESettingsPanel extends HBox {
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
                     String collaborationPasswordValue, String collaborationAvatarValue,
-                    Map<String, String> runtimePaths) {
+                    Map<String, String> runtimePaths, Function<String, String> runtimeRedetector) {
     super(18);
 
     ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "Runtimes & Compilers", "ChatGPT", "Collaboration", "Experimental"));
@@ -133,8 +135,15 @@ final class ZIDESettingsPanel extends HBox {
       for (Map.Entry<String, String> entry : runtimePaths.entrySet()) {
         TextField path = new TextField(entry.getValue());
         path.setMaxWidth(Double.MAX_VALUE);
+        path.setPromptText("Runtime not found");
         runtimeFields.put(entry.getKey(), path);
-        runtimeFieldsGrid.addRow(row++, new Label(runtimeLabel(entry.getKey())), path);
+        Button redetect = new Button("Re-find");
+        redetect.setOnAction(event -> {
+          String detected = runtimeRedetector == null ? null : runtimeRedetector.apply(entry.getKey());
+          if (detected != null && !detected.isBlank()) path.setText(detected);
+        });
+        redetect.setAccessibleText("Re-find " + runtimeLabel(entry.getKey()));
+        runtimeFieldsGrid.addRow(row++, new Label(runtimeLabel(entry.getKey())), path, redetect);
         GridPane.setHgrow(path, Priority.ALWAYS);
       }
       runtimeContent.getChildren().add(runtimeFieldsGrid);
@@ -209,6 +218,10 @@ final class ZIDESettingsPanel extends HBox {
     getChildren().addAll(sections, page);
     getStyleClass().add("settings-content");
     setPrefWidth(840);
+    // Keep the modal stable while switching pages; long runtime lists scroll inside their viewport.
+    setMinHeight(560);
+    setPrefHeight(560);
+    setMaxHeight(560);
   }
 
   boolean hasValidChatGPTSettings() {
@@ -257,6 +270,9 @@ final class ZIDESettingsPanel extends HBox {
 
   private static String runtimeLabel(String key) {
     if ("YASS_RUNTIME_PATH".equals(key)) return "YASS (ZPE)";
+    if ("RUNTIME_SQARL_PATH".equals(key)) return "SQARL";
+    if ("RUNTIME_JAVASCRIPT_PATH".equals(key)) return "JavaScript";
+    if ("RUNTIME_TYPESCRIPT_PATH".equals(key)) return "TypeScript";
     String label = key.replace("RUNTIME_", "").replace("_PATH", "").replace('_', ' ');
     return label.substring(0, 1).toUpperCase() + label.substring(1).toLowerCase();
   }
