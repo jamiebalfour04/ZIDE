@@ -12,6 +12,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.*;
@@ -33,7 +34,10 @@ public class BalfGlassMenuBar extends HBox {
   private Scene submenuDismissScene;
   private final EventHandler<MouseEvent> dismissSubmenuOnMouse = event -> hideActiveMenu();
   private final EventHandler<ScrollEvent> dismissSubmenuOnScroll = event -> hideActiveMenu();
-  private final EventHandler<KeyEvent> dismissSubmenuOnKey = event -> hideActiveMenu();
+  private final List<Scene> menuKeyScenes = new ArrayList<>();
+  private final EventHandler<KeyEvent> menuKeyHandler = this::handleMenuKey;
+  private Node keyboardMenuRow;
+  private GlassMenu keyboardMenu;
   private final List<GlassMenu> menus = new ArrayList<>();
   private boolean darkMode;
   private static final PseudoClass DARK = PseudoClass.getPseudoClass("dark");
@@ -190,6 +194,8 @@ public class BalfGlassMenuBar extends HBox {
     });
 
     activeMenu = popup;
+    selectFirstMenuRow(menu);
+    installMenuKeyFilter(popup.getScene());
   }
 
   private Insets menuItemPadding() {
@@ -205,6 +211,7 @@ public class BalfGlassMenuBar extends HBox {
     private final boolean opensAbove;
     private final List<GlassMenu> submenus = new ArrayList<>();
     private GlassMenu parentMenu;
+    private Node submenuRow;
 
     private GlassMenu(Label owner, boolean opensAbove) {
       this.owner = owner;
@@ -326,6 +333,7 @@ public class BalfGlassMenuBar extends HBox {
       Label arrow = new Label("›");
       arrow.getStyleClass().add("glass-menu-submenu-arrow");
       row.getChildren().addAll(label, spacer, arrow);
+      submenu.submenuRow = row;
 
       row.setOnMouseEntered(event -> showSubmenu(row, submenu));
       row.setOnMouseClicked(event -> {
@@ -342,6 +350,13 @@ public class BalfGlassMenuBar extends HBox {
       });
       box.getChildren().add(row);
       return new GlassSubmenu(row, submenu);
+    }
+
+    private GlassMenu submenuForRow(Node row) {
+      for (GlassMenu submenu : submenus) {
+        if (submenu.submenuRow == row) return submenu;
+      }
+      return null;
     }
 
     public class GlassSubmenu {
@@ -590,6 +605,8 @@ public class BalfGlassMenuBar extends HBox {
     // Submenu rows live in the detached popup scene. Click-away events happen
     // in the main application scene, so install the filter there instead.
     installSubmenuDismissFilters(BalfGlassMenuBar.this.getScene());
+    selectFirstMenuRow(menu);
+    installMenuKeyFilter(menu.popup.getScene());
   }
 
 
@@ -606,6 +623,7 @@ public class BalfGlassMenuBar extends HBox {
       activeMenu = null;
     }
 
+    clearKeyboardMenuState();
     setActiveOwner(null);
   }
 
@@ -615,15 +633,114 @@ public class BalfGlassMenuBar extends HBox {
     submenuDismissScene = scene;
     scene.addEventFilter(MouseEvent.MOUSE_PRESSED, dismissSubmenuOnMouse);
     scene.addEventFilter(ScrollEvent.SCROLL, dismissSubmenuOnScroll);
-    scene.addEventFilter(KeyEvent.KEY_PRESSED, dismissSubmenuOnKey);
   }
 
   private void removeSubmenuDismissFilters() {
     if (submenuDismissScene == null) return;
     submenuDismissScene.removeEventFilter(MouseEvent.MOUSE_PRESSED, dismissSubmenuOnMouse);
     submenuDismissScene.removeEventFilter(ScrollEvent.SCROLL, dismissSubmenuOnScroll);
-    submenuDismissScene.removeEventFilter(KeyEvent.KEY_PRESSED, dismissSubmenuOnKey);
     submenuDismissScene = null;
+  }
+
+  private void installMenuKeyFilter(Scene scene) {
+    if (scene == null || menuKeyScenes.contains(scene)) return;
+    menuKeyScenes.add(scene);
+    scene.addEventFilter(KeyEvent.KEY_PRESSED, menuKeyHandler);
+  }
+
+  private void clearKeyboardMenuState() {
+    if (keyboardMenuRow != null) keyboardMenuRow.pseudoClassStateChanged(HOVER, false);
+    keyboardMenuRow = null;
+    keyboardMenu = null;
+    for (Scene scene : menuKeyScenes) scene.removeEventFilter(KeyEvent.KEY_PRESSED, menuKeyHandler);
+    menuKeyScenes.clear();
+  }
+
+  private void handleMenuKey(KeyEvent event) {
+    if (activeMenu == null || !activeMenu.isShowing()) return;
+    GlassMenu context = keyboardMenu;
+    if (context == null) return;
+    String code = event.getCode().toString();
+    if ("ESCAPE".equals(code)) {
+      hideActiveMenu();
+      event.consume();
+      return;
+    }
+    if ("DOWN".equals(code) || "UP".equals(code)) {
+      moveMenuSelection(context, "DOWN".equals(code) ? 1 : -1);
+      event.consume();
+      return;
+    }
+    if ("RIGHT".equals(code)) {
+      GlassMenu submenu = context.submenuForRow(keyboardMenuRow);
+      if (submenu != null) {
+        showSubmenu(keyboardMenuRow, submenu);
+        selectFirstMenuRow(submenu);
+        installMenuKeyFilter(submenu.popup.getScene());
+        event.consume();
+      } else if (context.parentMenu == null) {
+        showAdjacentTopLevelMenu(context, 1);
+        event.consume();
+      }
+      return;
+    }
+    if ("LEFT".equals(code)) {
+      if (context.parentMenu != null) {
+        context.popup.hide();
+        activeSubmenu = null;
+        selectFirstMenuRow(context.parentMenu);
+        event.consume();
+      } else {
+        showAdjacentTopLevelMenu(context, -1);
+        event.consume();
+      }
+      return;
+    }
+    if ("ENTER".equals(code) || "SPACE".equals(code)) {
+      activateMenuRow(keyboardMenuRow);
+      event.consume();
+    }
+  }
+
+  private List<Node> selectableMenuRows(GlassMenu menu) {
+    return menu.box.getChildren().stream()
+        .filter(node -> node.getStyleClass().contains("glass-menu-item") && !node.isDisabled())
+        .toList();
+  }
+
+  private void selectFirstMenuRow(GlassMenu menu) {
+    List<Node> rows = selectableMenuRows(menu);
+    if (!rows.isEmpty()) selectMenuRow(menu, rows.getFirst());
+  }
+
+  private void moveMenuSelection(GlassMenu menu, int delta) {
+    List<Node> rows = selectableMenuRows(menu);
+    if (rows.isEmpty()) return;
+    int index = Math.max(0, rows.indexOf(keyboardMenuRow));
+    index = (index + delta + rows.size()) % rows.size();
+    selectMenuRow(menu, rows.get(index));
+  }
+
+  private void selectMenuRow(GlassMenu menu, Node row) {
+    if (keyboardMenuRow != null) keyboardMenuRow.pseudoClassStateChanged(HOVER, false);
+    keyboardMenu = menu;
+    keyboardMenuRow = row;
+    if (row != null) row.pseudoClassStateChanged(HOVER, true);
+  }
+
+  private void activateMenuRow(Node row) {
+    if (row == null || row.isDisabled()) return;
+    row.fireEvent(new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0,
+        MouseButton.PRIMARY, 1, false, false, false, false,
+        true, false, false, false, false, false, null));
+  }
+
+  private void showAdjacentTopLevelMenu(GlassMenu current, int delta) {
+    int index = menus.indexOf(current);
+    if (index < 0 || menus.isEmpty()) return;
+    GlassMenu next = menus.get((index + delta + menus.size()) % menus.size());
+    Node anchor = next.owner.getParent() == null ? next.owner : next.owner.getParent();
+    showMenu(anchor, next);
   }
 
   /** Clears JavaFX's latched hover state when a popup disappears under the pointer. */
