@@ -16,7 +16,8 @@ final class ZIDERuntimeManager {
 
   private static final String DOWNLOAD_ROOT = "https://www.jamiebalfour.scot/downloads/1-zpe/";
   private final Path installation;
-  private final Path sharedInstallation = Path.of(System.getProperty("user.home", ""), "jb", "zpe");
+  private final Path sharedInstallation = HelperFunctions.getAppDataDirectory(
+          "jamiebalfour/zpe", System.getProperty("user.home", "") + "/jb/zpe").toPath();
 
   ZIDERuntimeManager(Path installation) {
     this.installation = installation;
@@ -24,7 +25,17 @@ final class ZIDERuntimeManager {
 
   Path path(RuntimeKind kind) {
     Path shared = sharedInstallation.resolve(runtimeFileName(kind));
+    if (kind == RuntimeKind.ZPE) return shared;
     return Files.isRegularFile(shared) ? shared : installation.resolve(runtimeFileName(kind));
+  }
+
+  Path downloadPath(RuntimeKind kind) {
+    return kind == RuntimeKind.ZPE ? sharedInstallation.resolve(runtimeFileName(kind)) : path(kind);
+  }
+
+  Path path(RuntimeKind kind, Path configured) {
+    if (configured != null && Files.isRegularFile(configured)) return configured.toAbsolutePath().normalize();
+    return path(kind);
   }
 
   private static String runtimeFileName(RuntimeKind kind) {
@@ -33,6 +44,10 @@ final class ZIDERuntimeManager {
 
   boolean isInstalled(RuntimeKind kind) {
     return Files.isRegularFile(path(kind));
+  }
+
+  boolean isInstalled(RuntimeKind kind, Path configured) {
+    return Files.isRegularFile(path(kind, configured));
   }
 
   String downloadUrl(RuntimeKind kind) {
@@ -51,12 +66,12 @@ final class ZIDERuntimeManager {
     throw new IllegalStateException("ZPEX is not available for this operating system.");
   }
 
-  Launch prepare(RuntimeKind kind, Path source, Path resourceRoot, boolean debug, String extras)
+  Launch prepare(RuntimeKind kind, Path source, Path resourceRoot, boolean debug, String extras, String maximumMemory, Path configuredRuntime)
           throws IOException {
     if (source == null || !Files.isRegularFile(source)) {
       throw new IOException("The YASS source file does not exist.");
     }
-    Path runtime = path(kind);
+    Path runtime = path(kind, configuredRuntime);
     if (!Files.isRegularFile(runtime)) {
       throw new IOException(kind + " is not installed in ZIDE.");
     }
@@ -64,9 +79,11 @@ final class ZIDERuntimeManager {
     ArrayList<String> command = new ArrayList<>();
     if (kind == RuntimeKind.ZPEX) {
       command.add(runtime.toString());
+      if (maximumMemory != null && !maximumMemory.isBlank()) command.add("-Xmx" + maximumMemory.trim() + "m");
     } else {
       command.add(javaCommand());
       if (HelperFunctions.isMac()) command.add("-XstartOnFirstThread");
+      if (maximumMemory != null && !maximumMemory.isBlank()) command.add("-Xmx" + maximumMemory.trim() + "m");
       command.add("-jar");
       command.add(runtime.toString());
     }
@@ -89,25 +106,25 @@ final class ZIDERuntimeManager {
       if (extras != null && !extras.trim().isEmpty()) command.addAll(Arrays.asList(extras.trim().split("\\s+")));
       ProcessBuilder builder = new ProcessBuilder(command);
       if (resourceRoot != null && Files.isDirectory(resourceRoot)) builder.directory(resourceRoot.toFile());
-      return new Launch(builder, debugServer,
-              "Running with ZIDE's " + kind + " package (" + runtime + ").");
+      return new Launch(builder, debugServer, "Runtime path: " + runtime);
     } catch (RuntimeException exception) {
       if (debugServer != null) debugServer.close();
       throw exception;
     }
   }
 
-  Launch prepareZenLanguageTraining(Path definition) throws IOException {
+  Launch prepareZenLanguageTraining(Path definition, String maximumMemory, Path configuredRuntime) throws IOException {
     if (definition == null || !Files.isRegularFile(definition)) {
       throw new IOException("The ZenLang definition does not exist.");
     }
-    Path runtime = path(RuntimeKind.ZPE);
+    Path runtime = path(RuntimeKind.ZPE, configuredRuntime);
     if (!Files.isRegularFile(runtime)) {
       throw new IOException("ZPE is not installed in ZIDE.");
     }
     ArrayList<String> command = new ArrayList<>();
     command.add(javaCommand());
     if (HelperFunctions.isMac()) command.add("-XstartOnFirstThread");
+    if (maximumMemory != null && !maximumMemory.isBlank()) command.add("-Xmx" + maximumMemory.trim() + "m");
     command.add("-jar");
     command.add(runtime.toString());
     command.add("-m");
@@ -116,23 +133,24 @@ final class ZIDERuntimeManager {
     ProcessBuilder builder = new ProcessBuilder(command);
     Path parent = definition.toAbsolutePath().getParent();
     if (parent != null) builder.directory(parent.toFile());
-    return new Launch(builder, null, "Training ZenLang syntax with ZIDE's ZPE package.");
+    return new Launch(builder, null, "Runtime path: " + runtime);
   }
 
-  Launch prepareZenLanguageTest(Path definition, Path source) throws IOException {
+  Launch prepareZenLanguageTest(Path definition, Path source, String maximumMemory, Path configuredRuntime) throws IOException {
     if (definition == null || !Files.isRegularFile(definition)) {
       throw new IOException("The ZenLang definition does not exist.");
     }
     if (source == null || !Files.isRegularFile(source)) {
       throw new IOException("The test script does not exist.");
     }
-    Path runtime = path(RuntimeKind.ZPE);
+    Path runtime = path(RuntimeKind.ZPE, configuredRuntime);
     if (!Files.isRegularFile(runtime)) {
       throw new IOException("ZPE is not installed in ZIDE.");
     }
     ArrayList<String> command = new ArrayList<>();
     command.add(javaCommand());
     if (HelperFunctions.isMac()) command.add("-XstartOnFirstThread");
+    if (maximumMemory != null && !maximumMemory.isBlank()) command.add("-Xmx" + maximumMemory.trim() + "m");
     command.add("-jar");
     command.add(runtime.toString());
     command.add("-m");
@@ -141,7 +159,7 @@ final class ZIDERuntimeManager {
     ProcessBuilder builder = new ProcessBuilder(command);
     Path parent = source.toAbsolutePath().getParent();
     if (parent != null) builder.directory(parent.toFile());
-    return new Launch(builder, null, "Testing script with the current ZenLang definition.");
+    return new Launch(builder, null, "Runtime path: " + runtime);
   }
 
   static String javaCommand() {

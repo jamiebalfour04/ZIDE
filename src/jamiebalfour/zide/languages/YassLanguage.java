@@ -32,6 +32,17 @@ public final class YassLanguage extends LanguageSupport {
     editor.clearKeywords();
     editor.clearContextualKeywords();
     editor.clearAutoCompleteItems();
+    editor.clearAutoCompletionRules();
+    editor.addAutoCompletionRule("if", "if ${condition}\n\t\nend if", 3);
+    editor.addAutoCompletionRule("while", "while ${condition}\n\t\nend while", 6);
+    editor.addAutoCompletionRule("for", "for (${variable} = ${start} to ${end})\n\t\nend for", 5);
+    editor.addAutoCompletionRule("function", "function ${name}()\n\t\nend function", 9);
+    editor.addAutoCompletionRule("class", "class ${name}\n\t\nend class", 6);
+    editor.addAutoCompletionRule("structure", "structure ${name}\n\t\nend structure", 10);
+    editor.addAutoCompletionRule("namespace", "namespace ${name}\n\t\nend namespace", 10);
+    editor.addAutoCompletionRule("try", "try\n\t\ncatch\n\t\nend try", 5);
+    editor.addAutoCompletionRule("switch", "switch ${value}\n\tcase ${case}\n\t\t\nend switch", 7);
+    editor.addAutoCompletionRule("when", "when ${value}\n\tis ${case}\n\t\t\nend when", 5);
     for (String keyword : ZPEKit.getKeywords()) {
       editor.addKeyword(keyword, CodeSyntaxModel.Style.KEYWORD);
       editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword);

@@ -44,6 +44,7 @@ public final class ZpeedyLanguage extends LanguageSupport {
       command.add("-r");
       command.add(temporary.toString());
       ProcessBuilder process = new ProcessBuilder(command);
+      host.configureLanguageProcess("zpeedy", process);
       Path workingDirectory = host.languageResourceDirectory(tab);
       if (workingDirectory != null && Files.isDirectory(workingDirectory)) process.directory(workingDirectory.toFile());
       Path executionSource = temporary;

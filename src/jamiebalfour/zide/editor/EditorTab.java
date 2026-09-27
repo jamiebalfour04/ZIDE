@@ -216,7 +216,8 @@ public class EditorTab extends Tab {
     var area = editor.getEditor();
     String source = area.getText();
     if (source.isEmpty() || variableColours.isEmpty()) return;
-    for (Map.Entry<String, VariableColour> entry : variableColours.entrySet()) {
+    editor.runVisualUpdate(() -> {
+      for (Map.Entry<String, VariableColour> entry : variableColours.entrySet()) {
       Pattern pattern = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(entry.getKey())
               + "(?![A-Za-z0-9_])");
       Matcher matcher = pattern.matcher(source);
@@ -234,7 +235,8 @@ public class EditorTab extends Tab {
           position = spanEnd;
         }
       }
-    }
+      }
+    });
   }
 
   private static String withoutVariableColourStyle(String style) {
@@ -668,15 +670,16 @@ public class EditorTab extends Tab {
     diagnosticHints.clear();
     if (length == 0) return;
 
-    int position = 0;
-    for (var span : area.getStyleSpans(0, length)) {
-      int end = position + span.getLength();
-      try { area.setStyle(position, end, withoutDiagnosticStyle(span.getStyle())); }
-      catch (IllegalArgumentException ignored) { return; }
-      position = end;
-    }
+    editor.runVisualUpdate(() -> {
+      int position = 0;
+      for (var span : area.getStyleSpans(0, length)) {
+        int end = position + span.getLength();
+        try { area.setStyle(position, end, withoutDiagnosticStyle(span.getStyle())); }
+        catch (IllegalArgumentException ignored) { return; }
+        position = end;
+      }
 
-    for (YASSDiagnostic diagnostic : diagnostics) {
+      for (YASSDiagnostic diagnostic : diagnostics) {
       int start = diagnostic.getStartOffset();
       int end = diagnostic.getEndOffset();
       if (start < 0 || start >= length || end <= start) {
@@ -692,9 +695,10 @@ public class EditorTab extends Tab {
       String source = editor.getText();
       while (lineStart > 0 && source.charAt(lineStart - 1) != '\n') lineStart--;
       while (lineEnd < source.length() && source.charAt(lineEnd) != '\n') lineEnd++;
-      diagnosticHints.add(new DiagnosticHint(lineStart, Math.max(lineStart + 1, lineEnd),
-              diagnostic.getLine(), diagnostic.getSeverity().toString(), diagnostic.getMessage()));
-    }
+        diagnosticHints.add(new DiagnosticHint(lineStart, Math.max(lineStart + 1, lineEnd),
+                diagnostic.getLine(), diagnostic.getSeverity().toString(), diagnostic.getMessage()));
+      }
+    });
   }
 
   private static final class HoverTarget {

@@ -117,6 +117,7 @@ public class LanguageSupport implements ZIDELanguage {
       if (prefixArguments != null) command.addAll(prefixArguments);
       command.add(source.toString());
       ProcessBuilder process = new ProcessBuilder(command);
+      host.configureLanguageProcess(runtime, process);
       if (workingDirectory != null && Files.isDirectory(workingDirectory)) process.directory(workingDirectory.toFile());
       Path executionSource = source;
       host.runLanguageProcess(runtime + " > ", displayName, process, () -> {

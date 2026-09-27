@@ -712,6 +712,20 @@
     -fx-background-color: #1b1f26;
 }
 
+/* JavaFX shows the tab overflow control as a separate button. Keep it on the
+   same dark surface as the right-panel tab strip. */
+.app-root.dark .editor-tabs .control-buttons-tab,
+.app-root.dark .editor-tabs .control-buttons-tab .container,
+.app-root.dark .editor-tabs .control-buttons-tab .tab-down-button {
+    -fx-background-color: #1b1f26;
+}
+.app-root.dark .editor-tabs .control-buttons-tab .tab-down-button:hover {
+    -fx-background-color: #303943;
+}
+.app-root.dark .editor-tabs .control-buttons-tab .arrow {
+    -fx-background-color: #cbd5e1;
+}
+
 .right-side-panels {
     -fx-tab-min-width: 92px;
     -fx-tab-max-width: 160px;
@@ -4349,6 +4363,14 @@
 .pdf-toolbar .pdf-file-label {
     -fx-padding: 0 8px 0 2px;
 }
+.pdf-toolbar .separator:vertical {
+    -fx-padding: 0 4px;
+    -fx-background-color: transparent;
+}
+.pdf-toolbar .separator:vertical .line {
+    -fx-border-width: 0 1px 0 0;
+    -fx-border-color: rgba(80, 87, 96, 0.28);
+}
 .pdf-unavailable {
     -fx-alignment: center;
     -fx-text-fill: #707780;
@@ -4361,6 +4383,9 @@
 }
 .app-root.dark .pdf-toolbar .button {
     -fx-text-fill: #e6e9ee;
+}
+.app-root.dark .pdf-toolbar .separator:vertical .line {
+    -fx-border-color: rgba(226, 232, 240, 0.14);
 }
 
 /* ContextMenu popups are separate windows, so the application root is not

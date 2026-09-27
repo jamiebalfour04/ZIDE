@@ -36,6 +36,7 @@ final class ZIDESettingsPanel extends HBox {
   private final CheckBox codeMap;
   private final CheckBox useZpex;
   private final CheckBox showInputPrompt;
+  private final TextField maximumMemory;
   private final CheckBox groupProjectTabs;
   private final CheckBox blockClosures;
   private final CheckBox autoOpenCsvSpreadsheet;
@@ -50,7 +51,7 @@ final class ZIDESettingsPanel extends HBox {
   private final Map<String, TextField> runtimeFields = new LinkedHashMap<>();
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
-                    String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean codeMapValue, boolean preferZpex, boolean showInputPromptValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
+                    String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean codeMapValue, boolean preferZpex, boolean showInputPromptValue, String maximumMemoryValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
                     String collaborationPasswordValue, String collaborationAvatarValue,
@@ -110,9 +111,15 @@ final class ZIDESettingsPanel extends HBox {
     useZpex.setSelected(preferZpex);
     showInputPrompt = new CheckBox("Show a language prompt when input is required");
     showInputPrompt.setSelected(showInputPromptValue);
+    maximumMemory = new TextField(maximumMemoryValue);
+    maximumMemory.setPromptText("Optional, in MB, e.g. 4096");
+    maximumMemory.setMaxWidth(Double.MAX_VALUE);
+    GridPane executionFields = fields();
+    executionFields.addRow(0, new Label("ZPE maximum memory"), maximumMemory);
+    GridPane.setHgrow(maximumMemory, Priority.ALWAYS);
     Label yassTitle = new Label("YASS");
     yassTitle.getStyleClass().add("settings-group-title");
-    VBox yassGroup = new VBox(10, yassTitle, useZpex, showInputPrompt);
+    VBox yassGroup = new VBox(10, yassTitle, useZpex, showInputPrompt, executionFields);
     yassGroup.getStyleClass().add("settings-option-group");
     Label executionTitle = new Label("Execution");
     executionTitle.getStyleClass().add("settings-section-title");
@@ -251,6 +258,7 @@ final class ZIDESettingsPanel extends HBox {
   boolean isCodeMapEnabled() { return codeMap.isSelected(); }
   boolean isZpexPreferred() { return useZpex.isSelected(); }
   boolean isInputPromptEnabled() { return showInputPrompt.isSelected(); }
+  String getMaximumMemory() { return maximumMemory.getText().trim(); }
   boolean isProjectTabGroupingEnabled() { return groupProjectTabs.isSelected(); }
   boolean isBlockClosuresEnabled() { return blockClosures.isSelected(); }
   boolean isAutoOpenCsvSpreadsheetEnabled() { return autoOpenCsvSpreadsheet.isSelected(); }
