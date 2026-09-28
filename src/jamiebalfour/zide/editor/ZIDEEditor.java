@@ -3189,7 +3189,13 @@ public class ZIDEEditor extends Application {
       }
       @Override public void insertText(String text) {
         EditorTab tab = getCurrentTab();
-        if (tab != null && text != null) tab.getEditor().getEditor().replaceSelection(text);
+        if (tab != null && text != null) {
+          org.fxmisc.richtext.InlineCssTextArea area = tab.getEditor().getEditor();
+          int insertionStart = area.getSelection().getStart();
+          area.replaceSelection(text);
+          area.moveTo(insertionStart);
+          area.requestFocus();
+        }
       }
       @Override public void showMessage(String title, String message) { ZIDEEditor.this.showMessage(title, message); }
     });
