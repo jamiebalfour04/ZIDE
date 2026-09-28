@@ -90,6 +90,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -166,6 +167,7 @@ public class ZIDEEditor extends Application {
   Button continueButton;
   Separator debugSeparator;
   private final AtomicBoolean executionRunning = new AtomicBoolean(false);
+  private final ConcurrentLinkedDeque<Process> executionProcesses = new ConcurrentLinkedDeque<>();
   BalfGlassMenuBar.GlassCheckMenuItem darkThemeMenuItem;
   MenuItem runProject;
   MenuItem debugProject;
@@ -6972,15 +6974,27 @@ public class ZIDEEditor extends Application {
     // debugger breakpoint. Destroy the process tree so interpreters which
     // launch a child process do not continue running after Stop is pressed.
     terminateActiveProcess();
-    runBtn.getStyleClass().remove("running");
-    debugBtn.getStyleClass().remove("running");
-    statusLabel.setText("Ready");
-    setExecutionRunning(false);
+    if (!hasLiveExecutionProcess()) {
+      runBtn.getStyleClass().remove("running");
+      debugBtn.getStyleClass().remove("running");
+      statusLabel.setText("Ready");
+      setExecutionRunning(false);
+    }
   }
 
   private void terminateActiveProcess() {
-    Process active = consoleOutputTextArea.getProcess();
+    Process active = null;
+    for (Iterator<Process> iterator = executionProcesses.descendingIterator(); iterator.hasNext();) {
+      Process candidate = iterator.next();
+      if (candidate.isAlive()) {
+        active = candidate;
+        break;
+      }
+      executionProcesses.remove(candidate);
+    }
+    if (active == null) active = consoleOutputTextArea.getProcess();
     if (active == null) return;
+    executionProcesses.remove(active);
 
     try {
       active.toHandle().descendants()
@@ -6993,6 +7007,12 @@ public class ZIDEEditor extends Application {
       // Process handles are not available on every supported runtime.
       active.destroy();
     }
+  }
+
+  private boolean hasLiveExecutionProcess() {
+    executionProcesses.removeIf(process -> !process.isAlive());
+    Process consoleProcess = consoleOutputTextArea == null ? null : consoleOutputTextArea.getProcess();
+    return !executionProcesses.isEmpty() || (consoleProcess != null && consoleProcess.isAlive());
   }
 
   private void setExecutionRunning(boolean running) {
@@ -7011,6 +7031,7 @@ public class ZIDEEditor extends Application {
   private Process runConsoleProcess(String prompt, ProcessBuilder process) throws IOException {
     configureInputPrompt(prompt, process);
     Process started = consoleOutputTextArea.runProcess(process);
+    trackExecutionProcess(started);
     setExecutionRunning(true);
     return started;
   }
@@ -7018,8 +7039,24 @@ public class ZIDEEditor extends Application {
   private Process runConsoleProcess(String prompt, ProcessBuilder process, java.util.function.Consumer<Process> started) throws IOException {
     configureInputPrompt(prompt, process);
     Process result = consoleOutputTextArea.runProcess(process, started);
+    trackExecutionProcess(result);
     setExecutionRunning(true);
     return result;
+  }
+
+  private void trackExecutionProcess(Process process) {
+    if (process == null) return;
+    executionProcesses.addLast(process);
+    process.onExit().thenRun(() -> {
+      executionProcesses.remove(process);
+      Platform.runLater(() -> {
+        if (hasLiveExecutionProcess() || pythonDebugSession != null || javaDebugSession != null || currentBreakpoint != null) return;
+        runBtn.getStyleClass().remove("running");
+        debugBtn.getStyleClass().remove("running");
+        statusLabel.setText("Ready");
+        setExecutionRunning(false);
+      });
+    });
   }
 
   private void configureInputPrompt(String prompt, ProcessBuilder process) {
