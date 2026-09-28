@@ -263,6 +263,7 @@ public class ZIDEEditor extends Application {
   private Node compileScriptMenuItem;
   private Node buildJavaJarMenuItem;
   private Node compileNativeMenuItem;
+  private Button appMenu;
   private Node scriptCompileSeparator;
   private Node scriptTranspileSeparator;
   private Node transpileSubmenuItem;
@@ -3317,6 +3318,7 @@ public class ZIDEEditor extends Application {
     darkThemeEnabled = enabled;
     if (darkThemeMenuItem != null) darkThemeMenuItem.setSelected(enabled);
     if (applicationMenuBar != null) applicationMenuBar.setDarkMode(enabled);
+    FXHelpers.setJBMenuDarkMode(appMenu, enabled);
     if (darkIconsApplied != enabled) {
       invertImages();
       darkIconsApplied = enabled;
@@ -14052,7 +14054,7 @@ public class ZIDEEditor extends Application {
     jbLogo.setFitHeight(20);
     jbLogo.getStyleClass().add("status-bar-brand");
 
-    Button appMenu = FXHelpers.createJBMenu("ZIDE", event -> showAboutPanel(), event -> openSettings(), this::requestApplicationClose);
+    appMenu = FXHelpers.createJBMenu("ZIDE", event -> showAboutPanel(), event -> openSettings(), this::requestApplicationClose);
     FXHelpers.setJBMenuDarkMode(appMenu, darkThemeEnabled);
     if (appMenu != null) {
       appMenu.setGraphic(jbLogo);
