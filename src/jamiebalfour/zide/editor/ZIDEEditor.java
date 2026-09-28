@@ -250,6 +250,7 @@ public class ZIDEEditor extends Application {
   private PythonDebugSession pythonDebugSession;
   private JavaDebugSession javaDebugSession;
   private Node formatDocumentMenuItem;
+  private Node expandShortBlocksMenuItem;
   private Node indentSelectionMenuItem;
   private Node outdentSelectionMenuItem;
   private Node commentSelectionMenuItem;
@@ -2976,6 +2977,7 @@ public class ZIDEEditor extends Application {
     code.separator();
     var refactorMenu = code.submenu("Refactor");
     refactorMenu.createItem("Rename Symbol", "⌘⇧R", this::renameCurrentSymbol);
+    expandShortBlocksMenuItem = refactorMenu.createItem("Expand Short Blocks", "", this::expandShortBlocks);
     refactorMenu.createItem("Extract Variable", "", this::extractVariable);
     refactorMenu.createItem("Extract Function", "", this::extractFunction);
     refactorMenu.createItem("Change Signature", "", this::changeCurrentSignature);
@@ -9655,6 +9657,79 @@ public class ZIDEEditor extends Application {
     return source.substring(start, end);
   }
 
+  private void expandShortBlocks() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || tab.getEditor() == null || !tab.getEditor().isEditable()) return;
+    ZIDELanguage language = languageSupports.get(tab.getLanguageId());
+    if (language == null || !language.supportsShortBlockExpansion()) {
+      showMessage("Expand Short Blocks", "This language does not support brace-delimited blocks.");
+      return;
+    }
+
+    org.fxmisc.richtext.InlineCssTextArea area = tab.getEditor().getEditor();
+    String source = area.getText();
+    int start;
+    int end;
+    if (area.getSelection().getLength() > 0) {
+      start = area.getSelection().getStart();
+      end = area.getSelection().getEnd();
+    } else {
+      int caret = area.getCaretPosition();
+      start = source.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+      int newline = source.indexOf('\n', caret);
+      end = newline < 0 ? source.length() : newline;
+    }
+    String selected = source.substring(start, end);
+    String expanded = expandShortBlockLines(selected);
+    if (expanded.equals(selected)) {
+      showMessage("Expand Short Blocks", "No unbraced short blocks were found in the selected code.");
+      return;
+    }
+    area.replaceText(start, end, expanded);
+  }
+
+  private String expandShortBlockLines(String source) {
+    Pattern control = Pattern.compile("^(\\s*)(if|for|while)\\s*\\((.*)\\)\\s+(.+;\\s*)$");
+    Pattern elseIf = Pattern.compile("^(\\s*)else\\s+if\\s*\\((.*)\\)\\s+(.+;\\s*)$");
+    Pattern elseLine = Pattern.compile("^(\\s*)else\\s+(.+;\\s*)$");
+    String[] lines = source.split("\\n", -1);
+    boolean changed = false;
+    StringBuilder result = new StringBuilder(source.length() + 32);
+    for (int index = 0; index < lines.length; index++) {
+      String line = lines[index];
+      Matcher match = control.matcher(line);
+      String replacement = null;
+      if (match.matches()) {
+        if (!match.group(4).trim().startsWith("{")) {
+          replacement = expandControlLine(match.group(1), match.group(2) + " (" + match.group(3) + ")", match.group(4));
+        }
+      } else {
+        match = elseIf.matcher(line);
+        if (match.matches() && !match.group(3).trim().startsWith("{")) {
+          replacement = expandControlLine(match.group(1), "else if (" + match.group(2) + ")", match.group(3));
+        } else {
+          match = elseLine.matcher(line);
+          if (match.matches() && !match.group(2).trim().startsWith("if ") && !match.group(2).trim().startsWith("{")) {
+            replacement = expandControlLine(match.group(1), "else", match.group(2));
+          }
+        }
+      }
+      if (replacement != null) {
+        result.append(replacement);
+        changed = true;
+      } else {
+        result.append(line);
+      }
+      if (index + 1 < lines.length) result.append('\n');
+    }
+    return changed ? result.toString() : source;
+  }
+
+  private String expandControlLine(String indentation, String header, String body) {
+    String trimmedBody = body.trim();
+    return indentation + header + " {\n" + indentation + "    " + trimmedBody + "\n" + indentation + "}";
+  }
+
   private void renameCurrentSymbol() {
     EditorTab tab = getCurrentTab();
     if (tab == null || !tab.getEditor().isEditable()) return;
@@ -10995,6 +11070,7 @@ public class ZIDEEditor extends Application {
     setMenuItemAvailable(buildJavaJarMenuItem, language != null && "java".equals(language.id()) && isCurrentProjectType("java"));
     setMenuItemAvailable(compileNativeMenuItem, language != null && language.canCompileNative() && isCurrentProjectType("zpe"));
     setMenuItemAvailable(formatDocumentMenuItem, yass);
+    setMenuItemAvailable(expandShortBlocksMenuItem, language != null && language.supportsShortBlockExpansion());
     setMenuItemAvailable(toolsMsiSeparator, yass);
     setMenuItemAvailable(layoutBuilderMenuItem, yass);
     setMenuItemAvailable(toolsLayoutSeparator, yass);

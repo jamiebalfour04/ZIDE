@@ -60,6 +60,10 @@ public interface ZIDELanguage {
   ZIDEEditor.EditorInfo information(String token);
   void run(EditorTab tab);
   default boolean isYass() { return "yass".equals(id()); }
+  /** Whether this language uses brace-delimited blocks for short control statements. */
+  default boolean supportsShortBlockExpansion() {
+    return Set.of("java", "c", "cpp", "js", "typescript", "jsx", "php").contains(id());
+  }
   boolean canRun();
   boolean canCompile();
   boolean canDebug();
