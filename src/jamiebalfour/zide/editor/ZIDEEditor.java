@@ -2872,14 +2872,10 @@ public class ZIDEEditor extends Application {
 
   private File pluginDirectory() {
     File installPlugins = new File(INSTALL_PATH, "plugins");
-    if (installPlugins.isDirectory()) return installPlugins;
+    if (installPlugins.mkdirs() || installPlugins.isDirectory()) return installPlugins;
     File workingPlugins = new File(System.getProperty("user.dir"), "plugins");
-    if (workingPlugins.isDirectory()) return workingPlugins;
-    File userPlugins = new File(System.getProperty("user.home"), ".zide/plugins");
-    for (File candidate : List.of(installPlugins, workingPlugins, userPlugins)) {
-      if (candidate.mkdirs() || candidate.isDirectory()) return candidate;
-    }
-    return userPlugins;
+    if (workingPlugins.mkdirs() || workingPlugins.isDirectory()) return workingPlugins;
+    return installPlugins;
   }
 
   private boolean isWorkspaceContainerRoot(File folder) {
