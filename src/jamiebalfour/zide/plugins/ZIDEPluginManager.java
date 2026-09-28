@@ -19,8 +19,10 @@ public final class ZIDEPluginManager implements AutoCloseable {
   private final List<URLClassLoader> loaders = new ArrayList<>();
   private final List<ZIDEPlugin> plugins = new ArrayList<>();
   private final List<PluginNode> nodes = new ArrayList<>();
+  private ZIDEPluginContext context;
 
   public List<ZIDEPlugin> load(File directory, ZIDEPluginContext context) {
+    this.context = context;
     if (directory == null || !directory.isDirectory()) return List.of();
     File[] files = directory.listFiles(file -> file.isFile() && file.getName().endsWith(".jar"));
     if (files == null) return List.of();
@@ -65,9 +67,17 @@ public final class ZIDEPluginManager implements AutoCloseable {
       nodes.add(new PluginNode(nested.getNode(), languageIds));
       for (ZIDEPluginMenuItem child : item.children()) addItem(nested, child, languageIds);
     } else {
-      Node node = parent.createItem(item.name(), "", item.action());
+      Node node = parent.createItem(item.name(), "", () -> run(item));
       nodes.add(new PluginNode(node, languageIds));
     }
+  }
+
+  private void run(ZIDEPluginMenuItem item) {
+    String languageId = context == null ? null : context.activeLanguageId();
+    Runnable action = languageId == null ? null : item.languageActions().get(languageId);
+    if (action == null && languageId != null) action = item.languageActions().get(languageId.toLowerCase());
+    if (action == null) action = item.action();
+    if (action != null) action.run();
   }
 
   @Override public void close() {
