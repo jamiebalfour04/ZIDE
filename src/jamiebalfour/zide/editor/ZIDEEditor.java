@@ -1666,7 +1666,7 @@ public class ZIDEEditor extends Application {
     stage.setMinHeight(400);
 
   /*  stage.getIcons().add(
-            new Image(Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png")))
+            new Image(Objects.requireNonNull(getClass().getResourceAsStream("/jamiebalfour/balflaf_fx/icons/jb.png")))
     );
 */
     //Application.setUserAgentStylesheet(STYLESHEET_CASPIAN);
@@ -13923,7 +13923,7 @@ public class ZIDEEditor extends Application {
     caretPositionLabel.getStyleClass().addAll("status-text", "caret-position");
     sftpMenuBar = buildSftpMenu();
 
-    ImageView jbLogo = new ImageView(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/files/balflaf_fx/icons/jb.png"))));
+    ImageView jbLogo = new ImageView(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/jamiebalfour/balflaf_fx/icons/jb.png"))));
     jbLogo.setPreserveRatio(true);
     jbLogo.setFitHeight(20);
     jbLogo.getStyleClass().add("status-bar-brand");
