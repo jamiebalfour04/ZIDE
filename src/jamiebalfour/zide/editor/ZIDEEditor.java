@@ -6955,19 +6955,44 @@ public class ZIDEEditor extends Application {
     if (!executionRunning.get()) return;
     if (pythonDebugSession != null) {
       pythonDebugSession.close();
-      consoleOutputTextArea.destroyCurrentProcess();
+      terminateActiveProcess();
       return;
     }
     if (javaDebugSession != null) {
       javaDebugSession.stop();
       return;
     }
-    if (currentBreakpoint == null) {
-      return;
+    if (currentBreakpoint != null) {
+      currentBreakpoint.stopExecution();
+      currentBreakpoint = null;
+      breakpointVariables.clear();
     }
-    currentBreakpoint.stopExecution();
-    currentBreakpoint = null;
-    breakpointVariables.clear();
+
+    // Normal language runs are owned by the interactive console rather than a
+    // debugger breakpoint. Destroy the process tree so interpreters which
+    // launch a child process do not continue running after Stop is pressed.
+    terminateActiveProcess();
+    runBtn.getStyleClass().remove("running");
+    debugBtn.getStyleClass().remove("running");
+    statusLabel.setText("Ready");
+    setExecutionRunning(false);
+  }
+
+  private void terminateActiveProcess() {
+    Process active = consoleOutputTextArea.getProcess();
+    if (active == null) return;
+
+    try {
+      active.toHandle().descendants()
+              .sorted(Comparator.comparingLong(ProcessHandle::pid).reversed())
+              .forEach(handle -> {
+                if (handle.isAlive()) handle.destroyForcibly();
+              });
+      active.destroyForcibly();
+    } catch (UnsupportedOperationException ignored) {
+      // Process handles are not available on every supported runtime.
+      active.destroy();
+    }
   }
 
   private void setExecutionRunning(boolean running) {
