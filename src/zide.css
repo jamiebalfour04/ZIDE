@@ -181,47 +181,6 @@
     -fx-border-color: rgba(0,0,0,0.10);
     -fx-border-width: 1;
 }
-.glass-context-menu {
-    -fx-background-color: #f8f9fb;
-    -fx-background-radius: 12px;
-    -fx-border-radius: 12px;
-    -fx-border-color: rgba(82, 91, 102, 0.42);
-    -fx-border-width: 1px;
-    -fx-padding: 6px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.30), 22, 0.14, 0, 7);
-}
-.glass-context-menu .menu-item {
-    -fx-background-color: transparent;
-    -fx-background-radius: 8px;
-    -fx-padding: 8px 11px;
-}
-.glass-context-menu .menu-item .label {
-    -fx-font-family: "Inter", "Segoe UI", system;
-    -fx-font-size: 13px;
-    -fx-font-weight: normal;
-    -fx-text-fill: #292d33;
-}
-.context-menu .menu-item .language-file-icon,
-.glass-context-menu .menu-item .language-file-icon {
-    -fx-min-width: 36px;
-    -fx-pref-width: 36px;
-    -fx-max-width: 36px;
-    -fx-font-size: 9px;
-    -fx-text-overrun: clip;
-}
-.glass-context-menu .menu-item:hover {
-    -fx-background-color: #dceef5;
-}
-.glass-context-menu .menu-item.project-colour-palette-item:hover,
-.glass-context-menu .menu-item.project-colour-palette-item:focused {
-    -fx-background-color: transparent;
-}
-.glass-context-menu .separator:horizontal .line {
-    -fx-border-color: rgba(82, 91, 102, 0.22) transparent transparent transparent;
-}
-.glass-context-menu .menu-item:disabled .label {
-    -fx-text-fill: #9098a2;
-}
 .code-autocomplete-popup {
     -fx-background-color: #ffffff;
     -fx-background-insets: 0;
@@ -259,33 +218,6 @@
 }
 .app-root.dark .tool-bar .separator:vertical {
     -fx-background-color: #4a525d;
-}
-.app-root.dark .glass-context-menu,
-.glass-context-menu-dark {
-    -fx-background-color: #20252e;
-    -fx-border-color: #4a535f;
-}
-.app-root.dark .glass-context-menu .menu-item .label,
-.glass-context-menu-dark .menu-item .label { -fx-text-fill: #e6e9ee; }
-.app-root.dark .glass-context-menu .menu-item:hover {
-    -fx-background-color: #07566f;
-}
-.glass-context-menu-dark .menu-item:hover {
-    -fx-background-color: #07566f;
-}
-.app-root.dark .glass-context-menu .menu-item.project-colour-palette-item:hover,
-.app-root.dark .glass-context-menu .menu-item.project-colour-palette-item:focused,
-.glass-context-menu-dark .menu-item.project-colour-palette-item:hover,
-.glass-context-menu-dark .menu-item.project-colour-palette-item:focused {
-    -fx-background-color: transparent;
-}
-.app-root.dark .glass-context-menu .separator:horizontal .line,
-.glass-context-menu-dark .separator:horizontal .line {
-    -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
-}
-.app-root.dark .glass-context-menu .menu-item:disabled .label,
-.glass-context-menu-dark .menu-item:disabled .label {
-    -fx-text-fill: #78818d;
 }
 .app-root.dark .button {
     -fx-background-color: rgba(255,255,255,0.06);
@@ -3958,18 +3890,8 @@
     -fx-background-color: #363c46;
 }
 
-.jb-glass-menu-dark {
-    -fx-background-color: #20252e;
-    -fx-background-radius: 12px;
-    -fx-border-color: #4a535f;
-    -fx-border-radius: 12px;
-    -fx-border-width: 1px;
-}
-.jb-glass-menu-dark .menu-item:hover { -fx-background-color: #07566f; }
-.jb-glass-menu-dark .menu-item:hover .label { -fx-text-fill: #ffffff; }
 .jb-menu-content .label,
-.jb-menu-content.dark .label,
-.jb-glass-menu-dark .label {
+.jb-menu-content.dark .label {
     -fx-text-fill: #e6e9ee;
 }
 .jb-menu-button {
@@ -4405,82 +4327,6 @@
 }
 .app-root.dark .pdf-toolbar .separator:vertical .line {
     -fx-border-color: rgba(226, 232, 240, 0.14);
-}
-
-/* ContextMenu popups are separate windows, so the application root is not
-   their CSS ancestor. The explicit popup classes are therefore the source
-   of truth for the glass file/language menus in dark mode. */
-.context-menu.glass-context-menu {
-    -fx-background-color: #f8f9fb;
-    -fx-text-background-color: #202020;
-    -fx-text-base-color: #202020;
-    -fx-text-inner-color: #202020;
-    -fx-background-radius: 12px;
-    -fx-border-radius: 12px;
-    -fx-border-color: rgba(82, 91, 102, 0.42);
-    -fx-border-width: 1px;
-    -fx-padding: 6px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.30), 22, 0.14, 0, 7);
-}
-.context-menu.glass-context-menu-dark {
-    -fx-background-color: #20252e;
-    -fx-text-background-color: #e6e9ee;
-    -fx-text-base-color: #e6e9ee;
-    -fx-text-inner-color: #e6e9ee;
-    -fx-background-radius: 12px;
-    -fx-border-radius: 12px;
-    -fx-border-color: #4a535f;
-    -fx-border-width: 1px;
-    -fx-padding: 6px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.55), 22, 0.18, 0, 7);
-}
-.context-menu.glass-context-menu-dark .menu-item {
-    -fx-background-color: transparent;
-    -fx-background-radius: 8px;
-}
-.context-menu.glass-context-menu-dark .menu-item .label {
-    -fx-text-fill: #e6e9ee;
-}
-
-.context-menu.glass-context-menu .menu-item,
-.context-menu.glass-context-menu-dark .menu-item {
-    -fx-padding: 5px 6px;
-}
-
-.context-menu.glass-context-menu-dark .menu-item:hover,
-.context-menu.glass-context-menu-dark .menu-item:focused {
-    -fx-background-color: #07566f;
-}
-.context-menu.glass-context-menu-dark .menu-item:hover .label,
-.context-menu.glass-context-menu-dark .menu-item:focused .label {
-    -fx-text-fill: #ffffff;
-}
-.context-menu.glass-context-menu .separator-menu-item,
-.context-menu.glass-context-menu-dark .separator-menu-item {
-    -fx-padding: 10px 0;
-    -fx-min-height: 22px;
-    -fx-pref-height: 22px;
-    -fx-max-height: 22px;
-}
-.context-menu.glass-context-menu .separator:horizontal,
-.context-menu.glass-context-menu-dark .separator:horizontal {
-    -fx-padding: 3px;
-}
-.context-menu.glass-context-menu-dark .separator:horizontal .line {
-    -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
-}
-
-/* The bottom-right JB menu needs room around its section dividers and a
-   slightly quieter line inset than the ordinary application menus. */
-.context-menu.jb-glass-menu .separator-menu-item {
-    -fx-padding: 8px 0;
-}
-.context-menu.jb-glass-menu .separator:horizontal .line {
-    -fx-border-width: 1px 0 0 0;
-    -fx-border-color: rgba(82, 91, 102, 0.22) transparent transparent transparent;
-}
-.context-menu.jb-glass-menu.glass-context-menu-dark .separator:horizontal .line {
-    -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
 }
 
 /* Keep every project-tree label readable on the dark tree surface. These

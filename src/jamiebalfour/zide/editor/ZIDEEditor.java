@@ -5,6 +5,8 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import jamiebalfour.balflaf_fx.BalfComboBox;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
+import jamiebalfour.balflaf_fx.BalfGlassContextMenu;
+import jamiebalfour.balflaf_fx.FXHelpers;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
@@ -7579,12 +7581,12 @@ public class ZIDEEditor extends Application {
       MenuItem newFolder = new MenuItem("New Folder");
       newFolder.setOnAction(event -> createProjectFolder(file));
       ContextMenu rootMenu = new ContextMenu(systemExplorer, refreshFolder, newFolder);
-      rootMenu.getStyleClass().add("glass-context-menu");
+      BalfGlassContextMenu.install(rootMenu);
       return rootMenu;
     }
 
     ContextMenu menu = new ContextMenu(open);
-    menu.getStyleClass().add("glass-context-menu");
+    BalfGlassContextMenu.install(menu);
     menu.getItems().add(systemExplorer);
     File repositoryFolder = repositoryFolderFor(file);
     File existingRepository = repositoryFolder == null ? null : findGitRoot(repositoryFolder);
@@ -7654,7 +7656,7 @@ public class ZIDEEditor extends Application {
       }
     }
     menu.getItems().addAll(new SeparatorMenuItem(), rename, delete);
-    menu.setOnShown(event -> applySubmenuContextMenuTheme());
+    BalfGlassContextMenu.install(menu);
     return menu;
   }
 
@@ -7668,23 +7670,7 @@ public class ZIDEEditor extends Application {
   }
 
   private void styleContextMenuPopups() {
-    for (javafx.stage.Window window : javafx.stage.Window.getWindows()) {
-      if (!(window instanceof PopupWindow) || window.getScene() == null) continue;
-      Parent popupRoot = window.getScene().getRoot();
-      if (!popupRoot.getStyleClass().contains("context-menu")) continue;
-      Scene ownerScene = _stage == null ? null : _stage.getScene();
-      if (ownerScene != null) for (String stylesheet : ownerScene.getStylesheets()) {
-        if (!window.getScene().getStylesheets().contains(stylesheet)) {
-          window.getScene().getStylesheets().add(stylesheet);
-        }
-      }
-      if (!popupRoot.getStyleClass().contains("glass-context-menu")) {
-        popupRoot.getStyleClass().add("glass-context-menu");
-      }
-      popupRoot.getStyleClass().remove("glass-context-menu-dark");
-      if (darkThemeEnabled) popupRoot.getStyleClass().add("glass-context-menu-dark");
-      popupRoot.applyCss();
-    }
+    BalfGlassContextMenu.stylePopupWindows(_stage == null ? null : _stage.getScene(), darkThemeEnabled);
   }
 
   /**
@@ -9548,7 +9534,7 @@ public class ZIDEEditor extends Application {
 
   private void installEditorContextMenu(CodeEditorViewFX codeEditor, EditorTab tab) {
     ContextMenu menu = new ContextMenu();
-    menu.getStyleClass().add("glass-context-menu");
+    BalfGlassContextMenu.install(menu);
     MenuItem cut = new MenuItem("Cut");
     cut.setOnAction(event -> cutEditorTextOrLine(codeEditor));
     MenuItem copy = new MenuItem("Copy");
@@ -9609,12 +9595,7 @@ public class ZIDEEditor extends Application {
       goToDefinition.setDisable(symbolTokenForRename(codeEditor).isBlank());
       findUsages.setDisable(symbolTokenForRename(codeEditor).isBlank());
       unfold.setDisable(false);
-      if (isDarkThemeEnabled()) {
-        if (!menu.getStyleClass().contains("glass-context-menu-dark"))
-          menu.getStyleClass().add("glass-context-menu-dark");
-      } else {
-        menu.getStyleClass().remove("glass-context-menu-dark");
-      }
+      BalfGlassContextMenu.setDarkMode(menu, isDarkThemeEnabled());
       menu.show(area, event.getScreenX(), event.getScreenY());
       event.consume();
     });
@@ -12725,7 +12706,7 @@ public class ZIDEEditor extends Application {
       setFocusMode(tab, focusMode.isSelected());
     });
     ContextMenu tabMenu = new ContextMenu(closeOthers, closeLeft, closeRight, closeSaved, new SeparatorMenuItem(), rename, reveal, new SeparatorMenuItem(), focusMode);
-    tabMenu.getStyleClass().add("glass-context-menu");
+    BalfGlassContextMenu.install(tabMenu);
     tabMenu.setOnShowing(event -> focusMode.setSelected(focusModeActive));
 
     closeBtn.setOnContextMenuRequested(e -> {
@@ -13947,7 +13928,8 @@ public class ZIDEEditor extends Application {
     jbLogo.setFitHeight(20);
     jbLogo.getStyleClass().add("status-bar-brand");
 
-    Button appMenu = titleBar == null ? null : titleBar.detachJBMenu();
+    Button appMenu = FXHelpers.createJBMenu("ZIDE", event -> showAboutPanel(), event -> openSettings(), this::requestApplicationClose);
+    FXHelpers.setJBMenuDarkMode(appMenu, darkThemeEnabled);
     if (appMenu != null) {
       appMenu.setGraphic(jbLogo);
       appMenu.setTooltip(new Tooltip("ZIDE menu"));

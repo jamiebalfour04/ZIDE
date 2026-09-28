@@ -2,6 +2,7 @@ package jamiebalfour.zide.editor;
 
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.balflaf_fx.BalfComboBox;
+import jamiebalfour.balflaf_fx.BalfGlassContextMenu;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -560,7 +561,7 @@ public final class ZUILayoutBuilder {
     shell.relocate(offset, offset);
     Item item = new Item(kind, shell, resizeHandle, variableBase(kind) + nextId++);
     ContextMenu menu = new ContextMenu();
-    menu.getStyleClass().add("glass-context-menu");
+    BalfGlassContextMenu.install(menu);
     MenuItem delete = new MenuItem("Delete");
     delete.setOnAction(e -> { select(item); deleteSelected(); });
     menu.getItems().add(delete);
