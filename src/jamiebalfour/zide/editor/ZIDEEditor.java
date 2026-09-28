@@ -23,6 +23,8 @@ import jamiebalfour.zide.git.GitHubApi;
 import jamiebalfour.zide.git.GitHubCredentialStore;
 import jamiebalfour.zide.git.GitHubDeviceFlow;
 import jamiebalfour.zide.languages.*;
+import jamiebalfour.zide.plugins.ZIDEPluginContext;
+import jamiebalfour.zide.plugins.ZIDEPluginManager;
 import jamiebalfour.zpe.core.*;
 import jamiebalfour.zpe.core.exceptions.CompileException;
 import jamiebalfour.zpe.core.interfaces.ZPEType;
@@ -135,6 +137,8 @@ public class ZIDEEditor extends Application {
   final Label statusLabel = new Label("Ready");
   private final Map<String, RuntimeVariable> breakpointVariables = new java.util.concurrent.ConcurrentHashMap<>();
   private final List<Node> transpileMenuItems = new ArrayList<>();
+  private final ZIDEPluginManager pluginManager = new ZIDEPluginManager();
+  private final Map<String, BalfGlassMenuBar.GlassMenu> pluginTargetMenus = new LinkedHashMap<>();
   private final ZIDERuntimeManager zideRuntimes = new ZIDERuntimeManager(Path.of(INSTALL_PATH));
   private final GitHubDeviceFlow githubDeviceFlow = new GitHubDeviceFlow(GitHubDeviceFlow.ZIDE_CLIENT_ID);
   private final GitHubCredentialStore githubCredentials = new GitHubCredentialStore(Path.of(INSTALL_PATH));
@@ -2249,6 +2253,7 @@ public class ZIDEEditor extends Application {
   public void stop() {
     saveWindowSettings();
     stopProjectDirectoryWatcher();
+    pluginManager.close();
     if (ywpPreviewServer != null) {
       ywpPreviewServer.stop(0);
       ywpPreviewServer = null;
@@ -2864,6 +2869,14 @@ public class ZIDEEditor extends Application {
     return new File(System.getProperty("user.home"), "Documents/ZIDE Projects");
   }
 
+  private File pluginDirectory() {
+    File installPlugins = new File(INSTALL_PATH, "plugins");
+    if (installPlugins.isDirectory()) return installPlugins;
+    File workingPlugins = new File(System.getProperty("user.dir"), "plugins");
+    if (workingPlugins.isDirectory()) return workingPlugins;
+    return new File(System.getProperty("user.home"), ".zide/plugins");
+  }
+
   private boolean isWorkspaceContainerRoot(File folder) {
     if (folder == null) {
       return false;
@@ -3152,6 +3165,34 @@ public class ZIDEEditor extends Application {
     help.createItem("Download ZPE Runtime Environment", "", this::downloadZPERuntime);
     help.createItem("Download ZPE Native", "", this::downloadZPENative);
     help.createItem("Log", "", this::showLanguageLog);
+
+    pluginTargetMenus.put("File", file);
+    pluginTargetMenus.put("Edit", edit);
+    pluginTargetMenus.put("Code", code);
+    pluginTargetMenus.put("Project", projectMenu);
+    pluginTargetMenus.put("View", viewMenu);
+    pluginTargetMenus.put("Script", scriptMenu);
+    pluginTargetMenus.put("Tools", tools);
+    pluginTargetMenus.put("Git", gitMenu);
+    pluginTargetMenus.put("ZPE Online", zpeOnlineMenu);
+    pluginTargetMenus.put("Help", help);
+    pluginManager.load(pluginDirectory(), new ZIDEPluginContext() {
+      @Override public String activeLanguageId() {
+        EditorTab tab = getCurrentTab();
+        return tab == null ? null : tab.getLanguageId();
+      }
+      @Override public String selectedText() {
+        EditorTab tab = getCurrentTab();
+        return tab == null ? "" : tab.getEditor().getSelectedText();
+      }
+      @Override public void insertText(String text) {
+        EditorTab tab = getCurrentTab();
+        if (tab != null && text != null) tab.getEditor().getEditor().replaceSelection(text);
+      }
+      @Override public void showMessage(String title, String message) { ZIDEEditor.this.showMessage(title, message); }
+    });
+    pluginManager.installMenus(pluginTargetMenus);
+    pluginManager.updateLanguage(null);
 
     updateLanguageCommands(null);
     bar.setDarkMode(darkThemeEnabled);
@@ -10913,6 +10954,7 @@ public class ZIDEEditor extends Application {
   }
 
   private void updateLanguageCommands(ZIDELanguage language) {
+    pluginManager.updateLanguage(language == null ? null : language.id());
     if (unfoldPanel != null) unfoldPanel.follow(getCurrentTab());
     EditorTab currentTab = getCurrentTab();
     if (currentTab != null && currentTab.getEditor() != null) {
