@@ -94,6 +94,7 @@ import java.util.function.IntFunction;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.time.Instant;
 
 import static jamiebalfour.zide.editor.ZIDERuntimeManager.javaCommand;
@@ -245,6 +246,8 @@ public class ZIDEEditor extends Application {
   private Node formatDocumentMenuItem;
   private Node indentSelectionMenuItem;
   private Node outdentSelectionMenuItem;
+  private Node commentSelectionMenuItem;
+  private Node uncommentSelectionMenuItem;
   private Node runScriptMenuItem;
   private Node htmlPreviewMenuItem;
   private Node ywpPreviewMenuItem;
@@ -2943,27 +2946,27 @@ public class ZIDEEditor extends Application {
 
     edit.createItem("Word Colours", "", this::showProjectWordColours);
 
-    formatDocumentMenuItem = edit.createItem("Format document", "", this::beautifyCurrentDocument);
-
     var code = bar.menu("Code");
+    formatDocumentMenuItem = code.createItem("Format document", "", this::beautifyCurrentDocument);
+    commentSelectionMenuItem = code.createItem("Comment Selection", "⌘/", () -> commentCurrentSelection(false));
+    uncommentSelectionMenuItem = code.createItem("Uncomment Selection", "⌘\\", () -> commentCurrentSelection(true));
+    code.separator();
     indentSelectionMenuItem = code.createItem("Indent Selection", "", () -> indentCurrentSelection(false));
     outdentSelectionMenuItem = code.createItem("Outdent Selection", "", () -> indentCurrentSelection(true));
     setMenuItemEnabled(indentSelectionMenuItem, false);
     setMenuItemEnabled(outdentSelectionMenuItem, false);
     code.separator();
+    code.createItem("Go to Definition", "⌘B", this::goToDefinition, true);
+    code.createItem("Find Usages", "", this::findUsages);
+    code.separator();
     var refactorMenu = code.submenu("Refactor");
-    Node safeRenameMenuItem = refactorMenu.createItem("Safe Rename file", "", () -> {
-      // Safe rename will be added with the reference index.
-    });
-    Node removeReferencesMenuItem = refactorMenu.createItem("Remove References to File", "", () -> {
-      // Reference removal will be added with the reference index.
-    });
-    Node safeDeleteMenuItem = refactorMenu.createItem("Safe Delete file", "", () -> {
-      // Safe deletion will be added with the reference index.
-    });
-    setMenuItemAvailable(safeRenameMenuItem, false);
-    setMenuItemAvailable(removeReferencesMenuItem, false);
-    setMenuItemAvailable(safeDeleteMenuItem, false);
+    refactorMenu.createItem("Rename Symbol", "⌘⇧R", this::renameCurrentSymbol);
+    refactorMenu.createItem("Extract Variable", "", this::extractVariable);
+    refactorMenu.createItem("Extract Function", "", this::extractFunction);
+    refactorMenu.createItem("Change Signature", "", this::changeCurrentSignature);
+    refactorMenu.createItem("Safe Rename File", "", this::safeRenameCurrentFile);
+    refactorMenu.createItem("Remove References to File", "", this::removeReferencesToCurrentFile);
+    refactorMenu.createItem("Safe Delete File", "", this::safeDeleteCurrentFile);
 
     projectMenu = bar.menu("Project");
     projectMenu.createItem("Edit project settings", "", this::editCurrentProjectSettings);
@@ -7625,17 +7628,17 @@ public class ZIDEEditor extends Application {
       MenuItem newFile = new MenuItem("New File");
       newFile.setOnAction(event -> newFile());
       menu.getItems().addAll(new SeparatorMenuItem(), refreshFolder, newFolder, colourMenu);
+      if (isProjectRoot(file)) {
+        MenuItem editSettings = new MenuItem("Edit project settings");
+        editSettings.setOnAction(event -> openProjectSettings(file));
+        menu.getItems().add(editSettings);
+      }
       // Keep the most common folder action at the top, with a clear visual
       // break before the folder/file navigation actions.
       menu.getItems().add(0, newFile);
       menu.getItems().add(1, new SeparatorMenuItem());
       long yassCount = Arrays.stream(file.listFiles() == null ? new File[0] : file.listFiles()).filter(f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".yas") && !f.getName().equalsIgnoreCase(".project.yas")).count();
       File manifest = new File(file, ".project.yas");
-      if (manifest.isFile()) {
-        MenuItem editManifest = new MenuItem("Edit project settings");
-        editManifest.setOnAction(event -> openProjectManifest(manifest.toPath()));
-        menu.getItems().add(editManifest);
-      }
       if (yassCount > 1 && !manifest.exists()) {
         MenuItem createManifest = new MenuItem("Create .project.yas");
         createManifest.setOnAction(event -> {
@@ -7826,8 +7829,12 @@ public class ZIDEEditor extends Application {
     TextField nameField = new TextField(file.getName());
     nameField.setPromptText("New name");
     nameField.setMaxWidth(Double.MAX_VALUE);
+    CheckBox safeRename = new CheckBox("Safe rename references across the project");
+    safeRename.setSelected(true);
+    safeRename.setVisible(!file.isDirectory());
+    safeRename.setManaged(!file.isDirectory());
     Label validation = modalValidationLabel();
-    VBox content = new VBox(8, new Label("New name"), nameField, validation);
+    VBox content = new VBox(8, new Label("New name"), nameField, safeRename, validation);
     content.setPrefWidth(440);
 
     showInWindowModal(file.isDirectory() ? "Rename Folder" : "Rename File", "Rename " + file.getName(), content, "Rename", () -> {
@@ -7848,6 +7855,8 @@ public class ZIDEEditor extends Application {
       try {
         Files.move(source, destination);
         updateOpenTabPaths(source, destination);
+        updateOpenProjectSettingsFileNames(source, destination);
+        if (safeRename.isSelected()) updateProjectFileReferences(source, destination);
         refreshTree();
         return true;
       } catch (IOException exception) {
@@ -7862,12 +7871,224 @@ public class ZIDEEditor extends Application {
     });
   }
 
+  private File currentRefactorFile() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || tab.getPath() == null || tab.getPath().isBlank()) return null;
+    File file = new File(tab.getPath());
+    return file.isFile() ? file : null;
+  }
+
+  private void safeRenameCurrentFile() {
+    File file = currentRefactorFile();
+    if (file == null) {
+      showMessage("Safe Rename File", "Open a project file before using Safe Rename File.");
+      return;
+    }
+    renameProjectFile(file);
+  }
+
+  private void safeDeleteCurrentFile() {
+    File file = currentRefactorFile();
+    if (file == null) {
+      showMessage("Safe Delete File", "Open a project file before using Safe Delete File.");
+      return;
+    }
+    deleteProjectFile(file);
+  }
+
+  private void removeReferencesToCurrentFile() {
+    File file = currentRefactorFile();
+    if (file == null) {
+      showMessage("Remove References", "Open a project file before removing references.");
+      return;
+    }
+    Path path = file.toPath().toAbsolutePath().normalize();
+    List<String> references = findProjectFileReferences(path);
+    references.removeIf(reference -> !reference.equalsIgnoreCase(".zide.project") && !reference.equalsIgnoreCase(".project.yas"));
+    if (references.isEmpty()) {
+      showMessage("Remove References", "No references to " + file.getName() + " were found in the project settings.");
+      return;
+    }
+    ListView<String> referenceList = new ListView<>(FXCollections.observableArrayList(references));
+    referenceList.getStyleClass().add("project-reference-list");
+    referenceList.setPrefHeight(Math.min(180, Math.max(56, references.size() * 28)));
+    Label detail = new Label("Remove this file from the project settings references in:");
+    detail.setWrapText(true);
+    VBox content = new VBox(8, detail, referenceList);
+    content.setPrefWidth(460);
+    showInWindowModal("Remove References", "Remove references to " + file.getName(), content, "Remove", () -> {
+      removeProjectSettingsReferences(path);
+      return true;
+    });
+    setActiveModalWidth(520);
+  }
+
+  private void updateProjectFileReferences(Path source, Path destination) {
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    if (root == null || !Files.isDirectory(root)) return;
+    Path normalizedSource = source.toAbsolutePath().normalize();
+    Path normalizedDestination = destination.toAbsolutePath().normalize();
+    if (!normalizedSource.startsWith(root) || !normalizedDestination.startsWith(root)) return;
+    ZIDELanguage language = languageSupportForFile(source.toString());
+    String oldName = normalizedSource.getFileName().toString();
+    String newName = normalizedDestination.getFileName().toString();
+    String oldRelative = root.relativize(normalizedSource).toString().replace('\\', '/');
+    String newRelative = root.relativize(normalizedDestination).toString().replace('\\', '/');
+    String oldRelativeWindows = oldRelative.replace('/', '\\');
+    String newRelativeWindows = newRelative.replace('/', '\\');
+    try (var paths = Files.walk(root)) {
+      for (Path path : paths.filter(Files::isRegularFile)
+          .filter(candidate -> !candidate.startsWith(root.resolve(".git")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("build")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("out")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("target")))
+          .filter(candidate -> candidate.getFileName().toString().equals(".zide.project")
+              || (language != null && language.extensions().contains(fileExtension(candidate))))
+          .toList()) {
+        Path normalized = path.toAbsolutePath().normalize();
+        EditorTab open = openTabForPath(normalized);
+        String original;
+        try {
+          original = open == null ? Files.readString(path, StandardCharsets.UTF_8) : open.getEditor().getText();
+        } catch (IOException ignored) {
+          continue;
+        }
+        String updated = original.replace(oldRelative, newRelative)
+            .replace(oldRelativeWindows, newRelativeWindows)
+            .replace(oldName, newName);
+        if (original.equals(updated)) continue;
+        if (open == null) Files.writeString(path, updated, StandardCharsets.UTF_8);
+        else open.getEditor().getEditor().replaceText(updated);
+      }
+    } catch (IOException ignored) {
+      // The file has already been renamed; leave any references that could not be read unchanged.
+    }
+  }
+
+  private void updateOpenProjectSettingsFileNames(Path source, Path destination) {
+    String oldName = source.getFileName().toString();
+    String newName = destination.getFileName().toString();
+    for (Tab tab : new ArrayList<>(allEditorTabs)) {
+      ListView<String> available = projectSettingsList(tab, "project-settings-available");
+      ListView<String> selected = projectSettingsList(tab, "project-settings-selected");
+      replaceProjectSettingsFileName(available, oldName, newName);
+      replaceProjectSettingsFileName(selected, oldName, newName);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private ListView<String> projectSettingsList(Tab tab, String property) {
+    Object value = tab.getProperties().get(property);
+    return value instanceof ListView<?> ? (ListView<String>) value : null;
+  }
+
+  private void replaceProjectSettingsFileName(ListView<String> list, String oldName, String newName) {
+    if (list == null) return;
+    for (int index = 0; index < list.getItems().size(); index++) {
+      if (oldName.equals(list.getItems().get(index))) list.getItems().set(index, newName);
+    }
+  }
+
+  private void removeProjectSettingsReferences(Path deletedPath) {
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    Path normalized = deletedPath.toAbsolutePath().normalize();
+    if (root == null || !normalized.startsWith(root)) return;
+    String deletedName = normalized.getFileName().toString();
+    for (Tab tab : new ArrayList<>(allEditorTabs)) {
+      removeProjectSettingsFileName(projectSettingsList(tab, "project-settings-available"), deletedName);
+      removeProjectSettingsFileName(projectSettingsList(tab, "project-settings-selected"), deletedName);
+    }
+
+    Path metadata = root.resolve(".zide.project");
+    if (Files.isRegularFile(metadata)) {
+      List<String> includes = loadProjectIncludes(root);
+      List<String> retained = includes.stream()
+          .filter(include -> !projectIncludeMatches(include, deletedName))
+          .toList();
+      if (retained.size() != includes.size()) {
+        try {
+          writeProjectMetadataWithIncludes(root, retained);
+        } catch (IOException ignored) {
+        }
+      }
+    }
+
+    Path manifest = root.resolve(".project.yas");
+    if (Files.isRegularFile(manifest)) {
+      try {
+        List<String> lines = Files.readAllLines(manifest, StandardCharsets.UTF_8);
+        List<String> retained = lines.stream().filter(line -> {
+          String trimmed = line.trim();
+          if (!trimmed.matches("(?i)^includes?\\s+.+")) return true;
+          String value = trimmed.replaceFirst("(?i)^includes?\\s+", "").trim();
+          if (value.startsWith("\"") && value.endsWith("\"")) value = value.substring(1, value.length() - 1);
+          return !projectIncludeMatches(value, deletedName);
+        }).toList();
+        if (retained.size() != lines.size()) Files.writeString(manifest, String.join(System.lineSeparator(), retained) + System.lineSeparator(), StandardCharsets.UTF_8);
+      } catch (IOException ignored) {
+      }
+    }
+  }
+
+  private void removeProjectSettingsFileName(ListView<String> list, String deletedName) {
+    if (list != null) list.getItems().removeIf(deletedName::equals);
+  }
+
+  private boolean projectIncludeMatches(String include, String fileName) {
+    try {
+      return fileName.equals(Path.of(include).getFileName().toString());
+    } catch (InvalidPathException ignored) {
+      return false;
+    }
+  }
+
   private void deleteProjectFile(File file) {
     if (isProjectRoot(file)) return;
-    if (!confirmInWindow("Delete", "Delete " + file.getName() + "?", file.isDirectory() ? "This permanently deletes the folder and everything inside it." : "This permanently deletes the file.", "Delete"))
-      return;
-
+    CheckBox safeDelete = new CheckBox("Safe delete references from project settings");
+    safeDelete.setSelected(true);
     Path path = file.toPath().toAbsolutePath().normalize();
+    List<String> references = findProjectFileReferences(path);
+    Label referenceSummary = new Label(references.isEmpty()
+        ? "No project references were found."
+        : "References found in " + references.size() + " project file" + (references.size() == 1 ? "." : "s:") );
+    referenceSummary.setWrapText(true);
+    ListView<String> referenceList = new ListView<>(FXCollections.observableArrayList(references));
+    referenceList.getStyleClass().add("project-reference-list");
+    referenceList.setPrefHeight(Math.min(180, Math.max(56, references.size() * 28)));
+    referenceList.setVisible(!references.isEmpty());
+    referenceList.setManaged(!references.isEmpty());
+    safeDelete.selectedProperty().addListener((observable, wasSelected, isSelected) -> {
+      referenceSummary.setVisible(isSelected);
+      referenceSummary.setManaged(isSelected);
+      referenceList.setVisible(isSelected && !references.isEmpty());
+      referenceList.setManaged(isSelected && !references.isEmpty());
+    });
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(8,
+        new Label(file.isDirectory() ? "This permanently deletes the folder and everything inside it." : "This permanently deletes the file."),
+        safeDelete, referenceSummary, referenceList, validation);
+    content.setPrefWidth(460);
+    Object nestedLoop = new Object();
+    AtomicBoolean confirmed = new AtomicBoolean(false);
+    AtomicBoolean loopExited = new AtomicBoolean(false);
+    Runnable exitLoop = () -> {
+      if (loopExited.compareAndSet(false, true)) Platform.exitNestedEventLoop(nestedLoop, null);
+    };
+    showInWindowModal("Delete", "Delete " + file.getName() + "?", content, List.of(
+        new ModalAction("Cancel", false, () -> {
+          exitLoop.run();
+          return true;
+        }),
+        new ModalAction("Delete", true, () -> {
+          confirmed.set(true);
+          exitLoop.run();
+          return true;
+        })));
+    setActiveModalWidth(520);
+    activeModalDismiss = exitLoop;
+    Platform.enterNestedEventLoop(nestedLoop);
+    if (!confirmed.get()) return;
+
     try {
       try (java.util.stream.Stream<Path> paths = Files.walk(path)) {
         paths.sorted(Comparator.reverseOrder()).forEach(child -> {
@@ -7879,11 +8100,49 @@ public class ZIDEEditor extends Application {
         });
       }
       closeTabsUnder(path);
+      if (safeDelete.isSelected()) removeProjectSettingsReferences(path);
       refreshTree();
     } catch (IOException | UncheckedIOException exception) {
       Throwable cause = exception instanceof UncheckedIOException ? exception.getCause() : exception;
       showProjectFileError("Could not delete the item: " + cause.getMessage());
     }
+  }
+
+  private List<String> findProjectFileReferences(Path target) {
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    Path normalizedTarget = target.toAbsolutePath().normalize();
+    if (root == null || !Files.isDirectory(root) || !normalizedTarget.startsWith(root) || Files.isDirectory(normalizedTarget)) return List.of();
+    ZIDELanguage language = languageSupportForFile(normalizedTarget.toString());
+    String fileName = normalizedTarget.getFileName().toString();
+    String relative = root.relativize(normalizedTarget).toString().replace('\\', '/');
+    String windowsRelative = relative.replace('/', '\\');
+    Set<String> references = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    try (var paths = Files.walk(root)) {
+      for (Path candidate : paths.filter(Files::isRegularFile)
+          .filter(path -> !path.startsWith(root.resolve(".git")))
+          .filter(path -> !path.startsWith(root.resolve("build")))
+          .filter(path -> !path.startsWith(root.resolve("out")))
+          .filter(path -> !path.startsWith(root.resolve("target")))
+          .filter(path -> !path.toAbsolutePath().normalize().equals(normalizedTarget))
+          .filter(path -> path.getFileName().toString().equals(".zide.project")
+              || path.getFileName().toString().equals(".project.yas")
+              || (language != null && language.extensions().contains(fileExtension(path))))
+          .toList()) {
+        Path normalizedCandidate = candidate.toAbsolutePath().normalize();
+        EditorTab open = openTabForPath(normalizedCandidate);
+        String source;
+        try {
+          source = open == null ? Files.readString(candidate, StandardCharsets.UTF_8) : open.getEditor().getText();
+        } catch (IOException ignored) {
+          continue;
+        }
+        if (source.contains(relative) || source.contains(windowsRelative) || source.contains(fileName)) {
+          references.add(root.relativize(normalizedCandidate).toString().replace('\\', '/'));
+        }
+      }
+    } catch (IOException ignored) {
+    }
+    return new ArrayList<>(references);
   }
 
   private void revealProjectFile(File file) {
@@ -8323,6 +8582,7 @@ public class ZIDEEditor extends Application {
       }
       updateTabHeaderVisibility(rightSidePanels);
       updateEditorRightPanelLayout();
+      if (!restoringEditorLayout) savePanelPreferences();
       scheduleEditorLayoutSave();
     });
     rightSidePanels.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -8873,6 +9133,18 @@ public class ZIDEEditor extends Application {
     savePanelPreferences();
   }
 
+  private void openUnfoldPanelFromContext() {
+    EditorTab tab = getCurrentTab();
+    if (rightSidePanels == null || unfoldPanel == null) return;
+    if (!rightSidePanels.getTabs().contains(unfoldDockTab)) rightSidePanels.getTabs().add(unfoldDockTab);
+    if (unfoldPanel.isOpen()) unfoldPanel.follow(tab);
+    else unfoldPanel.toggle(tab);
+    rightSidePanels.getSelectionModel().select(unfoldDockTab);
+    unfoldPanelVisible = true;
+    if (unfoldMenuItem != null) unfoldMenuItem.setSelected(true);
+    savePanelPreferences();
+  }
+
   private void toggleByteCodePanel() {
     if (rightSidePanels.getTabs().contains(byteCodeDockTab) && rightSidePanels.getSelectionModel().getSelectedItem() == byteCodeDockTab) {
       rightSidePanels.getTabs().remove(byteCodeDockTab);
@@ -9286,17 +9558,33 @@ public class ZIDEEditor extends Application {
     MenuItem format = new MenuItem("Format document");
     format.setOnAction(event -> beautifyDocument(tab));
     MenuItem unfold = new MenuItem("Unfold");
-    unfold.setOnAction(event -> explainCodeSnippet(tab, selectedCodeOrCurrentLine(codeEditor)));
+    unfold.setOnAction(event -> openUnfoldPanelFromContext());
+    MenuItem renameSymbol = new MenuItem("Rename Symbol");
+    renameSymbol.setOnAction(event -> renameCurrentSymbol());
+    MenuItem goToDefinition = new MenuItem("Go to Definition");
+    goToDefinition.setOnAction(event -> goToDefinition());
+    MenuItem findUsages = new MenuItem("Find Usages");
+    findUsages.setOnAction(event -> findUsages());
+    MenuItem commentSelection = new MenuItem("Comment Selection");
+    commentSelection.setOnAction(event -> commentCurrentSelection(false));
+    MenuItem uncommentSelection = new MenuItem("Uncomment Selection");
+    uncommentSelection.setOnAction(event -> commentCurrentSelection(true));
     MenuItem spreadsheet = new MenuItem("Open as Spreadsheet");
     spreadsheet.setOnAction(event -> showCsvSpreadsheet(tab));
     MenuItem variableColour = new MenuItem("Set Word Colours");
     variableColour.setOnAction(event -> showVariableColourDialog(tab, variableTokenAt(codeEditor)));
-    menu.getItems().addAll(cut, copy, paste, new SeparatorMenuItem(), format, unfold, spreadsheet, new SeparatorMenuItem(), variableColour);
+    menu.getItems().addAll(cut, copy, paste, new SeparatorMenuItem(), format, commentSelection, uncommentSelection, unfold, renameSymbol, goToDefinition, findUsages, spreadsheet, new SeparatorMenuItem(), variableColour);
 
     var area = codeEditor.getEditor();
     area.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
       if (event.isShortcutDown() && !event.isAltDown() && !event.isShiftDown() && event.getCode() == KeyCode.C) {
         copyEditorTextOrLine(codeEditor);
+        event.consume();
+      } else if (event.isShortcutDown() && event.isShiftDown() && !event.isAltDown() && event.getCode() == KeyCode.R) {
+        renameCurrentSymbol();
+        event.consume();
+      } else if (event.isShortcutDown() && !event.isShiftDown() && !event.isAltDown() && event.getCode() == KeyCode.B) {
+        goToDefinition();
         event.consume();
       }
     });
@@ -9312,9 +9600,14 @@ public class ZIDEEditor extends Application {
       copy.setDisable(codeEditor.getText().isEmpty());
       paste.setDisable(!editable || !Clipboard.getSystemClipboard().hasString());
       format.setDisable(!editable || !"yass".equals(tab.getLanguageId()));
+      commentSelection.setDisable(!editable || codeEditor.getSelection().getLength() == 0);
+      uncommentSelection.setDisable(!editable || codeEditor.getSelection().getLength() == 0);
       spreadsheet.setVisible("csv".equals(tab.getLanguageId()));
       String variable = variableTokenAt(codeEditor);
       variableColour.setDisable(variable.isBlank());
+      renameSymbol.setDisable(symbolTokenForRename(codeEditor).isBlank());
+      goToDefinition.setDisable(symbolTokenForRename(codeEditor).isBlank());
+      findUsages.setDisable(symbolTokenForRename(codeEditor).isBlank());
       unfold.setDisable(false);
       if (isDarkThemeEnabled()) {
         if (!menu.getStyleClass().contains("glass-context-menu-dark"))
@@ -9338,6 +9631,664 @@ public class ZIDEEditor extends Application {
     while (start > 0 && isVariableTokenCharacter(source.charAt(start - 1))) start--;
     while (end < source.length() && isVariableTokenCharacter(source.charAt(end))) end++;
     return source.substring(start, end);
+  }
+
+  private void renameCurrentSymbol() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || !tab.getEditor().isEditable()) return;
+    CodeEditorViewFX codeEditor = tab.getEditor();
+    String symbol = symbolTokenForRename(codeEditor);
+    if (symbol.isBlank()) {
+      showMessage("Rename Symbol", "Place the caret on a symbol or select one first.");
+      return;
+    }
+
+    TextField nameField = new TextField(symbol);
+    nameField.setPromptText("New symbol name");
+    nameField.setMaxWidth(Double.MAX_VALUE);
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(8, new Label("Rename in matching project files"), nameField, validation);
+    content.setPrefWidth(440);
+    boolean variable = symbol.startsWith("$");
+    showInWindowModal("Rename Symbol", "Rename \"" + symbol + "\" throughout this project", content, "Rename", () -> {
+      String replacement = nameField.getText().trim();
+      String pattern = variable ? "\\$-?[A-Za-z_][A-Za-z0-9_]*" : "[A-Za-z_][A-Za-z0-9_]*";
+      if (!replacement.matches(pattern)) {
+        showModalValidation(validation, variable
+            ? "Use a variable name such as $new_name."
+            : "Use a name containing letters, numbers, and underscores.");
+        return false;
+      }
+      if (replacement.equals(symbol)) return true;
+      return renameSymbolAcrossProject(tab, symbol, replacement, validation);
+    });
+    setActiveModalWidth(520);
+    Platform.runLater(() -> {
+      nameField.requestFocus();
+      nameField.selectAll();
+    });
+  }
+
+  private void extractVariable() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || !tab.getEditor().isEditable()) return;
+    CodeEditorViewFX editor = tab.getEditor();
+    IndexRange selection = editor.getSelection();
+    String selected = editor.getSelectedText();
+    if (selection.getLength() == 0 || selected == null || selected.isBlank()) {
+      showMessage("Extract Variable", "Select an expression before extracting a variable.");
+      return;
+    }
+    if (!supportsVariableExtraction(tab.getLanguageId())) {
+      showMessage("Extract Variable", "Variable extraction is not supported for " + tab.getLanguageId() + " files yet.");
+      return;
+    }
+    TextField name = new TextField(defaultExtractVariableName(tab.getLanguageId()));
+    name.setPromptText("Variable name");
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(8, new Label("Variable name"), name, validation);
+    content.setPrefWidth(440);
+    showInWindowModal("Extract Variable", "Extract the selected expression", content, "Extract", () -> {
+      String variable = name.getText().trim();
+      if (!validExtractName(variable, tab.getLanguageId())) {
+        showModalValidation(validation, "Choose a valid variable name for this language.");
+        return false;
+      }
+      String source = editor.getText();
+      int lineStart = source.lastIndexOf('\n', Math.max(0, selection.getStart() - 1)) + 1;
+      String indentation = lineIndent(source, lineStart);
+      String declaration = extractVariableDeclaration(tab.getLanguageId(), variable, selected.trim());
+      String updated = source.substring(0, lineStart) + indentation + declaration + "\n" + source.substring(lineStart, selection.getStart())
+          + variable + source.substring(selection.getEnd());
+      editor.getEditor().replaceText(updated);
+      return true;
+    });
+    setActiveModalWidth(520);
+    Platform.runLater(() -> {
+      name.requestFocus();
+      name.selectAll();
+    });
+  }
+
+  private void changeCurrentSignature() {
+    EditorTab origin = getCurrentTab();
+    if (origin == null || !origin.getEditor().isEditable()) return;
+    String symbol = symbolTokenForRename(origin.getEditor());
+    if (symbol.isBlank()) {
+      showMessage("Change Signature", "Place the caret on a function name first.");
+      return;
+    }
+    DefinitionLocation definition = findDefinition(origin, symbol);
+    if (definition == null || definition.path() == null) {
+      showMessage("Change Signature", "Place the caret on a supported function definition or call.");
+      return;
+    }
+    String languageId = origin.getLanguageId();
+    if (!languageSupports.containsKey(languageId)) {
+      showMessage("Change Signature", "Signature changes are not supported for " + languageId + " files yet.");
+      return;
+    }
+    Path path = definition.path();
+    EditorTab definitionTab = openTabForPath(path);
+    String source;
+    try {
+      source = definitionTab == null ? Files.readString(path, StandardCharsets.UTF_8) : definitionTab.getEditor().getText();
+    } catch (IOException exception) {
+      showMessage("Change Signature", "Could not read the function definition: " + exception.getMessage());
+      return;
+    }
+    if (!functionDeclarationAt(source, definition.offset())) {
+      showMessage("Change Signature", "Place the caret on a supported function definition or call.");
+      return;
+    }
+    int[] range = signatureParameterRange(source, definition.offset());
+    if (range == null) {
+      showMessage("Change Signature", "Could not locate the function parameter list.");
+      return;
+    }
+    TextField parameters = new TextField(source.substring(range[0] + 1, range[1]).trim());
+    parameters.setPromptText("parameter, other_parameter");
+    Label validation = modalValidationLabel();
+    Label note = new Label("This updates the function declaration. Review its call sites if the parameter count changes.");
+    note.setWrapText(true);
+    VBox content = new VBox(8, new Label("Parameters"), parameters, note, validation);
+    content.setPrefWidth(560);
+    showInWindowModal("Change Signature", "Change " + symbol + " parameters", content, "Apply", () -> {
+      String updatedParameters = parameters.getText().trim();
+      if (!validParameterList(updatedParameters)) {
+        showModalValidation(validation, "Use a comma-separated parameter list without unmatched brackets or new lines.");
+        return false;
+      }
+      String updated = source.substring(0, range[0] + 1) + updatedParameters + source.substring(range[1]);
+      try {
+        if (definitionTab == null) Files.writeString(path, updated, StandardCharsets.UTF_8);
+        else definitionTab.getEditor().getEditor().replaceText(updated);
+        statusLabel.setText("Function signature changed");
+        return true;
+      } catch (IOException exception) {
+        showModalValidation(validation, "Could not update the function: " + exception.getMessage());
+        return false;
+      }
+    });
+    setActiveModalWidth(620);
+    Platform.runLater(() -> {
+      parameters.requestFocus();
+      parameters.selectAll();
+    });
+  }
+
+  private int[] signatureParameterRange(String source, int definitionOffset) {
+    int lineEnd = source.indexOf('\n', Math.max(0, definitionOffset));
+    if (lineEnd < 0) lineEnd = source.length();
+    int open = source.indexOf('(', Math.max(0, definitionOffset));
+    if (open < 0 || open >= lineEnd) return null;
+    int depth = 0;
+    for (int index = open; index < lineEnd; index++) {
+      char character = source.charAt(index);
+      if (character == '(') depth++;
+      else if (character == ')' && --depth == 0) return new int[]{open, index};
+    }
+    return null;
+  }
+
+  private boolean validParameterList(String parameters) {
+    int parentheses = 0, brackets = 0, braces = 0;
+    for (int index = 0; index < parameters.length(); index++) {
+      char character = parameters.charAt(index);
+      if (character == '\n' || character == '\r') return false;
+      if (character == '(') parentheses++;
+      if (character == ')') parentheses--;
+      if (character == '[') brackets++;
+      if (character == ']') brackets--;
+      if (character == '{') braces++;
+      if (character == '}') braces--;
+      if (parentheses < 0 || brackets < 0 || braces < 0) return false;
+    }
+    return parentheses == 0 && brackets == 0 && braces == 0;
+  }
+
+  private void extractFunction() {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || !tab.getEditor().isEditable()) return;
+    CodeEditorViewFX editor = tab.getEditor();
+    IndexRange selection = editor.getSelection();
+    String selected = editor.getSelectedText();
+    if (selection.getLength() == 0 || selected == null || selected.isBlank()) {
+      showMessage("Extract Function", "Select one or more statements before extracting a function.");
+      return;
+    }
+    if (!supportsFunctionExtraction(tab.getLanguageId())) {
+      showMessage("Extract Function", "Function extraction is not supported for " + tab.getLanguageId() + " files yet.");
+      return;
+    }
+    TextField name = new TextField("extracted_function");
+    name.setPromptText("Function name");
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(8, new Label("Function name"), name, validation);
+    content.setPrefWidth(440);
+    showInWindowModal("Extract Function", "Move the selected statements into a function", content, "Extract", () -> {
+      String function = name.getText().trim();
+      if (!validExtractName(function, tab.getLanguageId())) {
+        showModalValidation(validation, "Choose a valid function name for this language.");
+        return false;
+      }
+      String source = editor.getText();
+      int lineStart = source.lastIndexOf('\n', Math.max(0, selection.getStart() - 1)) + 1;
+      int lineEnd = source.indexOf('\n', selection.getEnd());
+      if (lineEnd < 0) lineEnd = source.length();
+      int blockEnd = Math.min(source.length(), lineEnd + (lineEnd < source.length() ? 1 : 0));
+      String indentation = lineIndent(source, lineStart);
+      String block = source.substring(lineStart, blockEnd);
+      String functionText = extractedFunctionText(tab.getLanguageId(), function, block, indentation);
+      String call = indentation + extractedFunctionCall(tab.getLanguageId(), function) + "\n";
+      String updated = source.substring(0, lineStart) + call + source.substring(blockEnd);
+      if (!updated.endsWith("\n")) updated += "\n";
+      updated += "\n" + functionText;
+      editor.getEditor().replaceText(updated);
+      return true;
+    });
+    setActiveModalWidth(520);
+    Platform.runLater(() -> {
+      name.requestFocus();
+      name.selectAll();
+    });
+  }
+
+  private String defaultExtractVariableName(String languageId) {
+    return "yass".equals(languageId) ? "$value" : "value";
+  }
+
+  private boolean supportsVariableExtraction(String languageId) {
+    return Set.of("yass", "python", "javascript", "typescript", "jsx").contains(languageId);
+  }
+
+  private boolean validExtractName(String name, String languageId) {
+    if ("yass".equals(languageId)) return name.matches("\\$-?[A-Za-z_][A-Za-z0-9_]*");
+    return name.matches("[A-Za-z_][A-Za-z0-9_]*");
+  }
+
+  private String extractVariableDeclaration(String languageId, String name, String expression) {
+    if ("yass".equals(languageId) || "zpeedy".equals(languageId)) return name + " = " + expression;
+    if ("python".equals(languageId) || "php".equals(languageId)) return name + " = " + expression;
+    return "var " + name + " = " + expression + ("java".equals(languageId) || "javascript".equals(languageId) || "typescript".equals(languageId) ? ";" : "");
+  }
+
+  private boolean supportsFunctionExtraction(String languageId) {
+    return Set.of("yass", "python", "javascript", "typescript", "jsx").contains(languageId);
+  }
+
+  private String extractedFunctionCall(String languageId, String name) {
+    return name + "()" + (Set.of("java", "javascript", "typescript", "jsx").contains(languageId) ? ";" : "");
+  }
+
+  private String extractedFunctionText(String languageId, String name, String block, String indentation) {
+    String body = indentExtractedBlock(block, languageId);
+    if ("yass".equals(languageId) || "zpeedy".equals(languageId)) return "function " + name + "()\n" + body + "end function\n";
+    if ("python".equals(languageId) || "php".equals(languageId)) return "def " + name + "():\n" + body + "\n";
+    return "function " + name + "() {\n" + body + "}\n";
+  }
+
+  private String indentExtractedBlock(String block, String languageId) {
+    String[] lines = block.replaceFirst("^\\s*", "").split("\\R", -1);
+    String unit = "yass".equals(languageId) || "zpeedy".equals(languageId) ? "  " : "    ";
+    return Arrays.stream(lines).map(line -> unit + line).collect(Collectors.joining("\n"));
+  }
+
+  private String lineIndent(String source, int lineStart) {
+    int index = lineStart;
+    while (index < source.length() && (source.charAt(index) == ' ' || source.charAt(index) == '\t')) index++;
+    return source.substring(lineStart, index);
+  }
+
+  private String symbolTokenForRename(CodeEditorViewFX codeEditor) {
+    String selected = codeEditor.getSelectedText();
+    if (isRenameSymbol(selected)) return selected;
+    return symbolTokenAt(codeEditor);
+  }
+
+  private void goToDefinition() {
+    EditorTab origin = getCurrentTab();
+    if (origin == null) return;
+    String symbol = symbolTokenForRename(origin.getEditor());
+    if (symbol.isBlank()) {
+      showMessage("Go to Definition", "Place the caret on a symbol or select one first.");
+      return;
+    }
+    DefinitionLocation definition = findDefinition(origin, symbol);
+    if (definition == null) {
+      showMessage("Go to Definition", "No definition for \"" + symbol + "\" was found in this project.");
+      return;
+    }
+    openDefinition(definition);
+  }
+
+  private void findUsages() {
+    EditorTab origin = getCurrentTab();
+    if (origin == null) return;
+    String symbol = symbolTokenForRename(origin.getEditor());
+    if (symbol.isBlank()) {
+      showMessage("Find Usages", "Place the caret on a symbol or select one first.");
+      return;
+    }
+    ZIDELanguage language = languageSupports.get(origin.getLanguageId());
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    if (language == null || root == null || !Files.isDirectory(root)) {
+      showMessage("Find Usages", "Open this file from a project folder first.");
+      return;
+    }
+
+    Pattern occurrence = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(symbol) + "(?![A-Za-z0-9_])");
+    List<UsageLocation> usages = new ArrayList<>();
+    try (var paths = Files.walk(root)) {
+      for (Path path : paths.filter(Files::isRegularFile)
+          .filter(candidate -> !candidate.startsWith(root.resolve(".git")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("build")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("out")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("target")))
+          .filter(candidate -> language.extensions().contains(fileExtension(candidate)))
+          .toList()) {
+        Path normalized = path.toAbsolutePath().normalize();
+        EditorTab open = openTabForPath(normalized);
+        String source;
+        try {
+          source = open == null ? Files.readString(path, StandardCharsets.UTF_8) : open.getEditor().getText();
+        } catch (IOException ignored) {
+          continue;
+        }
+        Matcher matcher = occurrence.matcher(source);
+        while (matcher.find()) {
+          int line = lineNumberAt(source, matcher.start());
+          int lineStart = source.lastIndexOf('\n', Math.max(0, matcher.start() - 1)) + 1;
+          int lineEnd = source.indexOf('\n', matcher.start());
+          if (lineEnd < 0) lineEnd = source.length();
+          String preview = source.substring(lineStart, lineEnd).trim();
+          usages.add(new UsageLocation(normalized, matcher.start(), line, preview));
+        }
+      }
+    } catch (IOException exception) {
+      showMessage("Find Usages", "Could not scan the project: " + exception.getMessage());
+      return;
+    }
+    usages.sort(Comparator.comparing((UsageLocation usage) -> usage.path().toString(), String.CASE_INSENSITIVE_ORDER)
+        .thenComparingInt(UsageLocation::line));
+    if (usages.isEmpty()) {
+      showMessage("Find Usages", "No usages of " + symbol + " were found in the project.");
+      return;
+    }
+
+    ListView<String> results = new ListView<>(FXCollections.observableArrayList(usages.stream()
+        .map(usage -> root.relativize(usage.path()).toString().replace('\\', '/') + ":" + usage.line() + "  " + usage.preview())
+        .toList()));
+    results.getStyleClass().add("project-reference-list");
+    results.setPrefHeight(Math.min(360, Math.max(100, usages.size() * 28)));
+    results.setOnMouseClicked(event -> {
+      if (event.getClickCount() == 2) {
+        int index = results.getSelectionModel().getSelectedIndex();
+        if (index >= 0 && index < usages.size()) openUsageLocation(usages.get(index));
+      }
+    });
+    Label detail = new Label(usages.size() + " usage" + (usages.size() == 1 ? "" : "s") + " found. Double-click a result to open it.");
+    detail.setWrapText(true);
+    VBox content = new VBox(8, detail, results);
+    content.setPrefWidth(720);
+    showInWindowModal("Find Usages", "Usages of " + symbol, content, "Close", () -> true, false);
+    setActiveModalWidth(780);
+  }
+
+  private void openUsageLocation(UsageLocation usage) {
+    openDefinition(new DefinitionLocation(usage.path(), usage.offset(), usage.offset()));
+  }
+
+  private DefinitionLocation findDefinition(EditorTab origin, String symbol) {
+    ZIDELanguage language = languageSupports.get(origin.getLanguageId());
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    if (language == null || root == null || !Files.isDirectory(root)) return null;
+
+    Path currentPath = origin.getPath() == null ? null : Path.of(origin.getPath()).toAbsolutePath().normalize();
+    DefinitionLocation current = findDefinitionInSource(currentPath, origin.getEditor().getText(), origin.getLanguageId(), symbol, origin.getEditor().getCaretPosition());
+    if (current != null) return current;
+    try (var paths = Files.walk(root)) {
+      for (Path path : paths.filter(Files::isRegularFile)
+          .filter(candidate -> !candidate.startsWith(root.resolve(".git")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("build")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("out")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("target")))
+          .filter(candidate -> language.extensions().contains(fileExtension(candidate)))
+          .toList()) {
+        Path normalized = path.toAbsolutePath().normalize();
+        if (normalized.equals(currentPath)) continue;
+        EditorTab open = openTabForPath(normalized);
+        try {
+          String source = open == null ? Files.readString(path, StandardCharsets.UTF_8) : open.getEditor().getText();
+          DefinitionLocation found = findDefinitionInSource(normalized, source, origin.getLanguageId(), symbol, -1);
+          if (found != null) return found;
+        } catch (IOException ignored) { }
+      }
+    } catch (IOException ignored) { }
+    return null;
+  }
+
+  private DefinitionLocation findDefinitionInSource(Path path, String source, String languageId, String symbol, int referenceOffset) {
+    if (source == null || source.isEmpty()) return null;
+    String name = Pattern.quote(symbol.startsWith("$") ? symbol.substring(1) : symbol);
+    List<Pattern> declarations = new ArrayList<>();
+    switch (languageId) {
+      case "yass" -> {
+        if (referenceOffset >= 0) {
+          int[] scope = yassClassScope(source, referenceOffset);
+          int cursor = Math.max(0, Math.min(referenceOffset, source.length()));
+          String before = source.substring(0, cursor);
+          if (scope != null && before.matches("(?s).*\\bthis\\s*->\\s*$")) {
+            int bodyEnd = scope[2] < 0 ? source.length() : scope[2];
+            Pattern property = Pattern.compile("(?im)^[ \\t]*(?:(?:public|private|protected|static|final|const)[ \\t]+)*" + Pattern.quote(symbol) + "[ \\t]*(?:=|\\+=|-=|\\*=|/=|%=|$)");
+            Matcher propertyMatcher = property.matcher(source.substring(scope[1], bodyEnd));
+            if (propertyMatcher.find()) {
+              int start = scope[1] + propertyMatcher.start();
+              return definitionLocation(path, source, start);
+            }
+          }
+        }
+        declarations.add(Pattern.compile("(?im)^[ \\t]*(?:(?:public|private|protected|static|abstract|final)[ \\t]+)*(?:function|module|namespace|class|structure|interface|record|enum|enumerator)[ \\t]+" + name + "\\b"));
+        declarations.add(Pattern.compile("(?im)^[ \\t]*(?:(?:public|private|protected|static|final|const)[ \\t]+)*" + Pattern.quote(symbol) + "[ \\t]*(?:=|\\+=|-=|\\*=|/=|%=)"));
+      }
+      case "zpeedy" -> {
+        declarations.add(Pattern.compile("(?im)^[ \\t]*(?:routine|thing)[ \\t]+" + name + "\\b"));
+        declarations.add(Pattern.compile("(?im)^[ \\t]*set[ \\t]+" + name + "[ \\t]+to\\b"));
+      }
+      case "python" -> {
+        declarations.add(Pattern.compile("(?m)^[ \\t]*(?:async[ \\t]+)?(?:def|class)[ \\t]+" + name + "\\b"));
+        declarations.add(Pattern.compile("(?m)^[ \\t]*" + name + "[ \\t]*="));
+      }
+      case "sqarl" -> declarations.add(Pattern.compile("(?im)^[ \\t]*(?:function|procedure|class|record|declare)[ \\t]+" + name + "\\b"));
+      default -> { }
+    }
+    declarations.add(Pattern.compile("(?m)^[ \\t]*(?:(?:(?:public|private|protected|internal|static|final|abstract|async|virtual|override|export|default)[ \\t]+)*)(?:class|interface|enum|record|struct|function|def|fn)[ \\t]+" + name + "\\b"));
+    declarations.add(Pattern.compile("(?m)^[ \\t]*(?:(?:public|private|protected|static|final|const|let|var)[ \\t]+)*" + name + "[ \\t]*(?:=|:)"));
+    declarations.add(Pattern.compile("(?m)^[ \\t]*(?:(?:public|private|protected|static|final|abstract|async|virtual|override|export)[ \\t]+)*(?:[A-Za-z_$][A-Za-z0-9_$<>\\[\\],.?]*[ \\t]+)?" + name + "[ \\t]*\\("));
+    for (Pattern declaration : declarations) {
+      Matcher matcher = declaration.matcher(source);
+      if (matcher.find()) return definitionLocation(path, source, matcher.start());
+    }
+    return null;
+  }
+
+  private void openDefinition(DefinitionLocation definition) {
+    if (definition.path() == null) return;
+    EditorTab existing = openTabForPath(definition.path());
+    if (existing != null) {
+      editorTabs.getSelectionModel().select(existing);
+      focusDefinitionWhenLoaded(definition, 0);
+      return;
+    }
+    openTab(definition.path().getFileName().toString(), definition.path().toString(), true);
+    focusDefinitionWhenLoaded(definition, 0);
+  }
+
+  private void focusDefinitionWhenLoaded(DefinitionLocation definition, int attempt) {
+    PauseTransition wait = new PauseTransition(Duration.millis(150));
+    wait.setOnFinished(event -> {
+      EditorTab opened = openTabForPath(definition.path());
+      if (opened != null && opened.getEditor().isEditable()) {
+        String source = opened.getEditor().getText();
+        int start = Math.min(source.length(), definition.offset());
+        int end = Math.min(source.length(), definition.end());
+        opened.navigateToDiagnostic(lineNumberAt(source, start), 1, start, Math.max(start, end));
+      } else if (attempt < 20) {
+        focusDefinitionWhenLoaded(definition, attempt + 1);
+      }
+    });
+    wait.play();
+  }
+
+  private String symbolTokenAt(CodeEditorViewFX codeEditor) {
+    String source = codeEditor.getText();
+    if (source.isEmpty()) return "";
+    int position = Math.max(0, Math.min(codeEditor.getCaretPosition(), source.length() - 1));
+    if (!isSymbolTokenCharacter(source.charAt(position)) && position > 0) position--;
+    if (!isSymbolTokenCharacter(source.charAt(position))) return "";
+    int start = position;
+    int end = position + 1;
+    while (start > 0 && isSymbolTokenCharacter(source.charAt(start - 1))) start--;
+    while (end < source.length() && isSymbolTokenCharacter(source.charAt(end))) end++;
+    if (start > 0 && source.charAt(start - 1) == '-' && start > 1 && source.charAt(start - 2) == '$') start--;
+    if (end < source.length() && source.charAt(end) == '-' && source.charAt(start) == '$') {
+      end++;
+      while (end < source.length() && isSymbolTokenCharacter(source.charAt(end))) end++;
+    }
+    String token = source.substring(start, end);
+    return isRenameSymbol(token) ? token : "";
+  }
+
+  private static boolean isRenameSymbol(String value) {
+    if (value == null || value.isBlank()) return false;
+    return value.matches("\\$-?[A-Za-z_][A-Za-z0-9_]*") || value.matches("[A-Za-z_][A-Za-z0-9_]*");
+  }
+
+  private static boolean isSymbolTokenCharacter(char value) {
+    return Character.isLetterOrDigit(value) || value == '_' || value == '$';
+  }
+
+  private boolean renameSymbolAcrossProject(EditorTab origin, String symbol, String replacement, Label validation) {
+    ZIDELanguage language = languageSupports.get(origin.getLanguageId());
+    Path root = currentProjectRoot == null ? null : currentProjectRoot.toPath().toAbsolutePath().normalize();
+    if (language == null || root == null || !Files.isDirectory(root)) {
+      showModalValidation(validation, "Open this file from a project folder first.");
+      return false;
+    }
+
+    Pattern occurrence = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(symbol) + "(?![A-Za-z0-9_])");
+    Path originPath = origin.getPath() == null ? null : Path.of(origin.getPath()).toAbsolutePath().normalize();
+    DefinitionLocation definition = findDefinition(origin, symbol);
+    boolean functionLike = definition != null && functionDeclarationAt(origin.getEditor().getText(), definition.offset());
+    boolean projectWide = functionLike && countDefinitions(root, language, origin.getLanguageId(), symbol) == 1;
+    int[] localScope = projectWide ? null : renameScope(origin.getEditor().getText(), origin.getEditor().getCaretPosition(), origin.getLanguageId());
+    Map<Path, String> diskUpdates = new LinkedHashMap<>();
+    Map<EditorTab, String> openUpdates = new LinkedHashMap<>();
+    List<Path> unreadable = new ArrayList<>();
+    try (var paths = Files.walk(root)) {
+      paths.filter(Files::isRegularFile)
+          .filter(path -> !path.startsWith(root.resolve(".git")))
+          .filter(path -> !path.startsWith(root.resolve("build")))
+          .filter(path -> !path.startsWith(root.resolve("out")))
+          .filter(path -> !path.startsWith(root.resolve("target")))
+          .filter(path -> language.extensions().contains(fileExtension(path)))
+          .filter(path -> projectWide || (originPath != null && originPath.equals(path.toAbsolutePath().normalize())))
+          .forEach(path -> {
+            try {
+              Path normalized = path.toAbsolutePath().normalize();
+              EditorTab open = openTabForPath(normalized);
+              String source = open == null ? Files.readString(path, StandardCharsets.UTF_8) : open.getEditor().getText();
+              String updated = projectWide
+                  ? replaceSymbolOccurrences(source, occurrence, replacement)
+                  : replaceSymbolOccurrencesInRange(source, occurrence, replacement, localScope);
+              if (!source.equals(updated)) {
+                if (open == null) diskUpdates.put(normalized, updated);
+                else openUpdates.put(open, updated);
+              }
+            } catch (IOException exception) {
+              unreadable.add(path);
+            }
+          });
+    } catch (IOException exception) {
+      showModalValidation(validation, "Could not scan the project: " + exception.getMessage());
+      return false;
+    }
+    if (!unreadable.isEmpty()) {
+      showModalValidation(validation, "Could not read " + unreadable.size() + " matching project file" + (unreadable.size() == 1 ? "" : "s") + ".");
+      return false;
+    }
+
+    try {
+      for (Map.Entry<Path, String> update : diskUpdates.entrySet()) {
+        Files.writeString(update.getKey(), update.getValue(), StandardCharsets.UTF_8);
+      }
+      for (Map.Entry<EditorTab, String> update : openUpdates.entrySet()) {
+        update.getKey().getEditor().getEditor().replaceText(update.getValue());
+      }
+      return true;
+    } catch (IOException exception) {
+      showModalValidation(validation, "Could not update the project: " + exception.getMessage());
+      return false;
+    }
+  }
+
+  private int countDefinitions(Path root, ZIDELanguage language, String languageId, String symbol) {
+    int count = 0;
+    try (var paths = Files.walk(root)) {
+      for (Path path : paths.filter(Files::isRegularFile)
+          .filter(candidate -> !candidate.startsWith(root.resolve(".git")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("build")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("out")))
+          .filter(candidate -> !candidate.startsWith(root.resolve("target")))
+          .filter(candidate -> language.extensions().contains(fileExtension(candidate)))
+          .toList()) {
+        try {
+          String source = Files.readString(path, StandardCharsets.UTF_8);
+          if (findDefinitionInSource(path, source, languageId, symbol, -1) != null && ++count > 1) return count;
+        } catch (IOException ignored) {
+        }
+      }
+    } catch (IOException ignored) {
+    }
+    return count;
+  }
+
+  private boolean functionDeclarationAt(String source, int offset) {
+    if (source == null || source.isEmpty()) return false;
+    int lineStart = source.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
+    int lineEnd = source.indexOf('\n', Math.max(0, offset));
+    if (lineEnd < 0) lineEnd = source.length();
+    String line = source.substring(lineStart, lineEnd);
+    return line.matches("(?s).*\\b(?:function|procedure|routine|def|fn)\\b.*")
+        || line.matches("(?s).*\\b[A-Za-z_$][A-Za-z0-9_$]*[ \\t]*\\(.*");
+  }
+
+  private int[] renameScope(String source, int offset, String languageId) {
+    int cursor = Math.max(0, Math.min(offset, source.length()));
+    if ("yass".equals(languageId)) {
+      int[] function = yassFunctionScope(source, cursor);
+      if (function != null) return function;
+      int[] clazz = yassClassScope(source, cursor);
+      if (clazz != null) return new int[]{clazz[1], clazz[2] < 0 ? source.length() : clazz[2]};
+    }
+    int open = source.lastIndexOf('{', cursor);
+    int close = open < 0 ? -1 : source.indexOf('}', cursor);
+    return open >= 0 && close > cursor ? new int[]{open + 1, close} : new int[]{0, source.length()};
+  }
+
+  private int[] yassFunctionScope(String source, int cursor) {
+    Pattern startPattern = Pattern.compile("(?im)^[ \\t]*(?:(?:public|private|protected|static|abstract|final)[ \\t]+)*function[ \\t]+[A-Za-z_][A-Za-z0-9_]*\\b");
+    Pattern endPattern = Pattern.compile("(?im)^[ \\t]*end[ \\t]+function\\b");
+    Matcher starts = startPattern.matcher(source);
+    int candidate = -1;
+    while (starts.find() && starts.start() <= cursor) candidate = starts.start();
+    if (candidate < 0) return null;
+    Matcher end = endPattern.matcher(source);
+    end.region(candidate, source.length());
+    if (!end.find() || end.start() <= cursor) return null;
+    return new int[]{candidate, end.end()};
+  }
+
+  private EditorTab openTabForPath(Path path) {
+    for (Tab item : allEditorTabs) {
+      if (item instanceof EditorTab tab && tab.getPath() != null
+          && path.equals(Path.of(tab.getPath()).toAbsolutePath().normalize())) return tab;
+    }
+    return null;
+  }
+
+  private static String fileExtension(Path path) {
+    String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+    int dot = name.lastIndexOf('.');
+    return dot < 0 ? "" : name.substring(dot + 1);
+  }
+
+  private static String replaceSymbolOccurrences(String source, Pattern occurrence, String replacement) {
+    Matcher matcher = occurrence.matcher(source);
+    StringBuffer updated = new StringBuffer();
+    while (matcher.find()) matcher.appendReplacement(updated, Matcher.quoteReplacement(replacement));
+    matcher.appendTail(updated);
+    return updated.toString();
+  }
+
+  private static String replaceSymbolOccurrencesInRange(String source, Pattern occurrence, String replacement, int[] scope) {
+    if (scope == null || scope.length < 2) return source;
+    int start = Math.max(0, Math.min(scope[0], source.length()));
+    int end = Math.max(start, Math.min(scope[1], source.length()));
+    return source.substring(0, start) + replaceSymbolOccurrences(source.substring(start, end), occurrence, replacement) + source.substring(end);
+  }
+
+  private static int definitionLineEnd(String source, int start) {
+    int end = source.indexOf('\n', Math.max(0, start));
+    end = end < 0 ? source.length() : end;
+    while (end > 0 && (source.charAt(end - 1) == ' ' || source.charAt(end - 1) == '\t' || source.charAt(end - 1) == '\r')) end--;
+    return end;
+  }
+
+  private static DefinitionLocation definitionLocation(Path path, String source, int start) {
+    int lineStart = source.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    while (start < source.length() && (source.charAt(start) == ' ' || source.charAt(start) == '\t')) start++;
+    return new DefinitionLocation(path, start, definitionLineEnd(source, lineStart));
   }
 
   private void showVariableColourDialog(EditorTab tab, String variable) {
@@ -9810,11 +10761,11 @@ public class ZIDEEditor extends Application {
     close.setMinSize(8, 8);
     close.setPrefSize(8, 8);
     close.setMaxSize(8, 8);
+    tab.setText(metadataProject ? "Project Settings" : manifest.getFileName().toString());
     tab.setGraphic(close);
-    Label manifestTitle = new Label(metadataProject ? "Project Settings" : manifest.getFileName().toString());
-    manifestTitle.getStyleClass().add("tab-title");
-    tab.setGraphic(new HBox(6, manifestTitle, close));
     tab.setContent(content);
+    tab.getProperties().put("project-settings-available", available);
+    tab.getProperties().put("project-settings-selected", selected);
     addEditorTab(tab);
   }
 
@@ -9988,6 +10939,8 @@ public class ZIDEEditor extends Application {
     } else {
       if (indentSelectionMenuItem != null) setMenuItemEnabled(indentSelectionMenuItem, false);
       if (outdentSelectionMenuItem != null) setMenuItemEnabled(outdentSelectionMenuItem, false);
+      if (commentSelectionMenuItem != null) setMenuItemEnabled(commentSelectionMenuItem, false);
+      if (uncommentSelectionMenuItem != null) setMenuItemEnabled(uncommentSelectionMenuItem, false);
     }
     if (scriptMenu != null) scriptMenu.setText(language != null && "java".equals(language.id()) ? "Execution" : "Script");
     boolean runnable = language != null && language.canRun();
@@ -10374,6 +11327,75 @@ public class ZIDEEditor extends Application {
         && current.getEditor().getEditor() == area && area.getSelection().getLength() > 0;
     if (indentSelectionMenuItem != null) setMenuItemEnabled(indentSelectionMenuItem, enabled);
     if (outdentSelectionMenuItem != null) setMenuItemEnabled(outdentSelectionMenuItem, enabled);
+    if (commentSelectionMenuItem != null) setMenuItemEnabled(commentSelectionMenuItem, enabled && current.getEditor().isEditable());
+    if (uncommentSelectionMenuItem != null) setMenuItemEnabled(uncommentSelectionMenuItem, enabled && current.getEditor().isEditable());
+  }
+
+  private void commentCurrentSelection(boolean uncomment) {
+    EditorTab tab = getCurrentTab();
+    if (tab == null || tab.getEditor() == null || !tab.getEditor().isEditable()) return;
+    org.fxmisc.richtext.InlineCssTextArea area = tab.getEditor().getEditor();
+    if (area.getSelection().getLength() == 0) return;
+    ZIDELanguage language = languageSupports.get(tab.getLanguageId());
+    if (language == null) return;
+    String opening = language.commentOpeningTag();
+    String closing = language.commentClosingTag();
+    if (opening.isEmpty()) {
+      showMessage(uncomment ? "Uncomment Selection" : "Comment Selection", "This language does not define comment markers.");
+    } else if (closing.isEmpty()) {
+      commentLines(area, opening, uncomment);
+    } else {
+      commentBlock(area, opening, closing, uncomment);
+    }
+  }
+
+  private void commentLines(org.fxmisc.richtext.InlineCssTextArea area, String marker, boolean uncomment) {
+    javafx.scene.control.IndexRange selection = area.getSelection();
+    String source = area.getText();
+    int start = source.lastIndexOf('\n', Math.max(0, selection.getStart() - 1)) + 1;
+    int end = selection.getEnd();
+    if (end > start && end <= source.length() && end > 0 && source.charAt(end - 1) == '\n') end--;
+    while (end < source.length() && source.charAt(end) != '\n') end++;
+    String selected = source.substring(start, end);
+    String[] lines = selected.split("\\n", -1);
+    StringBuilder replacement = new StringBuilder(selected.length() + lines.length * marker.length());
+    for (int index = 0; index < lines.length; index++) {
+      String line = lines[index];
+      int indentation = 0;
+      while (indentation < line.length() && Character.isWhitespace(line.charAt(indentation)) && line.charAt(indentation) != '\n') indentation++;
+      if (uncomment) {
+        if (line.startsWith(marker, indentation)) {
+          int removeEnd = indentation + marker.length();
+          if (removeEnd < line.length() && line.charAt(removeEnd) == ' ') removeEnd++;
+          replacement.append(line, 0, indentation).append(line.substring(removeEnd));
+        } else {
+          replacement.append(line);
+        }
+      } else {
+        replacement.append(line, 0, indentation).append(marker);
+        if (indentation < line.length()) replacement.append(' ');
+        replacement.append(line.substring(indentation));
+      }
+      if (index < lines.length - 1) replacement.append('\n');
+    }
+    area.replaceText(start, end, replacement.toString());
+    area.selectRange(start, start + replacement.length());
+  }
+
+  private void commentBlock(org.fxmisc.richtext.InlineCssTextArea area, String opening, String closing, boolean uncomment) {
+    javafx.scene.control.IndexRange selection = area.getSelection();
+    String selected = area.getSelectedText();
+    if (uncomment && selected.startsWith(opening) && selected.endsWith(closing)
+        && selected.length() >= opening.length() + closing.length()) {
+      int start = selection.getStart();
+      int end = selection.getEnd();
+      area.replaceText(start, end, selected.substring(opening.length(), selected.length() - closing.length()));
+      area.selectRange(start, start + selected.length() - opening.length() - closing.length());
+    } else if (!uncomment) {
+      int start = selection.getStart();
+      area.replaceText(start, selection.getEnd(), opening + selected + closing);
+      area.selectRange(start, start + opening.length() + selected.length() + closing.length());
+    }
   }
 
   private void indentCurrentSelection(boolean outdent) {
@@ -11396,8 +12418,8 @@ public class ZIDEEditor extends Application {
    */
   private int[] yassClassScope(String source, int offset) {
     int cursor = Math.max(0, Math.min(offset, source.length()));
-    Pattern classes = Pattern.compile("(?im)^\\s*(?:(?:public|private|protected|static|abstract|final)\\s+)*class\\s+([A-Za-z_][A-Za-z0-9_]*)\\b");
-    Pattern endClass = Pattern.compile("(?im)^\\s*end\\s+class\\b");
+    Pattern classes = Pattern.compile("(?im)^[ \\t]*(?:(?:public|private|protected|static|abstract|final)[ \\t]+)*class[ \\t]+([A-Za-z_][A-Za-z0-9_]*)\\b");
+    Pattern endClass = Pattern.compile("(?im)^[ \\t]*end[ \\t]+class\\b");
     Matcher declaration = classes.matcher(source);
     int[] scope = null;
     while (declaration.find() && declaration.start() <= cursor) {
@@ -13272,6 +14294,12 @@ public class ZIDEEditor extends Application {
   }
 
   private record Assignment(int start, String expression) {
+  }
+
+  private record DefinitionLocation(Path path, int offset, int end) {
+  }
+
+  private record UsageLocation(Path path, int offset, int line, String preview) {
   }
 
   private record Prediction(boolean known, boolean call, String description, String type) {

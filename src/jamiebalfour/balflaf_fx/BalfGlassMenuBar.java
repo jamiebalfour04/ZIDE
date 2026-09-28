@@ -200,7 +200,7 @@ public class BalfGlassMenuBar extends HBox {
 
   private Insets menuItemPadding() {
     return getStyleClass().contains("language-selector-menu")
-            ? new Insets(3, 8, 3, 6) : new Insets(8, 11, 8, 11);
+            ? new Insets(3, 8, 3, 6) : new Insets(5, 11, 5, 11);
   }
 
   public class GlassMenu {

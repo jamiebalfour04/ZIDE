@@ -1172,6 +1172,25 @@
     -fx-text-fill: white;
 }
 
+.in-window-modal-dark .project-reference-list,
+.in-window-modal-dark .project-reference-list .virtual-flow,
+.in-window-modal-dark .project-reference-list .viewport {
+    -fx-background-color: #1b1f26;
+    -fx-control-inner-background: #1b1f26;
+    -fx-border-color: #454b54;
+}
+.in-window-modal-dark .project-reference-list .list-cell {
+    -fx-background-color: #1b1f26;
+    -fx-text-fill: #e6e9ee;
+}
+.in-window-modal-dark .project-reference-list .list-cell:filled:hover {
+    -fx-background-color: #252c35;
+}
+.in-window-modal-dark .project-reference-list .list-cell:filled:selected {
+    -fx-background-color: #315b83;
+    -fx-text-fill: #ffffff;
+}
+
 .language-selector {
     -fx-padding: 0 3px;
     -fx-background-color: transparent;
@@ -4422,6 +4441,12 @@
 .context-menu.glass-context-menu-dark .menu-item .label {
     -fx-text-fill: #e6e9ee;
 }
+
+.context-menu.glass-context-menu .menu-item,
+.context-menu.glass-context-menu-dark .menu-item {
+    -fx-padding: 5px 6px;
+}
+
 .context-menu.glass-context-menu-dark .menu-item:hover,
 .context-menu.glass-context-menu-dark .menu-item:focused {
     -fx-background-color: #07566f;
@@ -4429,6 +4454,17 @@
 .context-menu.glass-context-menu-dark .menu-item:hover .label,
 .context-menu.glass-context-menu-dark .menu-item:focused .label {
     -fx-text-fill: #ffffff;
+}
+.context-menu.glass-context-menu .separator-menu-item,
+.context-menu.glass-context-menu-dark .separator-menu-item {
+    -fx-padding: 10px 0;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-max-height: 22px;
+}
+.context-menu.glass-context-menu .separator:horizontal,
+.context-menu.glass-context-menu-dark .separator:horizontal {
+    -fx-padding: 3px;
 }
 .context-menu.glass-context-menu-dark .separator:horizontal .line {
     -fx-border-color: rgba(226, 232, 240, 0.16) transparent transparent transparent;
