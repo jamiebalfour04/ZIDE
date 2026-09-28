@@ -7,6 +7,7 @@ import jamiebalfour.balflaf_fx.BalfComboBox;
 import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
 import jamiebalfour.balflaf_fx.BalfGlassContextMenu;
 import jamiebalfour.balflaf_fx.FXHelpers;
+import jamiebalfour.balflaf_fx.BalfTabBar;
 import jamiebalfour.balflaf_fx.BalfTitleBar;
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
@@ -227,7 +228,7 @@ public class ZIDEEditor extends Application {
   private ZIDEUnfoldPanel unfoldPanel;
   private ZIDEByteCodePanel byteCodePanel;
   private ZIDEScratchPadPanel scratchPadPanel;
-  private TabPane rightSidePanels;
+  private BalfTabBar rightSidePanels;
   private HBox collaborationAvatars;
   private HBox collaborationInfoAvatars;
   private SplitPane editorRightSplit;
@@ -331,13 +332,13 @@ public class ZIDEEditor extends Application {
   private SplitPane mainHorizontalSplit;
   private SplitPane mainVerticalSplit;
   private Node projectExplorerPane;
-  private TabPane leftSidePanels;
+  private BalfTabBar leftSidePanels;
   private VBox collaborationParticipantList;
   private Tab collaborationTab;
   private Tab filesTab;
   private Tab collaborationFilesTab;
   private Tab collaborationChatTab;
-  private TabPane collaborationSidebar;
+  private BalfTabBar collaborationSidebar;
   private TreeView<CollaborativeProjectItem> collaborationProjectTree;
   private VBox collaborationChatMessages;
   private ScrollPane collaborationChatScroll;
@@ -354,7 +355,7 @@ public class ZIDEEditor extends Application {
   private TreeView<File> projectTree;
   private ScrollPane projectBrowserScroll;
   private VBox projectBrowserContent;
-  private TabPane editorTabs;
+  private BalfTabBar editorTabs;
   // Call this whenever you want the label refreshed
   Runnable refreshRunText = () -> {
     if (getCurrentTab() == null) return;
@@ -917,19 +918,6 @@ public class ZIDEEditor extends Application {
 
   private static String escapeJson(String value) {
     return value.replace("\\", "\\\\").replace("\"", "\\\"");
-  }
-
-  private static void updateTabHeaderVisibility(TabPane pane) {
-    if (pane == null) return;
-    if (pane.getStyleClass().contains("right-side-panels")) {
-      pane.getStyleClass().remove("single-tab");
-      return;
-    }
-    if (pane.getTabs().size() <= 1) {
-      if (!pane.getStyleClass().contains("single-tab")) pane.getStyleClass().add("single-tab");
-    } else {
-      pane.getStyleClass().remove("single-tab");
-    }
   }
 
   /** Applies the application theme to JavaFX's separate tab-overflow popup. */
@@ -1683,8 +1671,7 @@ public class ZIDEEditor extends Application {
     boolean systemDark = isSystemDarkMode();
     darkThemeEnabled = "dark".equalsIgnoreCase(MAIN_PROPERTIES.getProperty("THEME", systemDark ? "dark" : "light"));
 
-    editorTabs = new TabPane();
-    editorTabs.getStyleClass().add("editor-tabs");
+    editorTabs = new BalfTabBar();
     applyProjectGroupingStyle();
 
     appRoot = new BorderPane();
@@ -1723,8 +1710,7 @@ public class ZIDEEditor extends Application {
     rememberProjectRoot(currentProjectRoot);
     updateProjectMenuVisibility();
     startProjectDirectoryWatcher(projectDir);
-    leftSidePanels = new TabPane();
-    leftSidePanels.getStyleClass().add("editor-tabs");
+    leftSidePanels = new BalfTabBar();
     leftSidePanels.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
     filesTab = new Tab("Files", projectTree);
     filesTab.setClosable(false);
@@ -1807,10 +1793,9 @@ public class ZIDEEditor extends Application {
       if (collaborationChatTab.isSelected()) collaborationChatTab.getStyleClass().remove("chat-unread");
     });
     leftSidePanels.getTabs().add(filesTab);
-    leftSidePanels.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) change -> updateTabHeaderVisibility(leftSidePanels));
-    updateTabHeaderVisibility(leftSidePanels);
-    collaborationSidebar = new TabPane();
-    collaborationSidebar.getStyleClass().add("editor-tabs");
+    leftSidePanels.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) change -> BalfTabBar.updateHeaderVisibility(leftSidePanels));
+    BalfTabBar.updateHeaderVisibility(leftSidePanels);
+    collaborationSidebar = new BalfTabBar();
     collaborationSidebar.getStyleClass().add("collaboration-tabs");
     collaborationSidebar.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
     collaborationSidebar.setMinWidth(260);
@@ -3282,6 +3267,10 @@ public class ZIDEEditor extends Application {
         if (node instanceof BalfComboBox<?>) ((BalfComboBox<?>) node).setDarkMode(enabled);
       }
     }
+    if (editorTabs != null) editorTabs.setDarkMode(enabled);
+    if (leftSidePanels != null) leftSidePanels.setDarkMode(enabled);
+    if (rightSidePanels != null) rightSidePanels.setDarkMode(enabled);
+    if (collaborationSidebar != null) collaborationSidebar.setDarkMode(enabled);
     if (titleBar != null) titleBar.setDarkMode(enabled);
     if (languageMenuBar != null) languageMenuBar.setDarkMode(enabled);
     if (sftpMenuBar != null) sftpMenuBar.setDarkMode(enabled);
@@ -5522,7 +5511,7 @@ public class ZIDEEditor extends Application {
     editor.getEditor().textProperty().addListener(listener);
     session.projectFileListeners.put(tab, listener);
     installCollaborationLineIndicators(session, tab);
-    updateTabHeaderVisibility(editorTabs);
+    BalfTabBar.updateHeaderVisibility(editorTabs);
     statusLabel.setText("Viewing shared project file · " + relativePath);
   }
 
@@ -8625,8 +8614,8 @@ public class ZIDEEditor extends Application {
     unfoldPanel = new ZIDEUnfoldPanel(this::showUnfoldDescription);
     byteCodePanel = new ZIDEByteCodePanel();
     scratchPadPanel = new ZIDEScratchPadPanel(message -> statusLabel.setText(message));
-    rightSidePanels = new TabPane();
-    rightSidePanels.getStyleClass().addAll("editor-tabs", "right-side-panels");
+    rightSidePanels = new BalfTabBar();
+    rightSidePanels.getStyleClass().add("right-side-panels");
     rightSidePanels.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
     rightSidePanels.setMinWidth(0);
     rightSidePanels.setPrefWidth(0);
@@ -8679,7 +8668,7 @@ public class ZIDEEditor extends Application {
         double panelWidth = layoutDimension("LAYOUT_RIGHT_PANEL_WIDTH", 340, 220, 900);
         rightSidePanels.setPrefWidth(panelWidth);
       }
-      updateTabHeaderVisibility(rightSidePanels);
+      BalfTabBar.updateHeaderVisibility(rightSidePanels);
       updateEditorRightPanelLayout();
       if (!restoringEditorLayout) savePanelPreferences();
       scheduleEditorLayoutSave();
@@ -8722,7 +8711,7 @@ public class ZIDEEditor extends Application {
       if (groupProjectTabs) {
         editorTabs.getStyleClass().remove("single-tab");
       } else {
-        updateTabHeaderVisibility(editorTabs);
+        BalfTabBar.updateHeaderVisibility(editorTabs);
       }
       if (groupProjectTabs) {
         Platform.runLater(() -> {
@@ -8736,7 +8725,7 @@ public class ZIDEEditor extends Application {
       updateSelectedTabProjectColour();
       scheduleEditorLayoutSave();
     });
-    updateTabHeaderVisibility(editorTabs);
+    BalfTabBar.updateHeaderVisibility(editorTabs);
 
     editorTabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
       scheduleEditorLayoutSave();
@@ -8829,7 +8818,7 @@ public class ZIDEEditor extends Application {
       if (!editorTabs.getTabs().equals(visible)) editorTabs.getTabs().setAll(visible);
       if (selected != null && visible.contains(selected)) editorTabs.getSelectionModel().select(selected);
       else if (!visible.isEmpty()) editorTabs.getSelectionModel().select(visible.getFirst());
-      updateTabHeaderVisibility(editorTabs);
+      BalfTabBar.updateHeaderVisibility(editorTabs);
       // The editor should retain a visible tab strip while switching projects;
       // collapsing it during the list replacement leaves the header blank.
       editorTabs.getStyleClass().remove("single-tab");

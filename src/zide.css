@@ -374,44 +374,6 @@
     -fx-text-fill: #e6e9ee;
 }
 
-/*
- * Flat document tabs.  The strip has no individual tab boxes: selection is
- * communicated by the same purple used by ZIDE's title bar (#517), keeping
- * the editor compact now and making it suitable for either Swing or JavaFX
- * code-editor content in future.
- */
-.editor-tabs {
-    -fx-tab-min-height: 26px;
-    -fx-tab-max-height: 26px;
-    -fx-background-color: transparent;
-}
-
-/* A lone tab is content, not a tab switcher. Keep its panel flush. */
-.editor-tabs.single-tab .tab-header-area {
-    visibility: hidden;
-    -fx-pref-height: 0;
-    -fx-min-height: 0;
-    -fx-max-height: 0;
-}
-
-.editor-tabs.single-tab .tab-content-area {
-    -fx-padding: 0;
-}
-
-/* Project grouping still needs a visible switcher when only one group is
- * currently visible.  This must override the compact lone-tab rule above. */
-.editor-tabs.project-grouping.single-tab .tab-header-area {
-    visibility: visible;
-    -fx-pref-height: 26px;
-    -fx-min-height: 26px;
-    -fx-max-height: 26px;
-    -fx-padding: 0;
-}
-
-.editor-tabs.project-grouping.single-tab .tab-content-area {
-    -fx-padding: 0;
-}
-
 .collaboration-chat-scroll,
 .collaboration-chat-scroll > .viewport {
     -fx-background-color: #ffffff;
@@ -545,117 +507,12 @@
     -fx-text-fill: #e6e9ee;
 }
 
-.editor-tabs .tab.chat-unread {
-    -fx-background-color: #5b237d;
-}
-
-.editor-tabs .tab.chat-unread .tab-label {
-    -fx-text-fill: white;
-}
-
-.editor-tabs .tab-header-area,
-.editor-tabs .tab-header-background {
-    -fx-padding: 0;
-    -fx-background-color: #f3f4f6;
-}
-
-.editor-tabs .headers-region {
-    -fx-background-color: transparent;
-}
-
-.editor-tabs .tab {
-    -fx-tab-min-width: 96px;
-    -fx-tab-pref-width: -1;
-    -fx-tab-max-width: 260px;
-    -fx-background-color: transparent;
-    -fx-background-insets: 0;
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
-    -fx-border-color: transparent transparent transparent transparent;
-    -fx-border-width: 0 0 3 0;
-    -fx-border-insets: 0;
-    -fx-padding: 3 10 2 10;
-}
-
-.collaboration-tabs .tab {
-    -fx-tab-min-width: 0;
-    -fx-tab-pref-width: -1;
-    -fx-tab-max-width: 140px;
-    -fx-padding: 3px 12px 2px 12px;
-}
-
-.collaboration-tabs .tab .tab-label {
-    -fx-padding: 0;
-}
-
-.editor-tabs .tab:hover {
-    -fx-background-color: rgba(0, 0, 0, 0.045);
-}
-.editor-tabs .tab.project-tab-group {
-    -fx-background-radius: 7px 7px 0 0;
-    -fx-padding: 3px 12px 2px;
-}
-.editor-tabs .tab.project-tab-group .tab-label {
-    -fx-text-fill: white;
-    -fx-font-weight: 700;
-}
-.editor-tabs .tab.project-tab-group:hover {
-    -fx-opacity: 0.86;
-}
-
-.editor-tabs .tab:selected {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent transparent #007acc transparent;
-}
-
-.editor-tabs .tab .focus-indicator,
-.editor-tabs .tab:selected .tab-container {
-    -fx-border-width: 0;
-    -fx-border-color: transparent;
-}
-
-.editor-tabs .tab-content-area {
-    -fx-background-color: white;
-    -fx-border-width: 0;
-}
-.app-root.focus-mode .editor-tabs .tab-header-area {
+.app-root.focus-mode .balf-tab-bar .tab-header-area {
     -fx-min-height: 0;
     -fx-pref-height: 0;
     -fx-max-height: 0;
     -fx-padding: 0;
     -fx-opacity: 0;
-}
-
-.app-root.dark .editor-tabs .tab-header-area,
-.app-root.dark .editor-tabs .tab-header-background {
-    -fx-background-color: #1b1f26;
-}
-
-.app-root.dark .editor-tabs .tab:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.06);
-}
-
-.app-root.dark .editor-tabs .tab:selected {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent transparent #517 transparent;
-}
-
-.app-root.dark .editor-tabs .tab-content-area {
-    -fx-background-color: #1b1f26;
-}
-
-/* JavaFX shows the tab overflow control as a separate button. Keep it on the
-   same dark surface as the right-panel tab strip. */
-.app-root.dark .editor-tabs .control-buttons-tab,
-.app-root.dark .editor-tabs .control-buttons-tab .container,
-.app-root.dark .editor-tabs .control-buttons-tab .tab-down-button {
-    -fx-background-color: #1b1f26;
-}
-.app-root.dark .editor-tabs .control-buttons-tab .tab-down-button:hover {
-    -fx-background-color: #303943;
-}
-.app-root.dark .editor-tabs .control-buttons-tab .arrow {
-    -fx-background-color: #cbd5e1;
 }
 
 .right-side-panels {
@@ -1188,62 +1045,6 @@
 .tab-title {
     -fx-font-size: 12px;
     -fx-padding: 0 2 0 0;
-}
-
-/* Tabs use JavaFX's original title label plus the close graphic. */
-.editor-tabs .tab > .tab-label,
-.right-side-panels .tab > .tab-label {
-    -fx-opacity: 1;
-    -fx-text-fill: -fx-text-base-color;
-    -fx-padding: 0;
-}
-
-.tab-close-button {
-    -fx-background-color: transparent;
-    -fx-padding: 0;
-
-    -fx-min-width: 8px;
-    -fx-min-height: 8px;
-    -fx-pref-width: 8px;
-    -fx-pref-height: 8px;
-    -fx-max-width: 8px;
-    -fx-max-height: 8px;
-
-    /* Thin X (JetBrains-style) */
-    -fx-shape: "M 2 2 L 3 1 L 5 3 L 7 1 L 8 2 L 6 4 L 8 6 L 7 7 L 5 5 L 3 7 L 2 6 L 4 4 Z";
-
-    -fx-opacity: 0;
-}
-
-/* Show close on hover or when selected */
-.tab:hover .tab-close-button,
-.tab:selected .tab-close-button {
-    -fx-opacity: 1;
-}
-
-/* Light theme X colour + hover */
-.tab-close-button {
-    -fx-background-color: rgba(0,0,0,0.55);
-}
-
-.tab-close-button:hover {
-    -fx-background-color: rgba(0,0,0,0.10);
-}
-
-.tab-close-button:pressed {
-    -fx-background-color: rgba(0,0,0,0.18);
-}
-
-.app-root.dark .tab-close-button {
-    -fx-background-color: rgba(255,255,255,0.86);
-}
-
-.app-root.dark .tab-close-button:hover {
-    -fx-background-color: rgba(255,255,255,0.64);
-}
-
-.app-root.dark .tab-close-button:pressed {
-    -fx-background-color: rgba(255,255,255,0.48);
 }
 
 .profiler-pane {
@@ -2580,9 +2381,7 @@
 }
 
 .side-pane,
-.pane-header,
-.editor-tabs .tab-header-area,
-.editor-tabs .tab-header-background {
+.pane-header {
     -fx-background-color: #f3f3f3;
 }
 
@@ -2648,21 +2447,11 @@
     -fx-background-color: #f3f3f3;
 }
 
-.editor-tabs .tab:hover {
-    -fx-background-color: #e8e8e8;
-}
-
 .app-root:not(.dark) .tree-view:focused .tree-cell:selected {
     -fx-background-color: transparent;
     -fx-text-fill: #202020;
 }
 
-.editor-tabs .tab:selected {
-    -fx-background-color: #ffffff;
-    -fx-border-color: transparent transparent #007acc transparent;
-}
-
-.editor-tabs .tab-content-area,
 .console-output,
 .console-output .content {
     -fx-background-color: #ffffff;
