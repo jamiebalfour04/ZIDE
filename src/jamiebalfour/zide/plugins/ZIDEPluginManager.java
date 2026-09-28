@@ -6,6 +6,8 @@ import javafx.scene.Node;
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +21,7 @@ public final class ZIDEPluginManager implements AutoCloseable {
   private final List<URLClassLoader> loaders = new ArrayList<>();
   private final List<ZIDEPlugin> plugins = new ArrayList<>();
   private final List<PluginNode> nodes = new ArrayList<>();
+  private final List<NativeMenu> nativeMenus = new ArrayList<>();
   private ZIDEPluginContext context;
 
   public List<ZIDEPlugin> load(File directory, ZIDEPluginContext context) {
@@ -38,7 +41,39 @@ public final class ZIDEPluginManager implements AutoCloseable {
         LOGGER.log(Level.WARNING, "Could not load plugin " + file.getName(), exception);
       }
     }
+    File[] nativeFiles = directory.listFiles(file -> file.isFile() && file.canExecute() && !file.getName().endsWith(".jar"));
+    if (nativeFiles != null) for (File file : nativeFiles) loadNativeManifest(file);
     return List.copyOf(plugins);
+  }
+
+  private void loadNativeManifest(File executable) {
+    try {
+      Process process = new ProcessBuilder(executable.getAbsolutePath(), "--manifest")
+          .redirectErrorStream(true).start();
+      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      if (!process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        return;
+      }
+      String target = null;
+      String title = null;
+      List<String> languages = List.of();
+      List<NativeItem> items = new ArrayList<>();
+      for (String line : output.split("\\R")) {
+        String[] fields = line.split("\\t", -1);
+        if (fields.length == 0) continue;
+        if ("ZIDE_MENU".equals(fields[0]) && fields.length >= 4) {
+          target = fields[1];
+          title = fields[2];
+          languages = fields[3].isBlank() ? List.of() : List.of(fields[3].split(","));
+        } else if ("ZIDE_ITEM".equals(fields[0]) && fields.length >= 4) {
+          items.add(new NativeItem(fields[1], fields[2], new String(Base64.getDecoder().decode(fields[3]), StandardCharsets.UTF_8)));
+        }
+      }
+      if (target != null && title != null && !items.isEmpty()) nativeMenus.add(new NativeMenu(target, title, languages, items));
+    } catch (Exception exception) {
+      LOGGER.log(Level.WARNING, "Could not read native plugin " + executable.getName(), exception);
+    }
   }
 
   public void installMenus(Map<String, BalfGlassMenuBar.GlassMenu> targetMenus) {
@@ -49,6 +84,20 @@ public final class ZIDEPluginManager implements AutoCloseable {
         BalfGlassMenuBar.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
         nodes.add(new PluginNode(submenu.getNode(), contribution.languageIds()));
         for (ZIDEPluginMenuItem item : contribution.items()) addItem(submenu, item, contribution.languageIds());
+      }
+    }
+    for (NativeMenu contribution : nativeMenus) {
+      BalfGlassMenuBar.GlassMenu target = targetMenus.get(contribution.targetMenu());
+      if (target == null) continue;
+      BalfGlassMenuBar.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
+      nodes.add(new PluginNode(submenu.getNode(), contribution.languageIds()));
+      Map<String, BalfGlassMenuBar.GlassMenu.GlassSubmenu> groups = new java.util.HashMap<>();
+      for (NativeItem item : contribution.items()) {
+        BalfGlassMenuBar.GlassMenu.GlassSubmenu parent = groups.computeIfAbsent(item.group(), submenu::submenu);
+        Node node = parent.createItem(item.name(), "", () -> {
+          if (context != null) context.insertText(item.text());
+        });
+        nodes.add(new PluginNode(node, contribution.languageIds()));
       }
     }
   }
@@ -86,4 +135,6 @@ public final class ZIDEPluginManager implements AutoCloseable {
   }
 
   private record PluginNode(Node node, List<String> languageIds) { }
+  private record NativeMenu(String targetMenu, String title, List<String> languageIds, List<NativeItem> items) { }
+  private record NativeItem(String group, String name, String text) { }
 }
