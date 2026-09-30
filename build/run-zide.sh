@@ -19,9 +19,12 @@ fi
 if [ -n "${JAVAFX_HOME:-}" ]; then
   JAVAFX_DIR=$JAVAFX_HOME
 else
-  JAVAFX_DIR="$PROJECT_DIR/package/ZIDE.app/Contents/app/jfx"
+  JAVAFX_DIR="$PROJECT_DIR/lib/jfx21"
   if [ ! -d "$JAVAFX_DIR" ]; then
-    JAVAFX_DIR="$BUILD_DIR/javafx"
+    JAVAFX_DIR="$PROJECT_DIR/package/ZIDE.app/Contents/app/jfx"
+    if [ ! -d "$JAVAFX_DIR" ]; then
+      JAVAFX_DIR="$BUILD_DIR/javafx"
+    fi
   fi
 fi
 
@@ -33,6 +36,7 @@ fi
 
 BALFLAFFX_PATH=""
 for candidate in \
+  "$PROJECT_DIR/lib/BalfLafFX.jar" \
   "$PROJECT_DIR/../BalfLafFX/out/production/BalfLafFX" \
   "$BUILD_DIR/BalfLafFX.jar" \
   "$PROJECT_DIR/../BalfLafFX/build/dist/BalfLafFX.jar" \
@@ -50,8 +54,10 @@ fi
 
 exec "$JAVA" \
   --module-path "$JAVAFX_DIR" \
+  --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
   --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.web,jdk.jdi,jdk.httpserver \
-  --enable-native-access=javafx.graphics \
+  --enable-native-access=javafx.graphics,javafx.web,ALL-UNNAMED \
   -Djava.library.path="$JAVAFX_DIR" \
+  -Djavafx.suppressPreviewWarning=true \
   -cp "$BALFLAFFX_PATH:$BUILD_DIR/zide.jar:$BUILD_DIR/zide-plugin-api.jar" \
   jamiebalfour.zide.core.ZIDE "$@"

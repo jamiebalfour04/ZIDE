@@ -1,7 +1,7 @@
 <component name="libraryTable">
-  <library name="flowless-0.7.3">
+  <library name="jna-5.13.0">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/lib/flowless-0.7.3.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jna-5.13.0.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
