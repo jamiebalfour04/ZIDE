@@ -55,14 +55,17 @@ final class ZIDESettingsPanel extends VBox {
   private final PasswordField collaborationPassword;
   private final TextField collaborationAvatar;
   private final Map<String, TextField> runtimeFields = new LinkedHashMap<>();
+  private final Runnable resetLayoutAction;
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
                     String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean codeMapValue, boolean preferZpex, boolean showInputPromptValue, String maximumMemoryValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
                     String collaborationPasswordValue, String collaborationAvatarValue,
-                    Map<String, String> runtimePaths, Function<String, String> runtimeRedetector) {
+                    Map<String, String> runtimePaths, Function<String, String> runtimeRedetector,
+                    Runnable resetLayoutAction) {
     super(18);
+    this.resetLayoutAction = resetLayoutAction;
 
     FlowPane sections = new FlowPane(Orientation.VERTICAL);
     sections.getStyleClass().add("settings-section-list");
@@ -90,6 +93,12 @@ final class ZIDESettingsPanel extends VBox {
     groupProjectTabs = new CheckBox("Group tabs by project");
     groupProjectTabs.setSelected(groupProjectTabsValue);
     guiFields.add(groupProjectTabs, 1, 1);
+    Button resetLayout = new Button("Reset ZIDE layout");
+    resetLayout.setOnAction(event -> {
+      if (this.resetLayoutAction != null) this.resetLayoutAction.run();
+    });
+    resetLayout.setTooltip(new javafx.scene.control.Tooltip("Restore the default panel, window, and workspace layout."));
+    guiFields.add(resetLayout, 1, 2);
     GridPane.setHgrow(theme, Priority.ALWAYS);
     VBox gui = section("GUI", guiFields);
     gui.setMinWidth(0);
@@ -179,14 +188,16 @@ final class ZIDESettingsPanel extends VBox {
     }
     ScrollPane runtimeScroll = new ScrollPane(runtimeContent);
     runtimeScroll.setFitToWidth(true);
-    runtimeScroll.setFitToHeight(false);
-    runtimeScroll.setPrefViewportHeight(420);
-    runtimeScroll.setPrefHeight(420);
-    runtimeScroll.setMaxHeight(420);
+    runtimeScroll.setFitToHeight(true);
+    //runtimeScroll.setPrefViewportHeight(420);
+    //runtimeScroll.setPrefHeight(420);
+    runtimeScroll.setMaxHeight(Double.MAX_VALUE);
     runtimeScroll.setMinHeight(0);
     runtimeScroll.getStyleClass().addAll("code-editor-scroll-pane", "roundedArea");
     VBox.setVgrow(runtimeScroll, Priority.ALWAYS);
     VBox runtimes = section("Runtimes & Compilers", runtimeScroll);
+    VBox.setVgrow(runtimes, Priority.ALWAYS);
+    runtimes.setMaxHeight(Double.MAX_VALUE);
     runtimes.getStyleClass().add("settings-runtime-section");
 
     url = new TextField(chatGPTUrl);
@@ -250,16 +261,18 @@ final class ZIDESettingsPanel extends VBox {
       choice.setOnAction(event -> collaborationAvatar.setText(avatar.value()));
       avatarChoices.add(choice, avatar.index() % 8, avatar.index() / 8);
     }
+    Label hostedServerNote = new Label("jamiebalfour.scot provides a free hosted collaboration server with limited resources. For larger sessions, use your own server. Avatars produced by ChatGPT.");
+    hostedServerNote.setWrapText(true);
+    hostedServerNote.getStyleClass().add("settings-help-text");
+    collaborationFields.add(hostedServerNote, 0, 5, 2, 1);
+
     Label builtInLabel = new Label("Built-in avatars");
     builtInLabel.getStyleClass().add("settings-help-text");
     VBox avatarOptions = new VBox(8, avatarField, builtInLabel, avatarChoices);
     avatarOptions.setMaxWidth(Double.MAX_VALUE);
     GridPane.setHgrow(avatarOptions, Priority.ALWAYS);
     collaborationFields.addRow(4, new Label("Avatar"), avatarOptions);
-    Label hostedServerNote = new Label("jamiebalfour.scot provides a free hosted collaboration server with limited resources. For larger sessions, use your own server.");
-    hostedServerNote.setWrapText(true);
-    hostedServerNote.getStyleClass().add("settings-help-text");
-    collaborationFields.add(hostedServerNote, 0, 5, 2, 1);
+
     GridPane.setHgrow(collaborationServer, Priority.ALWAYS);
     GridPane.setHgrow(collaborationPort, Priority.ALWAYS);
     GridPane.setHgrow(collaborationName, Priority.ALWAYS);
@@ -334,10 +347,16 @@ final class ZIDESettingsPanel extends VBox {
     });
     if (darkMode) getStyleClass().add("settings-dark");
     setPrefWidth(840);
-    // Keep the modal stable while switching pages; long runtime lists scroll inside their viewport.
+    // The settings view can be embedded as a full workspace surface; its
+    // internal pages and scroll panes should consume the available height.
     setMinHeight(560);
     setPrefHeight(560);
-    setMaxHeight(560);
+    setMaxHeight(Double.MAX_VALUE);
+    String settingsBackground = darkMode ? "#1e1e1e" : "#ffffff";
+    String settingsText = darkMode ? "#f3f3f3" : "#202020";
+    setStyle("-fx-background-color: " + settingsBackground + ";"
+        + "-fx-text-background-color: " + settingsText + ";"
+        + "-fx-text-base-color: " + settingsText + ";");
   }
 
   boolean hasValidChatGPTSettings() {

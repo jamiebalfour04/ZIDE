@@ -614,9 +614,8 @@
 .app-root.dark .console-output .styled-text-area,
 .app-root.dark .console-output .styled-text-area .content,
 .app-root.dark .console-output .paragraph-box {
-    -fx-background: #1e1e1e;
-    -fx-background-color: #1e1e1e;
-    -fx-control-inner-background: #1e1e1e;
+    -fx-background-color: #111318;
+    -fx-control-inner-background: #111318;
 }
 
 .app-root.dark .code-area .caret,
@@ -2218,7 +2217,7 @@
 
 .zpe-online-scroll {
     -fx-background-color: transparent;
-    -fx-background: transparent;
+    -fx-background-color: transparent;
     -fx-border-color: #d4d8dd;
     -fx-border-width: 1px;
     -fx-border-radius: 4px;
@@ -2598,7 +2597,7 @@
 }
 .project-tree .project-file-name { -fx-text-fill: #202020; }
 .project-tree .project-file-name {
-    -fx-background: transparent;
+    -fx-background-color: transparent;
     -fx-background-color: transparent;
 }
 .project-tree .project-file-open-indicator {
@@ -3687,7 +3686,15 @@
     -fx-padding: 8px 0;
 }
 
-.settings-content { -fx-min-height: 300px; }
+.settings-content {
+    -fx-min-height: 300px;
+    -fx-text-background-color: #202020;
+    -fx-text-base-color: #202020;
+}
+.settings-content.settings-dark {
+    -fx-text-background-color: #f3f3f3;
+    -fx-text-base-color: #f3f3f3;
+}
 .settings-dark {
     -fx-background-color: #1f1f1f;
     -fx-text-fill: #f3f3f3;
@@ -3731,7 +3738,7 @@
 .settings-dark .code-editor-scroll-pane .viewport,
 .settings-dark .code-editor-scroll-pane .content {
     -fx-background-color: #1f1f1f;
-    -fx-background: #1f1f1f;
+    -fx-background-color: #1f1f1f;
 }
 .settings-content .settings-help-text {
     -fx-text-fill: #77818c;
@@ -3785,7 +3792,8 @@
 .settings-runtime-section { -fx-padding: 12px 0 24px 24px; }
 .settings-section-list {
     -fx-background-color: #eef0f3;
-    -fx-background-radius: 8px;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
     -fx-padding: 4px;
 }
 .settings-section-tab {
@@ -3807,7 +3815,7 @@
 .settings-page-scroll .viewport,
 .settings-page-scroll .content {
     -fx-background-color: #ffffff;
-    -fx-background: #ffffff;
+    -fx-background-color: #ffffff;
 }
 .settings-page-scroll .scroll-bar:vertical {
     -fx-background-color: #e7ebf0;
@@ -3832,7 +3840,7 @@
 .settings-content .code-editor-scroll-pane .viewport,
 .settings-content .code-editor-scroll-pane .content {
     -fx-background-color: #ffffff;
-    -fx-background: #ffffff;
+    -fx-background-color: #ffffff;
 }
 .settings-content .code-editor-scroll-pane {
     -fx-border-color: transparent;
@@ -3868,7 +3876,7 @@
 .in-window-modal-dark .settings-content .code-editor-scroll-pane .viewport,
 .in-window-modal-dark .settings-content .code-editor-scroll-pane .content {
     -fx-background-color: #1f1f1f;
-    -fx-background: #1f1f1f;
+    -fx-background-color: #1f1f1f;
 }
 .in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar:vertical,
 .in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar:horizontal {
@@ -3915,7 +3923,7 @@
 .settings-content.settings-dark .settings-page-scroll .viewport,
 .settings-content.settings-dark .settings-page-scroll .content {
     -fx-background-color: #1f1f1f;
-    -fx-background: #1f1f1f;
+    -fx-background-color: #1f1f1f;
 }
 .settings-content.settings-dark .settings-page-scroll .scroll-bar:vertical {
     -fx-background-color: #21262f;
@@ -4035,7 +4043,7 @@
 .settings-content.settings-dark .code-editor-scroll-pane .viewport,
 .settings-content.settings-dark .code-editor-scroll-pane .content {
     -fx-background-color: #1f1f1f;
-    -fx-background: #1f1f1f;
+    -fx-background-color: #1f1f1f;
 }
 .settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical,
 .settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:horizontal {
@@ -4309,6 +4317,76 @@
     -fx-border-color: #454d59 transparent transparent transparent;
 }
 
+/* Settings uses the same full-workspace toolbar treatment as the RegExp builder. */
+.settings-toolbar {
+    -fx-padding: 8px 12px;
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: transparent transparent #d4d4d4 transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+.settings-toolbar-title {
+    -fx-font-weight: bold;
+    -fx-text-fill: #202020;
+}
+.settings-toolbar-subtitle {
+    -fx-text-fill: #616161;
+}
+.settings-toolbar-button,
+.settings-toolbar-close {
+    -fx-background-color: #f3f3f3;
+    -fx-border-color: #d4d4d4;
+    -fx-text-fill: #202020;
+}
+.settings-toolbar-button:hover,
+.settings-toolbar-close:hover {
+    -fx-background-color: #e8e8e8;
+}
+.settings-toolbar-primary {
+    -fx-background-color: #7b1fa2;
+    -fx-border-color: #7b1fa2;
+    -fx-text-fill: white;
+}
+.settings-toolbar-primary:hover {
+    -fx-background-color: #6a1b8c;
+}
+.settings-toolbar-close {
+    -fx-min-width: 22px;
+    -fx-pref-width: 22px;
+    -fx-max-width: 22px;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-max-height: 22px;
+    -fx-padding: 0;
+    -fx-background-radius: 7px;
+    -fx-font-size: 16px;
+}
+.settings-toolbar.dark {
+    -fx-background-color: #292f39;
+    -fx-border-color: transparent transparent #454d59 transparent;
+}
+.settings-toolbar.dark .settings-toolbar-title,
+.settings-toolbar.dark .settings-toolbar-subtitle {
+    -fx-text-fill: #e7eaee;
+}
+.settings-toolbar.dark .settings-toolbar-button,
+.settings-toolbar.dark .settings-toolbar-close {
+    -fx-background-color: #303943;
+    -fx-border-color: #454d59;
+    -fx-text-fill: #e7eaee;
+}
+.settings-toolbar.dark .settings-toolbar-button:hover,
+.settings-toolbar.dark .settings-toolbar-close:hover {
+    -fx-background-color: #3a4652;
+}
+.settings-toolbar.dark .settings-toolbar-primary {
+    -fx-background-color: #07566f;
+    -fx-border-color: #07566f;
+    -fx-text-fill: #ffffff;
+}
+.settings-toolbar.dark .settings-toolbar-primary:hover {
+    -fx-background-color: #086b87;
+}
+
 /* Keep builder scrollbars as quiet and compact as the main editor scrollbars. */
 .language-builder .scroll-bar:vertical {
     -fx-pref-width: 18px;
@@ -4490,6 +4568,34 @@
 
 .status-bar .status-text {
     -fx-opacity: 0.72;
+}
+
+/* Settings is a workspace page, so its scroll track should disappear into
+   the page rather than forming a separate strip. */
+.settings-page-scroll,
+.settings-page-scroll .viewport,
+.settings-page-scroll .corner,
+.settings-page-scroll .scroll-bar,
+.settings-page-scroll .scroll-bar:vertical,
+.settings-page-scroll .scroll-bar:horizontal,
+.settings-page-scroll .scroll-bar .track,
+.settings-page-scroll .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.settings-page-scroll .scroll-bar:vertical {
+    -fx-pref-width: 14px;
+    -fx-min-width: 14px;
+    -fx-max-width: 14px;
+    -fx-padding: 0 4px;
+}
+.settings-page-scroll .scroll-bar .thumb {
+    -fx-background-color: #aeb6c0;
+    -fx-background-radius: 4px;
+    -fx-background-insets: 1px 0;
+}
+.app-root.dark .settings-page-scroll .scroll-bar .thumb {
+    -fx-background-color: #59616d;
 }
 
 .status-bar .caret-position {
@@ -4994,7 +5100,7 @@
 .project-tree .tree-cell.active-project-file,
 .project-tree .tree-cell.active-project-file:filled,
 .project-tree .tree-cell.active-project-file:filled {
-    -fx-background: transparent;
+    -fx-background-color: transparent;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     /* Keep the same content origin as every other tree row. */
@@ -5012,7 +5118,7 @@
 .app-root:not(.dark) .project-tree .tree-cell:filled:hover,
 .app-root.dark .project-tree .tree-cell:filled,
 .app-root.dark .project-tree .tree-cell:filled:hover {
-    -fx-background: transparent;
+    -fx-background-color: transparent;
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-background-radius: 0;
@@ -5027,7 +5133,7 @@
 .app-root.dark .project-tree .tree-cell:hover,
 .app-root.dark .project-tree .tree-cell.active-project-root,
 .app-root.dark .project-tree .tree-cell.active-project-file {
-    -fx-background: transparent;
+    -fx-background-color: transparent;
     -fx-background-color: transparent;
 }
 .app-root:not(.dark) .project-tree .tree-cell:hover,

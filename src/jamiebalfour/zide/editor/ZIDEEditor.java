@@ -311,6 +311,7 @@ public class ZIDEEditor extends Application {
   private ZIDELanguageBuilder languageBuilder;
   private Node regexBuilderOverlay;
   private ZIDERegexBuilder regexBuilder;
+  private Node settingsWorkspaceOverlay;
   private volatile boolean watchingProjectDirectory;
   private PauseTransition externalFileChangeTimer;
   private String cloudFileName = "";
@@ -1448,6 +1449,14 @@ public class ZIDEEditor extends Application {
       Tab selected = rightSidePanels.getSelectionModel().getSelectedItem();
       MAIN_PROPERTIES.setProperty("LAYOUT_RIGHT_ACTIVE_TAB", selected == unfoldDockTab ? "unfold" : selected == byteCodeDockTab ? "bytecode" : selected == scratchPadDockTab ? "scratchpad" : selected == browserDockTab ? "browser" : selected == pdfDockTab ? "pdf" : selected == aiAssistDockTab ? "aiassist" : "");
     }
+    if (leftSidePanels != null) {
+      int index = 0;
+      for (Tab tab : leftSidePanels.getTabs()) {
+        String id = dockPanelId(tab);
+        if (id != null) MAIN_PROPERTIES.setProperty("LAYOUT_LEFT_TOOL_TAB_" + index++, id);
+      }
+      MAIN_PROPERTIES.setProperty("LAYOUT_LEFT_TOOL_TAB_COUNT", Integer.toString(index));
+    }
     if (projectTree != null && projectTree.getRoot() != null) {
       saveProjectTreeExpandedState(currentProjectRoot, projectTree.getRoot());
     }
@@ -1456,6 +1465,15 @@ public class ZIDEEditor extends Application {
   private void scheduleEditorLayoutSave() {
     if (restoringEditorLayout || layoutPersistenceTimer == null) return;
     layoutPersistenceTimer.playFromStart();
+  }
+
+  private void restoreLeftDockPanels() {
+    if (leftSidePanels == null) return;
+    int count = propertyInt("LAYOUT_LEFT_TOOL_TAB_COUNT", 0);
+    for (int i = 0; i < count; i++) {
+      Tab panel = panelForDockId(MAIN_PROPERTIES.getProperty("LAYOUT_LEFT_TOOL_TAB_" + i, ""));
+      if (panel != null && !leftSidePanels.getTabs().contains(panel)) leftSidePanels.getTabs().add(panel);
+    }
   }
 
   private int propertyInt(String name, int fallback) {
@@ -1492,6 +1510,7 @@ public class ZIDEEditor extends Application {
     List<String> paths = restoreProjectTabs(currentProjectRoot);
     String activePath = projectLayoutProperty(currentProjectRoot, "activeTab", MAIN_PROPERTIES.getProperty("LAYOUT_ACTIVE_TAB", ""));
     selectEditorTab(activePath);
+    restoreLeftDockPanels();
     String bottomPanel = MAIN_PROPERTIES.getProperty("LAYOUT_BOTTOM_PANEL", "problems");
     switch (bottomPanel) {
       case "console" -> {
@@ -1885,6 +1904,7 @@ public class ZIDEEditor extends Application {
       if (collaborationChatTab.isSelected()) collaborationChatTab.getStyleClass().remove("chat-unread");
     });
     leftSidePanels.getTabs().add(filesTab);
+    leftSidePanels.setTabReorderingEnabled(true);
     leftSidePanels.getTabs().addListener((javafx.collections.ListChangeListener<Tab>) change -> BalfTabBarFX.updateHeaderVisibility(leftSidePanels));
     BalfTabBarFX.updateHeaderVisibility(leftSidePanels);
     collaborationSidebar = new BalfTabBarFX();
@@ -2904,6 +2924,7 @@ public class ZIDEEditor extends Application {
     content.getStyleClass().add("about-content");
     content.setPrefWidth(410);
     showInWindowModal("About ZIDE", "A modern IDE for ZPE and YASS.", content, "Done", () -> true, false);
+    setActiveModalWidth(520);
     if (activeModalOverlay != null && !activeModalOverlay.getChildren().isEmpty() && activeModalOverlay.getChildren().getFirst() instanceof Region aboutPanel) {
       aboutPanel.setPrefWidth(400);
     }
@@ -5517,6 +5538,9 @@ public class ZIDEEditor extends Application {
             mainHorizontalSplit.getItems().add(0, collaborationSidebar);
           }
           setLeftSplitWidth(mainHorizontalSplit, layoutDimension("LAYOUT_COLLABORATION_SIDEBAR_WIDTH", 400, 260, 700));
+          // Collaboration replaces the left project explorer only. Keep the
+          // editor's right-side tools (Unfold, PDF, and other panels) active.
+          updateEditorRightPanelLayout();
           collaborationSidebar.getSelectionModel().select(collaborationFilesTab);
           session.participantAvatars = participantAvatars;
           updateCollaborationAvatars(participantNames, participantAvatars);
@@ -6098,6 +6122,7 @@ public class ZIDEEditor extends Application {
       mainHorizontalSplit.getItems().add(0, leftSidePanels);
     }
     setLeftSplitWidth(mainHorizontalSplit, layoutDimension("LAYOUT_EXPLORER_WIDTH", 260, 180, 700));
+    updateEditorRightPanelLayout();
     if (focusModeActive) {
       focusModeExitButton.setVisible(true);
       focusModeExitButton.setManaged(true);
@@ -6343,14 +6368,65 @@ public class ZIDEEditor extends Application {
     return stripCodeFence(chatGPT.sendMessage(systemMessage, userMessage));
   }
 
+  private void resetZideLayout() {
+    for (String key : new ArrayList<>(MAIN_PROPERTIES.stringPropertyNames())) {
+      if (key.startsWith("LAYOUT_") || key.equals("XPOS") || key.equals("YPOS")
+          || key.equals("WIDTH") || key.equals("HEIGHT") || key.equals("MAXIMISE")) {
+        MAIN_PROPERTIES.remove(key);
+      }
+    }
+    saveProps();
+    showMessage("ZIDE layout reset", "The default layout will be used the next time ZIDE starts.");
+  }
+
   /**
    * Opens the sectioned settings surface; further groups can be added to the sidebar later.
    */
   private void openSettings() {
     if (applicationMenuBar != null) applicationMenuBar.hideMenus();
-    ZIDESettingsPanel settings = new ZIDESettingsPanel(darkThemeEnabled, isDarkThemeEnabled() ? "Dark" : "Light", editorLightTheme, editorDarkTheme, editorFontFamily, editorFontSize, indentationSpaces, USE_WORD_WRAP, codeMapEnabled, preferZpex, showInputPrompt, zpeMaximumMemory, groupProjectTabs, blockClosuresEnabled, autoOpenCsvSpreadsheet, MAIN_PROPERTIES.getProperty("CHATGPT_URL", "https://api.openai.com/v1/responses"), MAIN_PROPERTIES.getProperty("CHATGPT_KEY", ""), MAIN_PROPERTIES.getProperty("CHATGPT_MODEL", "gpt-5-mini"), MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"), MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"), MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")), MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""), MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", ""), runtimePathsForSettings(), this::redetectRuntimePath);
+    ZIDESettingsPanel settings = new ZIDESettingsPanel(darkThemeEnabled, isDarkThemeEnabled() ? "Dark" : "Light", editorLightTheme, editorDarkTheme, editorFontFamily, editorFontSize, indentationSpaces, USE_WORD_WRAP, codeMapEnabled, preferZpex, showInputPrompt, zpeMaximumMemory, groupProjectTabs, blockClosuresEnabled, autoOpenCsvSpreadsheet, MAIN_PROPERTIES.getProperty("CHATGPT_URL", "https://api.openai.com/v1/responses"), MAIN_PROPERTIES.getProperty("CHATGPT_KEY", ""), MAIN_PROPERTIES.getProperty("CHATGPT_MODEL", "gpt-5-mini"), MAIN_PROPERTIES.getProperty("COLLABORATION_SERVER", "jamiebalfour.scot"), MAIN_PROPERTIES.getProperty("COLLABORATION_PORT", "6600"), MAIN_PROPERTIES.getProperty("COLLABORATION_NAME", System.getProperty("user.name", "ZIDE User")), MAIN_PROPERTIES.getProperty("COLLABORATION_PASSWORD", ""), MAIN_PROPERTIES.getProperty("COLLABORATION_AVATAR", ""), runtimePathsForSettings(), this::redetectRuntimePath, this::resetZideLayout);
 
-    showInWindowModal("Settings", "Configure ZIDE", settings, "Save", () -> {
+    Label settingsTitle = new Label("Settings");
+    settingsTitle.getStyleClass().add("settings-toolbar-title");
+    Label settingsSubtitle = new Label("Configure ZIDE");
+    settingsSubtitle.getStyleClass().add("settings-toolbar-subtitle");
+    VBox settingsHeading = new VBox(2, settingsTitle, settingsSubtitle);
+    settingsHeading.setPadding(new Insets(4, 18, 4, 18));
+    Region settingsSpacer = new Region();
+    HBox.setHgrow(settingsSpacer, Priority.ALWAYS);
+    Button cancelSettings = new Button("Cancel");
+    cancelSettings.getStyleClass().add("settings-toolbar-button");
+    Button saveSettings = new Button("Save");
+    saveSettings.getStyleClass().addAll("settings-toolbar-button", "settings-toolbar-primary");
+    Button closeSettings = new Button("×");
+    closeSettings.getStyleClass().add("settings-toolbar-close");
+    closeSettings.setAccessibleText("Close settings");
+    HBox settingsActions = new HBox(8, cancelSettings, saveSettings, closeSettings);
+    settingsActions.setAlignment(Pos.CENTER_RIGHT);
+    HBox settingsToolbar = new HBox(settingsHeading, settingsSpacer, settingsActions);
+    settingsToolbar.setAlignment(Pos.CENTER_LEFT);
+    settingsToolbar.getStyleClass().add("settings-toolbar");
+    if (darkThemeEnabled) settingsToolbar.getStyleClass().add("dark");
+    settingsToolbar.setPadding(new Insets(4, 18, 4, 18));
+
+    BorderPane settingsFrame = new BorderPane(settings);
+    settingsFrame.getStyleClass().add("zide-macro-editor-frame");
+    settingsFrame.setMinSize(0, 0);
+    settingsFrame.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+    settingsFrame.setPickOnBounds(true);
+    settingsFrame.setMouseTransparent(false);
+    String settingsBackground = darkThemeEnabled ? "#1e1e1e" : "#ffffff";
+    String settingsText = darkThemeEnabled ? "#f3f3f3" : "#202020";
+    settingsFrame.setStyle("-fx-background-color: " + settingsBackground + ";"
+        + "-fx-text-background-color: " + settingsText + ";"
+        + "-fx-text-base-color: " + settingsText + ";");
+    settingsFrame.setTop(settingsToolbar);
+    settings.setMouseTransparent(false);
+    BorderPane.setMargin(settings, Insets.EMPTY);
+    closeSettings.setOnAction(event -> closeSettingsWorkspace());
+    cancelSettings.setOnAction(event -> closeSettingsWorkspace());
+
+    BooleanSupplier saveSettingsAction = () -> {
       if (!settings.hasValidChatGPTSettings()) {
         showError("ChatGPT settings", "Enter the API URL, API key and model.");
         return false;
@@ -6416,8 +6492,27 @@ public class ZIDEEditor extends Application {
       updateLanguageCommands(tab == null ? null : languageSupports.get(tab.getLanguageId()));
       statusLabel.setText("Settings saved");
       return true;
+    };
+    saveSettings.setOnAction(event -> {
+      if (saveSettingsAction.getAsBoolean()) closeSettingsWorkspace();
     });
-    setActiveModalWidth(900);
+    settings.setPrefHeight(680);
+    settings.setMaxHeight(Double.MAX_VALUE);
+    settings.getStyleClass().add("settings-full-page");
+    settingsWorkspaceOverlay = settingsFrame;
+    workspaceStack.getChildren().add(settingsWorkspaceOverlay);
+    settingsWorkspaceOverlay.toFront();
+    workspaceStack.setPickOnBounds(true);
+    Platform.runLater(settingsFrame::requestFocus);
+    setFullscreenWorkspaceChrome(true);
+  }
+
+  private void closeSettingsWorkspace() {
+    if (settingsWorkspaceOverlay != null) {
+      workspaceStack.getChildren().remove(settingsWorkspaceOverlay);
+      settingsWorkspaceOverlay = null;
+      setFullscreenWorkspaceChrome(false);
+    }
   }
 
   boolean isBlockClosuresEnabled() {
@@ -6847,13 +6942,25 @@ public class ZIDEEditor extends Application {
   }
 
   private void setRegexBuilderModal(boolean open) {
+    setFullscreenWorkspaceChrome(open);
+  }
+
+  private void setFullscreenWorkspaceChrome(boolean open) {
     if (applicationMenuBar != null) {
       applicationMenuBar.setDisable(open);
-      applicationMenuBar.setOpacity(open ? 0.42 : 1.0);
+      applicationMenuBar.setOpacity(1.0);
+      applicationMenuBar.lookupAll(".glass-menu-title").forEach(node -> {
+        node.setOpacity(open ? 0 : 1);
+        node.setMouseTransparent(open);
+      });
     }
     if (titleBarActions != null) {
       titleBarActions.setDisable(open);
       titleBarActions.setOpacity(open ? 0.42 : 1.0);
+    }
+    if (projectSelector != null) {
+      projectSelector.setDisable(open);
+      projectSelector.setOpacity(open ? 0.42 : 1.0);
     }
   }
 
@@ -9118,6 +9225,9 @@ public class ZIDEEditor extends Application {
     scratchPadPanel = new ZIDEScratchPadPanel(message -> statusLabel.setText(message));
     rightSidePanels = new BalfTabBarFX();
     rightSidePanels.getStyleClass().add("right-side-panels");
+    rightSidePanels.setTabReorderingEnabled(true);
+    leftSidePanels.setExternalTabDropHandler(this::movePanelToLeftDock);
+    rightSidePanels.setExternalTabDropHandler(this::movePanelToRightDock);
     rightSidePanels.setTabClosingPolicy(TabPane.TabClosingPolicy.ALL_TABS);
     rightSidePanels.setMinWidth(0);
     rightSidePanels.setPrefWidth(0);
@@ -9668,7 +9778,8 @@ public class ZIDEEditor extends Application {
     try {
       writeProjectMetadata(projectPath, colour, loadVariableColours(projectPath.toString()));
       projectGroupColors.put(projectPath, colour);
-      if (projectSelectorMenu != null) projectSelectorMenu.hide();
+      // Keep the project popup open so another project action can be chosen
+      // without reopening it.
       refreshProjectSelector();
       updateSelectedTabProjectColour();
       rebuildProjectBrowser();
@@ -9730,6 +9841,45 @@ public class ZIDEEditor extends Application {
     } else if (!showPanel && wasAttached) {
       editorRightSplit.getItems().remove(rightSidePanels);
     }
+  }
+
+  private boolean isMovableDockPanel(Tab tab) {
+    return tab == unfoldDockTab || tab == byteCodeDockTab || tab == scratchPadDockTab
+        || tab == browserDockTab || tab == pdfDockTab || tab == aiAssistDockTab;
+  }
+
+  private String dockPanelId(Tab tab) {
+    return tab == unfoldDockTab ? "unfold" : tab == byteCodeDockTab ? "bytecode" : tab == scratchPadDockTab ? "scratchpad" : tab == browserDockTab ? "browser" : tab == pdfDockTab ? "pdf" : tab == aiAssistDockTab ? "aiassist" : null;
+  }
+
+  private Tab panelForDockId(String id) {
+    return switch (id) {
+      case "unfold" -> unfoldDockTab;
+      case "bytecode" -> byteCodeDockTab;
+      case "scratchpad" -> scratchPadDockTab;
+      case "browser" -> browserDockTab;
+      case "pdf" -> pdfDockTab;
+      case "aiassist" -> aiAssistDockTab;
+      default -> null;
+    };
+  }
+
+  private void movePanelToLeftDock(Tab tab) {
+    if (!isMovableDockPanel(tab) || leftSidePanels == null || rightSidePanels == null) return;
+    rightSidePanels.getTabs().remove(tab);
+    if (!leftSidePanels.getTabs().contains(tab)) leftSidePanels.getTabs().add(tab);
+    leftSidePanels.getSelectionModel().select(tab);
+    updateEditorRightPanelLayout();
+    scheduleEditorLayoutSave();
+  }
+
+  private void movePanelToRightDock(Tab tab) {
+    if (!isMovableDockPanel(tab) || leftSidePanels == null || rightSidePanels == null) return;
+    leftSidePanels.getTabs().remove(tab);
+    if (!rightSidePanels.getTabs().contains(tab)) rightSidePanels.getTabs().add(tab);
+    rightSidePanels.getSelectionModel().select(tab);
+    updateEditorRightPanelLayout();
+    scheduleEditorLayoutSave();
   }
 
   private void configurePanelTab(Tab tab, String title) {
@@ -11713,8 +11863,10 @@ public class ZIDEEditor extends Application {
     boolean ywp = language != null && language.supportsYwpPreview();
     boolean transpilable = language != null && language.canTranspile();
     boolean dataLanguage = language != null && language.isDataLanguage();
+    // Keep the Script menu stable while switching languages. Individual actions
+    // are disabled below when the selected language cannot use them.
     if (scriptMenu != null)
-      scriptMenu.setVisible(!dataLanguage && (runnable || compilable || debuggable || transpilable || ywp));
+      scriptMenu.setVisible(language != null && !dataLanguage);
     // Keep ZPE Online browsing and account actions available for every file
     // type; only the save item is restricted to validated YASS documents.
     if (zpeOnlineMenu != null) {
@@ -11729,7 +11881,8 @@ public class ZIDEEditor extends Application {
     setMenuItemAvailable(ywpPreviewMenuItem, language != null && language.supportsYwpPreview());
     boolean projectCanCompile = currentProjectRoot != null && !isWorkspaceContainerRoot(currentProjectRoot);
     setMenuItemAvailable(compileScriptMenuItem, compilable && ((yass && isCurrentProjectType("zpe")) || !yass));
-    setMenuItemAvailable(buildJavaJarMenuItem, language != null && language.canBuildJar() && isCurrentProjectType("java"));
+    boolean canBuildJavaJar = language != null && language.canBuildJar() && isCurrentProjectType("java");
+    setMenuItemEnabled(buildJavaJarMenuItem, canBuildJavaJar);
     setMenuItemAvailable(compileNativeMenuItem, language != null && language.canCompileNative() && isCurrentProjectType("zpe"));
     setMenuItemAvailable(formatDocumentMenuItem, yass);
     setMenuItemAvailable(expandShortBlocksMenuItem, language != null && language.supportsShortBlockExpansion());
@@ -14207,6 +14360,96 @@ public class ZIDEEditor extends Application {
     return String.format(Locale.ROOT, "Time %d:%06.3f", minutes, seconds);
   }
 
+  private String handleZideTerminalCommand(String arguments) {
+    String command = arguments == null ? "" : arguments.trim();
+    if (command.equalsIgnoreCase("run")) {
+      runCode();
+      return "Started the current file.";
+    }
+    if (command.equalsIgnoreCase("stop")) {
+      stopExecution();
+      return "Stopped execution.";
+    }
+    if (command.equalsIgnoreCase("version")) {
+      return "ZIDE " + ZIDE.getMajorVersion() + "." + ZIDE.getMinorVersion()
+              + " | Java " + System.getProperty("java.version")
+              + " | JavaFX " + System.getProperty("javafx.version", "unknown");
+    }
+    if (command.equalsIgnoreCase("project")) {
+      return currentProjectRoot == null ? "No project is open." : "Project: " + currentProjectRoot.getAbsolutePath();
+    }
+    if (command.equalsIgnoreCase("build")) {
+      compileCurrentLanguage();
+      return "Build started.";
+    }
+    if (command.equalsIgnoreCase("clear-cache")) {
+      return clearZideCache();
+    }
+    if (command.equalsIgnoreCase("open") || command.regionMatches(true, 0, "open ", 0, 5)) {
+      return openZideProjectCommand(command.length() <= 4 ? "" : command.substring(5).trim());
+    }
+    return "zide: unknown command: " + command + "\nUse 'zide help' to list commands.";
+  }
+
+  private String clearZideCache() {
+    if (currentProjectRoot == null) return "No project is open; there is no project cache to clear.";
+    Path cache = currentProjectRoot.toPath().resolve(".zide-cache");
+    if (!Files.exists(cache)) return "No ZIDE cache was present in the current project.";
+    try (var paths = Files.walk(cache)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+        try { Files.deleteIfExists(path); } catch (IOException ignored) { }
+      });
+      return "Cleared the ZIDE project cache.";
+    } catch (IOException exception) {
+      return "Could not clear the ZIDE cache: " + exception.getMessage();
+    }
+  }
+
+  private String openZideProjectCommand(String supplied) {
+    if (supplied.isBlank()) return "Usage: zide open <project-folder>";
+    Path projects = defaultProjectsFolder().toPath().toAbsolutePath().normalize();
+    Path source;
+    try {
+      String expanded = supplied.startsWith("~")
+              ? System.getProperty("user.home") + supplied.substring(1) : supplied;
+      Path requested = Path.of(expanded);
+      if (!requested.isAbsolute()) {
+        Path managedProject = projects.resolve(requested).normalize();
+        source = Files.isDirectory(managedProject)
+                ? managedProject : requested.toAbsolutePath().normalize();
+      } else {
+        source = requested.normalize();
+      }
+    } catch (Exception exception) {
+      return "zide open: invalid project path.";
+    }
+    if (!Files.isDirectory(source)) return "zide open: project folder not found: " + source;
+    Path destination = source;
+    if (!source.startsWith(projects)) {
+      try {
+        Files.createDirectories(projects);
+        destination = projects.resolve(source.getFileName());
+        if (Files.exists(destination)) {
+          destination = projects.resolve(source.getFileName() + "-copy");
+        }
+        Path finalDestination = destination;
+        try (var paths = Files.walk(source)) {
+          paths.forEach(path -> {
+            try {
+              Path target = finalDestination.resolve(source.relativize(path));
+              if (Files.isDirectory(path)) Files.createDirectories(target);
+              else Files.copy(path, target);
+            } catch (IOException ignored) { }
+          });
+        }
+      } catch (IOException exception) {
+        return "zide open: could not copy project: " + exception.getMessage();
+      }
+    }
+    activateProjectGroup(destination.toFile());
+    return "Opened project: " + destination;
+  }
+
   private Node buildconsole() {
     // JavaFX-native console: output history is immutable and the command
     // field stays separate, so neither output nor process input needs Swing.
@@ -14220,7 +14463,7 @@ public class ZIDEEditor extends Application {
 
     // Console remains program output. Terminal is a separate JavaFX wrapper
     // around the user's system shell.
-    systemTerminal = new ZIDESystemTerminal(currentProjectRoot == null ? Path.of(System.getProperty("user.home")) : currentProjectRoot.toPath());
+    systemTerminal = new ZIDESystemTerminal(currentProjectRoot == null ? Path.of(System.getProperty("user.home")) : currentProjectRoot.toPath(), this::handleZideTerminalCommand);
     terminalView = wrapWithHeader("Terminal", systemTerminal, panelIconButton("/files/bin.png", "Clear screen", systemTerminal::clearScreen));
 
     // --- Problems view ---
@@ -14748,14 +14991,6 @@ public class ZIDEEditor extends Application {
 
     bar.setPadding(new Insets(2, 8, 2, 8));
     bar.getStyleClass().add("status-bar");
-    if (HelperFunctions.isMac()) {
-      var statusClip = new javafx.scene.shape.Rectangle();
-      statusClip.setArcWidth(28);
-      statusClip.setArcHeight(28);
-      statusClip.widthProperty().bind(bar.widthProperty());
-      statusClip.heightProperty().bind(bar.heightProperty());
-      bar.setClip(statusClip);
-    }
     return bar;
   }
 
