@@ -1,6 +1,6 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfComboBox;
+import jamiebalfour.balflaf_fx.BalfComboBoxFX;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -30,7 +30,7 @@ final class ZIDEFilePickerPanel extends VBox {
   private final ListView<File> entries = new ListView<>();
   private final TextField location = new TextField();
   private final TextField fileName = new TextField();
-  private final BalfComboBox<FileChooser.ExtensionFilter> fileType = new BalfComboBox<>();
+  private final BalfComboBoxFX<FileChooser.ExtensionFilter> fileType = new BalfComboBoxFX<>();
   private final List<FileChooser.ExtensionFilter> filters;
   private final CheckBox replaceExisting = new CheckBox("Replace existing file");
   private final Label validation = new Label();

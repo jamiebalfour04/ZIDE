@@ -1,8 +1,8 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
-import jamiebalfour.balflaf_fx.BalfComboBox;
-import jamiebalfour.balflaf_fx.BalfGlassContextMenu;
+import jamiebalfour.balflaf_fx.BalfGlassMenuBarFX;
+import jamiebalfour.balflaf_fx.BalfComboBoxFX;
+import jamiebalfour.balflaf_fx.BalfGlassContextMenuFX;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -77,8 +77,8 @@ public final class ZUILayoutBuilder {
   private final Spinner<Integer> yField = spinner(0, 2000, 0);
   private final Spinner<Integer> widthField = spinner(20, 2000, 120);
   private final Spinner<Integer> heightField = spinner(20, 2000, 30);
-  private final BalfComboBox<String> eventField = new BalfComboBox<>();
-  private final BalfComboBox<HandlerOption> handlerField = new BalfComboBox<>();
+  private final BalfComboBoxFX<String> eventField = new BalfComboBoxFX<>();
+  private final BalfComboBoxFX<HandlerOption> handlerField = new BalfComboBoxFX<>();
   private final List<HandlerOption> handlers = new ArrayList<>();
   private final List<Item> items = new ArrayList<>();
   private final List<Button> paletteButtons = new ArrayList<>();
@@ -89,7 +89,7 @@ public final class ZUILayoutBuilder {
   private boolean updating;
   private boolean loadingSource;
   private int nextId = 1;
-  private BalfGlassMenuBar glassMenuBar;
+  private BalfGlassMenuBarFX glassMenuBar;
   private boolean darkMode;
 
   public ZUILayoutBuilder(Window owner, Path file, String source, Runnable savedAction, Runnable closeAction) {
@@ -118,8 +118,8 @@ public final class ZUILayoutBuilder {
   public Node getView() { return root; }
 
   private Node buildMenuBar() {
-    glassMenuBar = new BalfGlassMenuBar();
-    BalfGlassMenuBar.GlassMenu edit = glassMenuBar.menu("Edit");
+    glassMenuBar = new BalfGlassMenuBarFX();
+    BalfGlassMenuBarFX.GlassMenu edit = glassMenuBar.menu("Edit");
     boolean mac = System.getProperty("os.name", "").toLowerCase().contains("mac");
     String shortcut = mac ? "⌘" : "Ctrl+";
     Node undo = edit.createItem("Undo", shortcut + "Z", () -> editFocused(TextInputControl::undo));
@@ -561,7 +561,7 @@ public final class ZUILayoutBuilder {
     shell.relocate(offset, offset);
     Item item = new Item(kind, shell, resizeHandle, variableBase(kind) + nextId++);
     ContextMenu menu = new ContextMenu();
-    BalfGlassContextMenu.install(menu);
+    BalfGlassContextMenuFX.install(menu);
     MenuItem delete = new MenuItem("Delete");
     delete.setOnAction(e -> { select(item); deleteSelected(); });
     menu.getItems().add(delete);

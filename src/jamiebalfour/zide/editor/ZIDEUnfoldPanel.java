@@ -1,6 +1,6 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfGlassContextMenu;
+import jamiebalfour.balflaf_fx.BalfGlassContextMenuFX;
 import jamiebalfour.zpe.core.ZPEKit;
 import jamiebalfour.zpe.core.IAST;
 import jamiebalfour.zpe.core.YASSUnfoldChunk;
@@ -201,7 +201,7 @@ final class ZIDEUnfoldPanel extends VBox {
           clearHighlight();
           showDescription.accept(prefix + chunk.getShortDescription(), chunk.getLongDescription());
         });
-        ContextMenu menu = BalfGlassContextMenu.create(summary);
+        ContextMenu menu = BalfGlassContextMenuFX.create(summary);
         description.setContextMenu(menu);
       }
       if (located) {

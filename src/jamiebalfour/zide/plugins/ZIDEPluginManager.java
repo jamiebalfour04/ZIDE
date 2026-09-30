@@ -1,6 +1,6 @@
 package jamiebalfour.zide.plugins;
 
-import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
+import jamiebalfour.balflaf_fx.BalfGlassMenuBarFX;
 import javafx.scene.Node;
 
 import java.io.File;
@@ -76,24 +76,24 @@ public final class ZIDEPluginManager implements AutoCloseable {
     }
   }
 
-  public void installMenus(Map<String, BalfGlassMenuBar.GlassMenu> targetMenus) {
+  public void installMenus(Map<String, BalfGlassMenuBarFX.GlassMenu> targetMenus) {
     for (ZIDEPlugin plugin : plugins) {
       for (ZIDEPluginMenu contribution : plugin.descriptor().menus()) {
-        BalfGlassMenuBar.GlassMenu target = targetMenus.get(contribution.targetMenu());
+        BalfGlassMenuBarFX.GlassMenu target = targetMenus.get(contribution.targetMenu());
         if (target == null || contribution.items().isEmpty()) continue;
-        BalfGlassMenuBar.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
+        BalfGlassMenuBarFX.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
         nodes.add(new PluginNode(submenu.getNode(), contribution.languageIds()));
         for (ZIDEPluginMenuItem item : contribution.items()) addItem(submenu, item, contribution.languageIds());
       }
     }
     for (NativeMenu contribution : nativeMenus) {
-      BalfGlassMenuBar.GlassMenu target = targetMenus.get(contribution.targetMenu());
+      BalfGlassMenuBarFX.GlassMenu target = targetMenus.get(contribution.targetMenu());
       if (target == null) continue;
-      BalfGlassMenuBar.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
+      BalfGlassMenuBarFX.GlassMenu.GlassSubmenu submenu = target.submenu(contribution.title());
       nodes.add(new PluginNode(submenu.getNode(), contribution.languageIds()));
-      Map<String, BalfGlassMenuBar.GlassMenu.GlassSubmenu> groups = new java.util.HashMap<>();
+      Map<String, BalfGlassMenuBarFX.GlassMenu.GlassSubmenu> groups = new java.util.HashMap<>();
       for (NativeItem item : contribution.items()) {
-        BalfGlassMenuBar.GlassMenu.GlassSubmenu parent = groups.computeIfAbsent(item.group(), submenu::submenu);
+        BalfGlassMenuBarFX.GlassMenu.GlassSubmenu parent = groups.computeIfAbsent(item.group(), submenu::submenu);
         Node node = parent.createItem(item.name(), "", () -> {
           if (context != null) context.insertText(item.text());
         });
@@ -110,9 +110,9 @@ public final class ZIDEPluginManager implements AutoCloseable {
     }
   }
 
-  private void addItem(BalfGlassMenuBar.GlassMenu.GlassSubmenu parent, ZIDEPluginMenuItem item, List<String> languageIds) {
+  private void addItem(BalfGlassMenuBarFX.GlassMenu.GlassSubmenu parent, ZIDEPluginMenuItem item, List<String> languageIds) {
     if (item.isSubmenu()) {
-      BalfGlassMenuBar.GlassMenu.GlassSubmenu nested = parent.submenu(item.name());
+      BalfGlassMenuBarFX.GlassMenu.GlassSubmenu nested = parent.submenu(item.name());
       nodes.add(new PluginNode(nested.getNode(), languageIds));
       for (ZIDEPluginMenuItem child : item.children()) addItem(nested, child, languageIds);
     } else {

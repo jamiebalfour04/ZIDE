@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="BalfLafFX">
     <CLASSES>
-      <root url="jar://$JARs$/balflaf_fx.jar!/" />
+      <root url="jar://$JARs$/BalfLafFX.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
