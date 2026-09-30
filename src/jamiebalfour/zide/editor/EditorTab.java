@@ -290,6 +290,7 @@ public class EditorTab extends Tab {
     replaceRow.setAlignment(Pos.CENTER_LEFT);
     findReplacePanel.getChildren().addAll(header, findRow, replaceRow);
     findReplacePanel.getStyleClass().add("editor-find-replace");
+    findReplacePanel.setMaxHeight(Region.USE_PREF_SIZE);
     findReplacePanel.setVisible(false);
     findReplacePanel.setManaged(false);
     findField.textProperty().addListener((observable, oldValue, newValue) -> updateFindResult());
@@ -639,7 +640,7 @@ public class EditorTab extends Tab {
   }
 
   void scheduleAnalysis() {
-    if (!"yass".equals(languageId) && !"python".equals(languageId)) {
+    if (!"yass".equals(languageId) && !"zpeedy".equals(languageId) && !"python".equals(languageId)) {
       analysisVersion.incrementAndGet();
       analysisTimer.stop();
       owner.updateProblems(this, List.of());

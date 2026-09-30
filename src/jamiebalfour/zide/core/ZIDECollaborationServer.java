@@ -279,6 +279,16 @@ public final class ZIDECollaborationServer implements AutoCloseable {
         }
       }
     }
+    // The active document is always part of the collaboration view, even if
+    // an older client did not send a project manifest.
+    String normalizedFileName = normalizedProjectPath(fileName);
+    if (normalizedFileName != null && !projectFiles.contains(normalizedFileName)) {
+      if (projectFiles.size() >= MAX_PROJECT_FILES) {
+        send(exchange, 413, Map.of("error", "Project manifest contains too many files."));
+        return;
+      }
+      projectFiles.add(normalizedFileName);
+    }
     if (document == null || fileName == null || language == null || name == null) {
       send(exchange, 400, Map.of("error", "Document metadata must be text."));
       return;
@@ -361,7 +371,9 @@ public final class ZIDECollaborationServer implements AutoCloseable {
 
   private static String avatar(Map<String, Object> request) {
     Object value = request.get("avatar");
-    if (!(value instanceof String image) || image.length() > 200_000 || !image.startsWith("data:image/")) return "";
+    if (!(value instanceof String image) || image.length() > 200_000) return "";
+    if (image.matches("builtin:(raccoon|rabbit|dog|cat|fox|panda|penguin|frog|koala|owl|bear|lion|tiger|monkey|hedgehog|otter)")) return image;
+    if (!image.startsWith("data:image/")) return "";
     return image;
   }
 
@@ -501,6 +513,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
       response.put("revision", session.revision);
       response.put("participantRevision", session.participantRevision);
       response.put("participantNames", List.copyOf(session.participantNames.values()));
+      response.put("participantAvatars", List.copyOf(session.participantAvatars.values()));
       send(exchange, 200, response);
     }
   }
@@ -626,6 +639,7 @@ public final class ZIDECollaborationServer implements AutoCloseable {
     response.put("revision", session.revision);
     response.put("participantRevision", session.participantRevision);
     response.put("participantNames", List.copyOf(session.participantNames.values()));
+    response.put("participantAvatars", List.copyOf(session.participantAvatars.values()));
     response.put("projectFiles", session.projectFiles);
     response.put("projectFileRevision", session.projectFileRevision);
     response.put("cachedProjectFiles", List.copyOf(session.projectFileCache.keySet()));

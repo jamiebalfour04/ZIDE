@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -74,21 +75,29 @@ public final class ZIDECollaborationClient {
     return request("join", Map.of("code", code, "name", name, "avatar", avatar == null ? "" : avatar, "authHash", passwordHash()));
   }
 
-  /** Encodes a configured image as a compact 128x128 JPEG data payload. */
+  /** Encodes a configured image as a resized 256x256 PNG data payload. */
   public static String avatarData(String path) throws IOException {
     if (path == null || path.isBlank()) return "";
-    BufferedImage source = ImageIO.read(Path.of(path).toFile());
+    String trimmed = path.trim();
+    if (trimmed.startsWith("builtin:") && trimmed.matches("builtin:[a-z]+")) return trimmed;
+    BufferedImage source;
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      source = ImageIO.read(new URL(trimmed));
+    } else {
+      source = ImageIO.read(Path.of(trimmed).toFile());
+    }
     if (source == null) return "";
-    BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
-    double scale = Math.max(128.0 / source.getWidth(), 128.0 / source.getHeight());
+    BufferedImage image = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+    double scale = Math.max(256.0 / source.getWidth(), 256.0 / source.getHeight());
     int w = (int) Math.round(source.getWidth() * scale), h = (int) Math.round(source.getHeight() * scale);
     java.awt.Graphics2D graphics = image.createGraphics();
-    graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-    graphics.drawImage(source.getScaledInstance(w, h, Image.SCALE_SMOOTH), (128 - w) / 2, (128 - h) / 2, null);
+    graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+    graphics.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+    graphics.drawImage(source.getScaledInstance(w, h, Image.SCALE_SMOOTH), (256 - w) / 2, (256 - h) / 2, null);
     graphics.dispose();
     ByteArrayOutputStream output = new ByteArrayOutputStream();
-    ImageIO.write(image, "jpg", output);
-    return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
+    ImageIO.write(image, "png", output);
+    return "data:image/png;base64," + Base64.getEncoder().encodeToString(output.toByteArray());
   }
 
   private String passwordHash() {
