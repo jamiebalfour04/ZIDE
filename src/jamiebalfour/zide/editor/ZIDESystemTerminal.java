@@ -6,7 +6,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
@@ -22,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * A small JavaFX wrapper around the user's local command shell.  It deliberately
@@ -37,14 +40,21 @@ final class ZIDESystemTerminal extends BorderPane {
   private int historyPosition = 0;
   private int inputStart;
   private boolean commandRunning;
+  private boolean internalEdit;
   private Path workingDirectory;
   private Process activeProcess;
   private BufferedWriter activeInput;
+  private final Function<String, String> zideCommandHandler;
   private static final java.util.regex.Pattern ANSI = java.util.regex.Pattern.compile(
           "\\u001B(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\u0007]*(?:\\u0007|\\u001B\\\\))");
 
   ZIDESystemTerminal(Path initialDirectory) {
+    this(initialDirectory, null);
+  }
+
+  ZIDESystemTerminal(Path initialDirectory, Function<String, String> zideCommandHandler) {
     workingDirectory = normaliseDirectory(initialDirectory);
+    this.zideCommandHandler = zideCommandHandler;
 
     getStyleClass().add("terminal-pane");
 
@@ -52,8 +62,34 @@ final class ZIDESystemTerminal extends BorderPane {
     transcript.setWrapText(true);
     transcript.setFont(TERMINAL_FONT);
     transcript.getStyleClass().add("terminal-output");
+    transcript.setTextFormatter(new TextFormatter<String>(change -> {
+      if (internalEdit) return change;
+      int boundary = Math.min(inputStart, transcript.getLength());
+      return change.getRangeStart() < boundary || change.getRangeEnd() < boundary ? null : change;
+    }));
+    transcript.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+      if (transcript.getCaretPosition() < inputStart) {
+        Platform.runLater(() -> transcript.positionCaret(transcript.getLength()));
+      }
+    });
+    transcript.addEventFilter(MouseEvent.MOUSE_RELEASED, e ->
+        Platform.runLater(() -> {
+          if (transcript.getCaretPosition() < inputStart) {
+            transcript.positionCaret(transcript.getLength());
+          }
+        }));
     transcript.setOnKeyPressed(e -> {
-      if (commandRunning && e.isControlDown()) {
+      if (e.isShortcutDown() && e.getCode() == KeyCode.A) {
+        transcript.selectRange(inputStart, transcript.getLength());
+        e.consume();
+      } else if (e.getCode() == KeyCode.HOME) {
+        transcript.positionCaret(inputStart);
+        e.consume();
+      } else if (e.getCode() == KeyCode.LEFT
+              && transcript.getSelection().getStart() == transcript.getSelection().getEnd()
+              && transcript.getCaretPosition() <= inputStart) {
+        e.consume();
+      } else if (commandRunning && e.isControlDown()) {
         if (e.getCode() == KeyCode.C) sendSignal("INT");
         else if (e.getCode() == KeyCode.Z) sendSignal("TSTP");
         else if (e.getCode() == KeyCode.BACK_SLASH) sendSignal("QUIT");
@@ -63,7 +99,10 @@ final class ZIDESystemTerminal extends BorderPane {
         submitProcessInput();
         e.consume();
       } else if (commandRunning && e.getCode() == KeyCode.BACK_SPACE
-              && transcript.getCaretPosition() <= inputStart) {
+              && inputTouchesTranscriptBoundary()) {
+        e.consume();
+      } else if (commandRunning && e.getCode() == KeyCode.DELETE
+              && inputTouchesTranscriptBoundary()) {
         e.consume();
       } else if (commandRunning && transcript.getCaretPosition() < inputStart) {
         transcript.positionCaret(transcript.getLength());
@@ -72,6 +111,10 @@ final class ZIDESystemTerminal extends BorderPane {
         submit();
         e.consume();
       } else if (e.getCode() == KeyCode.BACK_SPACE && transcript.getCaretPosition() <= inputStart) {
+        e.consume();
+      } else if (e.getCode() == KeyCode.BACK_SPACE && inputTouchesTranscriptBoundary()) {
+        e.consume();
+      } else if (e.getCode() == KeyCode.DELETE && inputTouchesTranscriptBoundary()) {
         e.consume();
       } else if (e.getCode() == KeyCode.UP) {
         showPreviousHistory();
@@ -103,8 +146,15 @@ final class ZIDESystemTerminal extends BorderPane {
 
     append("ZIDE system terminal\n");
     append("Working directory: " + workingDirectory + "\n");
-    append("Commands are run using your local " + shellName() + " shell. Use cd, ls, git, zpe, etc.\n\n");
+    append("Commands are run using your local " + shellName() + " shell. This terminal also supports the built-in zide command. Use cd, ls, git, zpe, etc.\n\n");
     appendPrompt();
+  }
+
+  private boolean inputTouchesTranscriptBoundary() {
+    int selectionStart = transcript.getSelection().getStart();
+    int selectionEnd = transcript.getSelection().getEnd();
+    return selectionStart < inputStart
+            || (selectionStart == selectionEnd && transcript.getCaretPosition() <= inputStart);
   }
 
   private static Font loadTerminalFont() {
@@ -131,7 +181,7 @@ final class ZIDESystemTerminal extends BorderPane {
 
   private void submit() {
     if (commandRunning) return;
-    String command = transcript.getText(inputStart, transcript.getLength()).trim();
+    String command = currentInput().trim();
     append("\n");
     if (command.isEmpty()) { appendPrompt(); return; }
     if (history.isEmpty() || !history.get(history.size() - 1).equals(command)) {
@@ -149,9 +199,14 @@ final class ZIDESystemTerminal extends BorderPane {
       return;
     }
     if (command.equalsIgnoreCase("help") || command.equalsIgnoreCase("zide-help")) {
-      append("This terminal runs local system commands. Built-ins: cd [directory], pwd, clear, help.\n");
+      append("This terminal runs local system commands and the built-in zide command.\n");
+      append("Built-ins: cd [directory], pwd, clear, help, zide help.\n");
       append("Examples: ls, git status, zpe --version, java --version.\n");
       appendPrompt();
+      return;
+    }
+    if (isZideCommand(command)) {
+      runZideCommand(command);
       return;
     }
     if (isChangeDirectory(command)) {
@@ -161,6 +216,53 @@ final class ZIDESystemTerminal extends BorderPane {
     }
 
     runSystemCommand(command);
+  }
+
+  private boolean isZideCommand(String command) {
+    return command.equalsIgnoreCase("zide")
+            || command.regionMatches(true, 0, "zide ", 0, 5);
+  }
+
+  private void runZideCommand(String command) {
+    String arguments = command.length() <= 4 ? "" : command.substring(4).trim();
+    if (arguments.isEmpty()) {
+      append("Type 'zide help' for more information.\n");
+      appendPrompt();
+      return;
+    }
+    if ("help".equalsIgnoreCase(arguments)) {
+      append("ZIDE terminal commands:\n");
+      append("  zide help   Show this help\n");
+      append("  zide pwd    Show the terminal working directory\n");
+      append("  zide clear  Clear the terminal\n");
+      append("  zide run    Run the current file\n");
+      append("  zide stop   Stop the active process\n");
+      append("  zide build  Build the current project\n");
+      append("  zide open <folder>  Open or import a project\n");
+      append("  zide project  Show the active project\n");
+      append("  zide version  Show ZIDE and Java versions\n");
+      append("  zide clear-cache  Clear the current project cache\n");
+      appendPrompt();
+      return;
+    }
+    if ("pwd".equalsIgnoreCase(arguments)) {
+      append(workingDirectory + "\n");
+      appendPrompt();
+      return;
+    }
+    if ("clear".equalsIgnoreCase(arguments) || "cls".equalsIgnoreCase(arguments)) {
+      clear();
+      return;
+    }
+    if (zideCommandHandler != null) {
+      String response = zideCommandHandler.apply(arguments);
+      if (response != null && !response.isBlank()) append(response.endsWith("\n") ? response : response + "\n");
+      appendPrompt();
+      return;
+    }
+    append("zide: unknown command: " + arguments + "\n");
+    append("Use 'zide help' to list ZIDE terminal commands.\n");
+    appendPrompt();
   }
 
   private boolean isChangeDirectory(String command) {
@@ -304,7 +406,8 @@ final class ZIDESystemTerminal extends BorderPane {
   private void submitProcessInput() {
     BufferedWriter input = activeInput;
     if (input == null) return;
-    String line = transcript.getText(Math.min(inputStart, transcript.getLength()), transcript.getLength());
+    String line = currentInput();
+    line = stripInteractivePrompt(line);
     append("\n");
     inputStart = transcript.getLength();
     try {
@@ -318,7 +421,12 @@ final class ZIDESystemTerminal extends BorderPane {
   }
 
   void clearScreen() {
-    transcript.clear();
+    internalEdit = true;
+    try {
+      transcript.clear();
+    } finally {
+      internalEdit = false;
+    }
     appendPrompt();
   }
 
@@ -337,18 +445,41 @@ final class ZIDESystemTerminal extends BorderPane {
   }
 
   private void append(String text) {
-    transcript.appendText(ANSI.matcher(text).replaceAll(""));
-    transcript.positionCaret(transcript.getLength());
+    internalEdit = true;
+    try {
+      transcript.appendText(ANSI.matcher(text).replaceAll(""));
+      transcript.positionCaret(transcript.getLength());
+    } finally {
+      internalEdit = false;
+    }
   }
 
   /** Keeps asynchronously arriving output ahead of text the user is currently composing. */
   private void insertProcessOutput(String text) {
     String clean = ANSI.matcher(text).replaceAll("");
     if (clean.isEmpty()) return;
+    removeDuplicateInteractivePrompt(clean);
     int insertionPoint = Math.max(0, Math.min(inputStart, transcript.getLength()));
-    transcript.insertText(insertionPoint, clean);
-    inputStart = insertionPoint + clean.length();
+    internalEdit = true;
+    try {
+      transcript.insertText(insertionPoint, clean);
+      inputStart = insertionPoint + clean.length();
+    } finally {
+      internalEdit = false;
+    }
     transcript.positionCaret(transcript.getLength());
+  }
+
+  private void removeDuplicateInteractivePrompt(String output) {
+    if (!output.contains("zpe > ")) return;
+    String pending = currentInput();
+    if (!pending.startsWith("zpe > ")) return;
+    internalEdit = true;
+    try {
+      transcript.replaceText(inputStart, transcript.getLength(), pending.substring("zpe > ".length()));
+    } finally {
+      internalEdit = false;
+    }
   }
 
   private String promptText() {
@@ -362,8 +493,26 @@ final class ZIDESystemTerminal extends BorderPane {
   }
 
   private void replaceCurrentInput(String value) {
-    transcript.replaceText(Math.min(inputStart, transcript.getLength()), transcript.getLength(), value);
-    transcript.positionCaret(transcript.getLength());
+    internalEdit = true;
+    try {
+      transcript.replaceText(Math.min(inputStart, transcript.getLength()), transcript.getLength(), value);
+      transcript.positionCaret(transcript.getLength());
+    } finally {
+      internalEdit = false;
+    }
+  }
+
+  private String currentInput() {
+    int start = Math.max(0, Math.min(inputStart, transcript.getLength()));
+    return transcript.getText(start, transcript.getLength());
+  }
+
+  private String stripInteractivePrompt(String value) {
+    String result = value;
+    while (result.startsWith("zpe > ")) {
+      result = result.substring("zpe > ".length());
+    }
+    return result;
   }
 
   private void finishCommand() {
