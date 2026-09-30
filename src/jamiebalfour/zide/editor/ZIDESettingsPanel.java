@@ -1,23 +1,29 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfComboBox;
+import jamiebalfour.balflaf_fx.BalfComboBoxFX;
 import javafx.collections.FXCollections;
+import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Circle;
 
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -25,11 +31,11 @@ import java.util.Map;
 import java.util.function.Function;
 
 /** Builds the preferences view independently from the main editor window. */
-final class ZIDESettingsPanel extends HBox {
-  private final BalfComboBox<String> theme;
-  private final BalfComboBox<String> lightEditorTheme;
-  private final BalfComboBox<String> darkEditorTheme;
-  private final BalfComboBox<String> fontFamily;
+final class ZIDESettingsPanel extends VBox {
+  private final BalfComboBoxFX<String> theme;
+  private final BalfComboBoxFX<String> lightEditorTheme;
+  private final BalfComboBoxFX<String> darkEditorTheme;
+  private final BalfComboBoxFX<String> fontFamily;
   private final Spinner<Integer> fontSize;
   private final Spinner<Integer> indentationSpaces;
   private final CheckBox wordWrap;
@@ -42,7 +48,7 @@ final class ZIDESettingsPanel extends HBox {
   private final CheckBox autoOpenCsvSpreadsheet;
   private final TextField url;
   private final PasswordField key;
-  private final BalfComboBox<String> model;
+  private final BalfComboBoxFX<String> model;
   private final TextField collaborationServer;
   private final TextField collaborationPort;
   private final TextField collaborationName;
@@ -58,12 +64,24 @@ final class ZIDESettingsPanel extends HBox {
                     Map<String, String> runtimePaths, Function<String, String> runtimeRedetector) {
     super(18);
 
-    ListView<String> sections = new ListView<>(FXCollections.observableArrayList("GUI", "Editor", "Execution", "Runtimes & Compilers", "ChatGPT", "Collaboration", "Experimental"));
+    FlowPane sections = new FlowPane(Orientation.VERTICAL);
     sections.getStyleClass().add("settings-section-list");
+    sections.setVgap(4);
+    sections.setHgap(4);
     sections.setPrefWidth(190);
     sections.setMinWidth(190);
     sections.setMaxWidth(190);
-    sections.getSelectionModel().selectFirst();
+    ToggleGroup sectionGroup = new ToggleGroup();
+    for (String sectionName : List.of("GUI", "Editor", "Execution", "Runtimes & Compilers", "ChatGPT", "Collaboration", "Experimental")) {
+      ToggleButton sectionButton = new ToggleButton(sectionName);
+      sectionButton.setUserData(sectionName);
+      sectionButton.setToggleGroup(sectionGroup);
+      sectionButton.setMaxWidth(Double.MAX_VALUE);
+      sectionButton.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+      sectionButton.getStyleClass().add("settings-section-tab");
+      sections.getChildren().add(sectionButton);
+    }
+    sectionGroup.selectToggle(sections.getChildren().getFirst() instanceof ToggleButton first ? first : null);
 
     theme = combo(List.of("Light", "Dark"), darkMode);
     theme.setValue(themeName);
@@ -74,6 +92,7 @@ final class ZIDESettingsPanel extends HBox {
     guiFields.add(groupProjectTabs, 1, 1);
     GridPane.setHgrow(theme, Priority.ALWAYS);
     VBox gui = section("GUI", guiFields);
+    gui.setMinWidth(0);
 
     List<String> editorThemes = List.of("ZIDE", "Solarized", "GitHub", "Dracula", "Monokai", "Nord", "Purples and Greens");
     lightEditorTheme = combo(editorThemes, darkMode);
@@ -131,6 +150,8 @@ final class ZIDESettingsPanel extends HBox {
     VBox experimental = section("Experimental", new VBox(10, blockClosures));
 
     VBox runtimeContent = new VBox(10);
+    runtimeContent.getStyleClass().add("settings-runtime-content");
+    runtimeContent.setPadding(new javafx.geometry.Insets(0, 0, 0, 12));
     if (runtimePaths.isEmpty()) {
       Label empty = new Label("Runtime and compiler paths will appear here after a language is run for the first time.");
       empty.setWrapText(true);
@@ -138,6 +159,7 @@ final class ZIDESettingsPanel extends HBox {
       runtimeContent.getChildren().add(empty);
     } else {
       GridPane runtimeFieldsGrid = fields();
+      runtimeFieldsGrid.getStyleClass().add("settings-runtime-fields");
       int row = 0;
       for (Map.Entry<String, String> entry : runtimePaths.entrySet()) {
         TextField path = new TextField(entry.getValue());
@@ -165,6 +187,7 @@ final class ZIDESettingsPanel extends HBox {
     runtimeScroll.getStyleClass().add("code-editor-scroll-pane");
     VBox.setVgrow(runtimeScroll, Priority.ALWAYS);
     VBox runtimes = section("Runtimes & Compilers", runtimeScroll);
+    runtimes.getStyleClass().add("settings-runtime-section");
 
     url = new TextField(chatGPTUrl);
     key = new PasswordField();
@@ -194,13 +217,45 @@ final class ZIDESettingsPanel extends HBox {
     collaborationFields.addRow(1, new Label("Port"), collaborationPort);
     collaborationFields.addRow(2, new Label("Your name"), collaborationName);
     collaborationFields.addRow(3, new Label("Server password"), collaborationPassword);
-    ImageView avatarPreview = new ImageView();
-    avatarPreview.setFitWidth(36); avatarPreview.setFitHeight(36); avatarPreview.setPreserveRatio(true);
+    ImageView avatarPreviewImage = new ImageView();
+    StackPane avatarPreview = new StackPane(avatarPreviewImage);
+    avatarPreview.setMinSize(36, 36);
+    avatarPreview.setPrefSize(36, 36);
+    avatarPreview.setMaxSize(36, 36);
+    avatarPreview.setShape(new Circle(18, 18, 18));
     HBox avatarField = new HBox(8, collaborationAvatar, avatarPreview);
     HBox.setHgrow(collaborationAvatar, Priority.ALWAYS);
-    collaborationAvatar.textProperty().addListener((observable, oldValue, newValue) -> updateAvatarPreview(avatarPreview, newValue));
-    updateAvatarPreview(avatarPreview, collaborationAvatar.getText());
-    collaborationFields.addRow(4, new Label("Avatar image"), avatarField);
+    avatarField.setMaxWidth(Double.MAX_VALUE);
+    GridPane.setHgrow(avatarField, Priority.ALWAYS);
+    collaborationAvatar.textProperty().addListener((observable, oldValue, newValue) -> updateAvatarPreview(avatarPreview, avatarPreviewImage, newValue));
+    updateAvatarPreview(avatarPreview, avatarPreviewImage, collaborationAvatar.getText());
+    GridPane avatarChoices = new GridPane();
+    avatarChoices.setHgap(6);
+    avatarChoices.setVgap(6);
+    ToggleGroup avatarGroup = new ToggleGroup();
+    for (CollaborationAvatarCatalog.Avatar avatar : CollaborationAvatarCatalog.avatars()) {
+      ToggleButton choice = new ToggleButton();
+      choice.setUserData(avatar.value());
+      choice.setToggleGroup(avatarGroup);
+      choice.setTooltip(new javafx.scene.control.Tooltip(avatar.name()));
+      choice.setMinSize(52, 52);
+      choice.setPrefSize(52, 52);
+      choice.setMaxSize(52, 52);
+      choice.getStyleClass().add("collaboration-avatar-choice");
+      choice.setShape(new Circle(26, 26, 26));
+      choice.setStyle("-fx-background-color: " + avatar.background() + "; -fx-background-radius: 50%;");
+      javafx.scene.image.ImageView icon = CollaborationAvatarCatalog.view(avatar.value(), 44);
+      if (icon != null) choice.setGraphic(icon);
+      choice.setSelected(CollaborationAvatarCatalog.is(collaborationAvatarValue, avatar));
+      choice.setOnAction(event -> collaborationAvatar.setText(avatar.value()));
+      avatarChoices.add(choice, avatar.index() % 8, avatar.index() / 8);
+    }
+    Label builtInLabel = new Label("Built-in avatars");
+    builtInLabel.getStyleClass().add("settings-help-text");
+    VBox avatarOptions = new VBox(8, avatarField, builtInLabel, avatarChoices);
+    avatarOptions.setMaxWidth(Double.MAX_VALUE);
+    GridPane.setHgrow(avatarOptions, Priority.ALWAYS);
+    collaborationFields.addRow(4, new Label("Avatar"), avatarOptions);
     Label hostedServerNote = new Label("jamiebalfour.scot provides a free hosted collaboration server with limited resources. For larger sessions, use your own server.");
     hostedServerNote.setWrapText(true);
     hostedServerNote.getStyleClass().add("settings-help-text");
@@ -211,19 +266,73 @@ final class ZIDESettingsPanel extends HBox {
     VBox collaboration = section("Collaboration", collaborationFields);
 
     StackPane page = new StackPane(gui);
-    page.setMinWidth(590);
-    HBox.setHgrow(page, Priority.ALWAYS);
-    sections.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, selected) -> {
+    // The modal may become narrower than the original desktop layout. Let
+    // the active page take the width it is given instead of forcing the
+    // modal beyond the window.
+    page.setMinWidth(0);
+    page.setMaxWidth(Double.MAX_VALUE);
+    ScrollPane settingsScroll = new ScrollPane(page);
+    settingsScroll.setFitToWidth(true);
+    settingsScroll.setFitToHeight(false);
+    settingsScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+    settingsScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+    settingsScroll.setPannable(true);
+    settingsScroll.setMinWidth(0);
+    settingsScroll.setMaxWidth(Double.MAX_VALUE);
+    settingsScroll.getStyleClass().add("settings-page-scroll");
+    String settingsSurface = darkMode ? "#1e1e1e" : "#ffffff";
+    settingsScroll.setStyle("-fx-background-color: " + settingsSurface + ";"
+        + " -fx-background: " + settingsSurface + ";"
+        + " -fx-control-inner-background: " + settingsSurface + ";");
+    page.setStyle("-fx-background-color: " + settingsSurface + ";");
+    HBox.setHgrow(settingsScroll, Priority.ALWAYS);
+    sectionGroup.selectedToggleProperty().addListener((observable, oldValue, selectedToggle) -> {
+      String selected = selectedToggle == null ? "GUI" : String.valueOf(selectedToggle.getUserData());
       Node selectedPage = "ChatGPT".equals(selected) ? chatGPT
               : "Collaboration".equals(selected) ? collaboration
               : "Runtimes & Compilers".equals(selected) ? runtimes
               : "Experimental".equals(selected) ? experimental
               : "Execution".equals(selected) ? execution
               : "Editor".equals(selected) ? editor : gui;
+      if (selectedPage instanceof javafx.scene.layout.Region region) {
+        region.setMinWidth(0);
+        region.setMaxWidth(Double.MAX_VALUE);
+      }
       page.getChildren().setAll(selectedPage);
     });
     getChildren().addAll(sections, page);
+    HBox settingsBody = new HBox(18, sections, settingsScroll);
+    getChildren().setAll(settingsBody);
+    VBox.setVgrow(settingsBody, Priority.ALWAYS);
     getStyleClass().add("settings-content");
+    setMinWidth(0);
+    setMaxWidth(Double.MAX_VALUE);
+    widthProperty().addListener((observable, oldWidth, newWidth) -> {
+      boolean compact = newWidth.doubleValue() > 0 && newWidth.doubleValue() < 820;
+      if (compact == (getChildren().size() == 2 && getChildren().getFirst() == sections)) return;
+      if (compact) {
+        sections.setOrientation(Orientation.HORIZONTAL);
+        sections.setPrefWidth(Double.MAX_VALUE);
+        sections.setMinWidth(0);
+        sections.setMaxWidth(Double.MAX_VALUE);
+        sections.setMinHeight(54);
+        sections.setPrefHeight(54);
+        sections.setMaxHeight(54);
+        getChildren().setAll(sections, settingsScroll);
+        VBox.setVgrow(settingsScroll, Priority.ALWAYS);
+      } else {
+        sections.setOrientation(Orientation.VERTICAL);
+        sections.setMinWidth(190);
+        sections.setPrefWidth(190);
+        sections.setMaxWidth(190);
+        sections.setMinHeight(0);
+        sections.setPrefHeight(Control.USE_COMPUTED_SIZE);
+        sections.setMaxHeight(Double.MAX_VALUE);
+        getChildren().setAll(settingsBody);
+        VBox.setVgrow(settingsBody, Priority.ALWAYS);
+      }
+    });
+    if (darkMode) getStyleClass().add("settings-dark");
     setPrefWidth(840);
     // Keep the modal stable while switching pages; long runtime lists scroll inside their viewport.
     setMinHeight(560);
@@ -285,16 +394,50 @@ final class ZIDESettingsPanel extends HBox {
     return label.substring(0, 1).toUpperCase() + label.substring(1).toLowerCase();
   }
 
-  private static void updateAvatarPreview(ImageView preview, String path) {
+  private static void updateAvatarPreview(StackPane frame, ImageView preview, String path) {
     try {
-      if (path == null || path.isBlank()) { preview.setImage(null); return; }
-      Image image = new Image(java.nio.file.Path.of(path.trim()).toUri().toString(), 128, 128, true, true, true);
-      preview.setImage(image.isError() ? null : image);
-    } catch (Exception ignored) { preview.setImage(null); }
+      if (path == null || path.isBlank()) {
+        preview.setImage(null);
+        frame.setVisible(false);
+        frame.setManaged(false);
+        return;
+      }
+      String trimmed = path.trim();
+      if (CollaborationAvatarCatalog.isBuiltIn(trimmed)) {
+        ImageView builtIn = CollaborationAvatarCatalog.view(trimmed, 30);
+        preview.setImage(builtIn == null ? null : builtIn.getImage());
+        preview.setViewport(builtIn == null ? null : builtIn.getViewport());
+        preview.setFitWidth(30);
+        preview.setFitHeight(30);
+        preview.setPreserveRatio(true);
+        preview.setClip(new Circle(15, 15, 15));
+        frame.setStyle("-fx-background-color: " + CollaborationAvatarCatalog.background(trimmed) + "; -fx-background-radius: 50%;");
+        frame.setVisible(builtIn != null);
+        frame.setManaged(builtIn != null);
+        return;
+      }
+      String source = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+          ? trimmed : java.nio.file.Path.of(trimmed).toUri().toString();
+      Image image = new Image(source, 128, 128, true, true, true);
+      boolean valid = !image.isError();
+      preview.setImage(valid ? image : null);
+      preview.setViewport(null);
+      preview.setFitWidth(30);
+      preview.setFitHeight(30);
+      preview.setPreserveRatio(true);
+      preview.setClip(new Circle(15, 15, 15));
+      frame.setStyle("-fx-background-color: transparent;");
+      frame.setVisible(valid);
+      frame.setManaged(valid);
+    } catch (Exception ignored) {
+      preview.setImage(null);
+      frame.setVisible(false);
+      frame.setManaged(false);
+    }
   }
 
-  private static BalfComboBox<String> combo(List<String> choices, boolean darkMode) {
-    BalfComboBox<String> result = new BalfComboBox<>(FXCollections.observableArrayList(choices));
+  private static BalfComboBoxFX<String> combo(List<String> choices, boolean darkMode) {
+    BalfComboBoxFX<String> result = new BalfComboBoxFX<>(FXCollections.observableArrayList(choices));
     result.setDarkMode(darkMode);
     result.setMaxWidth(Double.MAX_VALUE);
     return result;

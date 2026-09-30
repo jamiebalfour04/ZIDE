@@ -1,6 +1,6 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfTitleBar;
+import jamiebalfour.balflaf_fx.BalfTitleBarFX;
 import jamiebalfour.zpe.core.ZPE;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -32,7 +32,7 @@ public final class ZIDEAboutWindow {
 
 
     // ---- Titlebar ----
-    BalfTitleBar titleBar = new BalfTitleBar(stage, "About ZIDE", null, false);
+    BalfTitleBarFX titleBar = new BalfTitleBarFX(stage, "About ZIDE", null, false);
 
     titleBar.setMinHeight(32);
     titleBar.styleProperty().set("-fx-background-color: #517;");

@@ -115,6 +115,18 @@
     -fx-prompt-text-fill: #929aa6;
 }
 
+/* Keep standard settings controls flat and predictable across themes. */
+.text-field,
+.combo-box-base {
+    -fx-background-insets: 0;
+    -fx-effect: none;
+}
+
+.combo-box-base > .arrow-button {
+    -fx-background-insets: 0;
+    -fx-effect: none;
+}
+
 .app-root.dark .check-box .box,
 .in-window-modal-dark .check-box .box {
     -fx-background-color: #242a33;
@@ -294,14 +306,14 @@
 .project-browser {
     -fx-background-color: #ffffff;
     -fx-control-inner-background: #ffffff;
-    -fx-padding: 6;
+    -fx-padding: 0;
     -fx-background-insets: 0;
 }
 .project-browser > .viewport {
     -fx-background-color: transparent;
 }
 .project-browser-content {
-    -fx-padding: 2;
+    -fx-padding: 0;
 }
 .project-browser-project {
     -fx-padding: 2 0 2 0;
@@ -1203,11 +1215,14 @@
 }
 
 .about-content {
-    -fx-background-color: -fx-control-inner-background;
+    -fx-background-color: transparent;
 }
 
 .in-window-modal-dark .about-content {
-    -fx-background-color: #1e1e1e;
+    -fx-background-color: transparent;
+}
+.balf-modal-dark .about-content {
+    -fx-background-color: transparent;
 }
 
 .in-window-modal-dark .about-content .separator .line {
@@ -1219,6 +1234,15 @@
 .in-window-modal-dark .about-key,
 .in-window-modal-dark .about-val {
     -fx-text-fill: #f3f3f3;
+}
+.balf-modal-dark .about-title,
+.balf-modal-dark .about-version,
+.balf-modal-dark .about-key,
+.balf-modal-dark .about-val {
+    -fx-text-fill: #f3f3f3;
+}
+.balf-modal-dark .about-content .separator .line {
+    -fx-border-color: #454545 transparent transparent transparent;
 }
 
 .about-title {
@@ -1702,66 +1726,6 @@
     -fx-background-color: #1b2028;
 }
 
-.glass-menu-popup {
-    -fx-background-color: #ffffff;
-    -fx-background-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 22, 0.14, 0, 8);
-    -fx-border-color: rgba(60,60,67,0.24);
-    -fx-border-radius: 12px;
-    -fx-border-width: 1px;
-}
-
-.glass-menu-container:dark .glass-menu-popup {
-    -fx-background-color: #20252e;
-    -fx-border-color: #4a535f;
-}
-
-.glass-menu-item {
-    -fx-background-radius: 8px;
-}
-
-.glass-menu-item:hover {
-    -fx-background-color: #dceef5;
-}
-
-.glass-menu-item:hover .glass-menu-item-text,
-.glass-menu-item:hover .glass-menu-shortcut {
-    -fx-text-fill: #1b2c35;
-}
-
-.glass-menu-container:dark .glass-menu-item:hover { -fx-background-color: #07566f; }
-.glass-menu-container:dark .glass-menu-item:hover .glass-menu-item-text,
-.glass-menu-container:dark .glass-menu-item:hover .glass-menu-shortcut { -fx-text-fill: #ffffff; }
-
-.glass-menu-item-text {
-    -fx-font-size: 13px;
-    -fx-text-fill: #202020;
-}
-
-/* Keep keyboard shortcuts close to their command instead of stretching the
-   spacer across the full popup width. */
-.glass-menu-item > .region {
-    -fx-max-width: 22px;
-}
-
-.glass-menu-submenu-arrow {
-    -fx-font-size: 18px;
-    -fx-text-fill: #555555;
-}
-
-.glass-menu-container:dark .glass-menu-submenu-arrow {
-    -fx-text-fill: #e2e8f0;
-}
-
-.glass-menu-container:dark .glass-menu-item:hover .glass-menu-submenu-arrow {
-    -fx-text-fill: #ffffff;
-}
-
-.glass-menu-shortcut {
-    -fx-font-size: 13px;
-    -fx-text-fill: #555555;
-}
-
 .glass-menu-separator {
     -fx-background-color: rgba(82, 91, 102, 0.22);
     -fx-min-height: 1px;
@@ -1861,25 +1825,6 @@
 .titlebar-actions .separator:vertical .line {
     -fx-border-color: rgba(255,255,255,0.35);
     -fx-border-width: 0 0 0 1px;
-}
-
-.app-root .main-menu-bar{
-    -fx-background-color: #517;
-    -fx-background-insets: 0;
-    -fx-border-color: transparent;
-    -fx-border-width: 0;
-    -fx-effect: none;
-    -fx-text-fill: white;
-}
-
-.main-menu-bar .glass-menu-title {
-    -fx-text-fill: white;
-}
-
-.app-root .main-menu-bar .glass-menu-title:hover,
-.app-root .main-menu-bar .glass-menu-title.active {
-    -fx-background-color: rgba(255,255,255,0.16);
-    -fx-background-radius: 7px;
 }
 
 .app-root .app-toolbar {
@@ -2573,14 +2518,18 @@
 }
 
 .new-file-type-scroll {
-    -fx-background-color: transparent;
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 12px;
     -fx-background-insets: 0;
     -fx-padding: 0;
-    -fx-border-color: transparent;
+    -fx-border-color: #d0d5dc;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
 }
 
 .new-file-type-scroll > .viewport {
-    -fx-background-color: transparent;
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 12px;
 }
 
 .new-file-type-scroll .scroll-bar:vertical {
@@ -2637,14 +2586,26 @@
 .app-root.dark .new-file-type-scroll .scroll-bar .thumb:hover {
     -fx-background-color: #737d89;
 }
+.balf-modal-dark .new-file-type-scroll .scroll-bar,
 .in-window-modal-dark .new-file-type-scroll .scroll-bar {
     -fx-background-color: #21262f;
 }
+.balf-modal-dark .new-file-type-scroll .scroll-bar .thumb,
 .in-window-modal-dark .new-file-type-scroll .scroll-bar .thumb {
     -fx-background-color: #59616d;
 }
+.balf-modal-dark .new-file-type-scroll .scroll-bar .thumb:hover,
 .in-window-modal-dark .new-file-type-scroll .scroll-bar .thumb:hover {
     -fx-background-color: #737d89;
+}
+.balf-modal-dark .new-file-type-scroll,
+.in-window-modal-dark .new-file-type-scroll {
+    -fx-background-color: #20252e;
+    -fx-border-color: #3f4b59;
+}
+.balf-modal-dark .new-file-type-scroll > .viewport,
+.in-window-modal-dark .new-file-type-scroll > .viewport {
+    -fx-background-color: #20252e;
 }
 
 .java-type-popup {
@@ -2904,6 +2865,59 @@
 .in-window-modal-dark .breakpoints-empty-state {
     -fx-text-fill: #aeb8c4;
 }
+.balf-modal-dark .breakpoints-list {
+    -fx-background-color: #20252e;
+    -fx-control-inner-background: #20252e;
+    -fx-border-color: #4a535f;
+}
+.balf-modal-dark .breakpoints-list .virtual-flow,
+.balf-modal-dark .breakpoints-list .clipped-container,
+.balf-modal-dark .breakpoints-list .viewport {
+    -fx-background-color: #20252e;
+}
+.balf-modal-dark .breakpoints-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e6e9ee;
+}
+.balf-modal-dark .breakpoints-list .list-cell:filled:hover {
+    -fx-background-color: #2a313c;
+}
+.balf-modal-dark .breakpoints-list .list-cell:filled:selected {
+    -fx-background-color: #174c68;
+    -fx-text-fill: #ffffff;
+}
+.balf-modal-dark .breakpoints-empty-state {
+    -fx-text-fill: #aeb8c4;
+}
+.balf-modal-dark .breakpoints-source-line,
+.balf-modal-dark .breakpoints-source-line .scroll-pane,
+.balf-modal-dark .breakpoints-source-line .scroll-pane .viewport,
+.balf-modal-dark .breakpoints-source-line .content {
+    -fx-background-color: #252526;
+    -fx-control-inner-background: #252526;
+    -fx-text-fill: #f3f3f3;
+    -fx-fill: #f3f3f3;
+    -fx-prompt-text-fill: #9aa6b3;
+}
+.balf-modal-dark .breakpoints-source-line {
+    -fx-border-color: #454545;
+}
+.balf-modal-dark .breakpoints-source-line .scroll-pane,
+.balf-modal-dark .breakpoints-source-line .scroll-pane .viewport,
+.balf-modal-dark .breakpoints-source-line .content {
+    -fx-border-color: transparent;
+}
+.balf-modal-dark .breakpoints-source-line .scroll-bar:vertical,
+.balf-modal-dark .breakpoints-source-line .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+.balf-modal-dark .breakpoints-source-line .scroll-bar .track,
+.balf-modal-dark .breakpoints-source-line .scroll-bar .track-background {
+    -fx-background-color: transparent;
+}
+.balf-modal-dark .breakpoints-source-line .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
 
 .in-window-modal-title {
     -fx-font-family: "Inter";
@@ -3119,12 +3133,18 @@
 .zide-macro-editor-dark .macro-validate-button { -fx-background-color: #47515e; }
 .zide-macro-editor-dark .split-pane,
 .zide-macro-editor-dark .split-pane > .split-pane-divider { -fx-background-color: #20252e; }
-.in-window-modal-dark .new-file-type-choice { -fx-border-color: #555555; }
+.balf-modal-dark .new-file-type-choice,
+.in-window-modal-dark .new-file-type-choice { -fx-border-color: #555555; -fx-background-color: #20252e; }
+.balf-modal-dark .new-file-type-choice:hover,
 .in-window-modal-dark .new-file-type-choice:hover { -fx-background-color: #292929; }
+.balf-modal-dark .new-file-type-choice:selected,
 .in-window-modal-dark .new-file-type-choice:selected {
     -fx-background-color: #173b57;
     -fx-border-color: #3794ff;
 }
+.balf-modal-dark .new-file-type-name,
+.balf-modal-dark .new-file-type-heading { -fx-text-fill: #f3f3f3; }
+.balf-modal-dark .new-file-type-extension { -fx-text-fill: #b9b9b9; }
 .in-window-modal-dark .text-field,
 .in-window-modal-dark .password-field,
 .in-window-modal-dark .text-area,
@@ -3134,6 +3154,54 @@
     -fx-background-color: #252526;
     -fx-text-fill: #f3f3f3;
     -fx-prompt-text-fill: #a5a5a5;
+}
+.in-window-modal-dark .log-view,
+.in-window-modal-dark .log-view .scroll-pane,
+.in-window-modal-dark .log-view .scroll-pane .viewport,
+.in-window-modal-dark .log-view .content {
+    -fx-background-color: #252526;
+    -fx-control-inner-background: #252526;
+    -fx-text-fill: #f3f3f3;
+    -fx-fill: #f3f3f3;
+    -fx-border-color: #454545;
+}
+.in-window-modal-dark .log-view .scroll-bar:vertical,
+.in-window-modal-dark .log-view .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+.in-window-modal-dark .log-view .scroll-bar .track,
+.in-window-modal-dark .log-view .scroll-bar .track-background {
+    -fx-background-color: transparent;
+}
+.in-window-modal-dark .log-view .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.in-window-modal-dark .log-view .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+.balf-modal-dark .log-view,
+.balf-modal-dark .log-view .scroll-pane,
+.balf-modal-dark .log-view .scroll-pane .viewport,
+.balf-modal-dark .log-view .content {
+    -fx-background-color: #252526;
+    -fx-control-inner-background: #252526;
+    -fx-text-fill: #f3f3f3;
+    -fx-fill: #f3f3f3;
+    -fx-border-color: #454545;
+}
+.balf-modal-dark .log-view .scroll-bar:vertical,
+.balf-modal-dark .log-view .scroll-bar:horizontal {
+    -fx-background-color: #21262f;
+}
+.balf-modal-dark .log-view .scroll-bar .track,
+.balf-modal-dark .log-view .scroll-bar .track-background {
+    -fx-background-color: transparent;
+}
+.balf-modal-dark .log-view .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+.balf-modal-dark .log-view .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
 }
 .in-window-modal-panel .text-area,
 .in-window-modal-panel .text-area .scroll-pane,
@@ -3190,10 +3258,15 @@
 }
 
 .in-window-modal-primary {
-    -fx-background-color: #007acc;
-    -fx-border-color: #007acc;
+    -fx-background-color: #6d28a8;
+    -fx-border-color: #6d28a8;
     -fx-text-fill: white;
     -fx-opacity: 1;
+}
+
+.in-window-modal-primary:hover {
+    -fx-background-color: #7e35bc;
+    -fx-border-color: #7e35bc;
 }
 
 .in-window-modal-secondary {
@@ -3226,9 +3299,78 @@
 }
 
 .settings-content { -fx-min-height: 300px; }
+.settings-dark {
+    -fx-background-color: #1f1f1f;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-dark .label,
+.settings-dark .check-box,
+.settings-dark .check-box .text {
+    -fx-text-fill: #f3f3f3;
+}
+.settings-dark .text-field,
+.settings-dark .password-field,
+.settings-dark .combo-box,
+.settings-dark .spinner {
+    -fx-background-color: #252526;
+    -fx-text-fill: #f3f3f3;
+    -fx-prompt-text-fill: #9aa6b3;
+}
+.settings-dark .text-field,
+.settings-dark .password-field,
+.settings-dark .combo-box-base,
+.settings-dark .spinner {
+    -fx-border-color: #454545;
+}
+.settings-dark .text-field .text,
+.settings-dark .password-field .text,
+.settings-dark .combo-box .list-cell {
+    -fx-fill: #f3f3f3;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-dark .list-view {
+    -fx-background-color: #252a32;
+}
+.settings-dark .list-cell {
+    -fx-text-fill: #eeeeee;
+}
+.settings-dark .list-cell:selected {
+    -fx-background-color: #094771;
+    -fx-text-fill: #f3f7fb;
+}
+.settings-dark .code-editor-scroll-pane,
+.settings-dark .code-editor-scroll-pane .viewport,
+.settings-dark .code-editor-scroll-pane .content {
+    -fx-background-color: #1f1f1f;
+    -fx-background: #1f1f1f;
+}
 .settings-content .settings-help-text {
     -fx-text-fill: #77818c;
     -fx-font-size: 12px;
+}
+.settings-content .collaboration-avatar-choice {
+    -fx-padding: 3px;
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 8px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 8px;
+}
+.settings-content .collaboration-avatar-choice:hover {
+    -fx-background-color: #dceafa;
+}
+.settings-content .collaboration-avatar-choice:selected {
+    -fx-background-color: #8fc7f0;
+    -fx-border-color: #1672ad;
+}
+.settings-content.settings-dark .collaboration-avatar-choice {
+    -fx-background-color: #252a32;
+}
+.settings-content.settings-dark .collaboration-avatar-choice:hover {
+    -fx-background-color: #303b49;
+}
+.settings-content.settings-dark .collaboration-avatar-choice:selected {
+    -fx-background-color: #094771;
+    -fx-border-color: #48a8df;
 }
 .in-window-modal-dark .settings-content .settings-help-text {
     -fx-text-fill: #9aa6b3;
@@ -3250,12 +3392,62 @@
     -fx-background-color: #dceafa;
     -fx-text-fill: #163858;
 }
-.settings-section-content { -fx-padding: 4px 0; }
+.settings-section-content { -fx-padding: 12px 24px 24px 24px; }
+.settings-runtime-section { -fx-padding: 12px 0 24px 24px; }
+.settings-section-list {
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 8px;
+    -fx-padding: 4px;
+}
+.settings-section-tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6px;
+    -fx-border-color: transparent;
+    -fx-padding: 9px 12px;
+    -fx-text-fill: #26364a;
+    -fx-font-size: 14px;
+}
+.settings-section-tab:hover {
+    -fx-background-color: #dceafa;
+}
+.settings-section-tab:selected {
+    -fx-background-color: #dceafa;
+    -fx-text-fill: #163858;
+}
+.settings-page-scroll,
+.settings-page-scroll .viewport,
+.settings-page-scroll .content {
+    -fx-background-color: #ffffff;
+    -fx-background: #ffffff;
+}
+.settings-page-scroll .scroll-bar:vertical {
+    -fx-background-color: #e7ebf0;
+    -fx-pref-width: 12px;
+}
+.settings-page-scroll .scroll-bar:vertical .track,
+.settings-page-scroll .scroll-bar:vertical .track-background {
+    -fx-background-color: transparent;
+}
+.settings-page-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: #9aa7b5;
+    -fx-background-radius: 6px;
+}
+.settings-page-scroll .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #718091;
+}
+.settings-page-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-pref-height: 0;
+}
 .settings-content .code-editor-scroll-pane,
 .settings-content .code-editor-scroll-pane .viewport,
 .settings-content .code-editor-scroll-pane .content {
     -fx-background-color: #ffffff;
     -fx-background: #ffffff;
+}
+.settings-content .code-editor-scroll-pane {
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 .settings-section-title {
     -fx-font-family: "Inter";
@@ -3302,6 +3494,157 @@
 }
 .in-window-modal-dark .settings-content .code-editor-scroll-pane .scroll-bar .thumb:hover {
     -fx-background-color: #737d89;
+}
+
+/* The settings panel owns its palette because it is also embedded inside
+   modal content whose dark class is not always inherited by every control. */
+.settings-content.settings-dark {
+    -fx-background-color: #1f1f1f;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .label,
+.settings-content.settings-dark .check-box,
+.settings-content.settings-dark .check-box .text,
+.settings-content.settings-dark .settings-section-title,
+.settings-content.settings-dark .settings-group-title {
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .settings-section-list {
+    -fx-background-color: #252a32;
+}
+.settings-content.settings-dark .settings-section-tab {
+    -fx-text-fill: #e6edf5;
+}
+.settings-content.settings-dark .settings-section-tab:hover {
+    -fx-background-color: #303b49;
+}
+.settings-content.settings-dark .settings-section-tab:selected {
+    -fx-background-color: #094771;
+    -fx-text-fill: #f3f7fb;
+}
+.settings-content.settings-dark .settings-page-scroll,
+.settings-content.settings-dark .settings-page-scroll .viewport,
+.settings-content.settings-dark .settings-page-scroll .content {
+    -fx-background-color: #1f1f1f;
+    -fx-background: #1f1f1f;
+}
+.settings-content.settings-dark .settings-page-scroll .scroll-bar:vertical {
+    -fx-background-color: #21262f;
+}
+.settings-content.settings-dark .settings-page-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: #59616d;
+}
+.settings-content.settings-dark .settings-page-scroll .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #737d89;
+}
+.settings-content.settings-dark .settings-section-list .list-cell,
+.settings-content.settings-dark .settings-section-list .list-cell .text {
+    -fx-background-color: transparent;
+    -fx-text-fill: #e6edf5;
+    -fx-fill: #e6edf5;
+}
+.settings-content.settings-dark .settings-section-list .list-cell:selected,
+.settings-content.settings-dark .settings-section-list .list-cell:selected .text {
+    -fx-background-color: #094771;
+    -fx-text-fill: #f3f7fb;
+    -fx-fill: #f3f7fb;
+}
+.settings-content.settings-dark .text-field,
+.settings-content.settings-dark .password-field,
+.settings-content.settings-dark .combo-box-base,
+.settings-content.settings-dark .spinner {
+    -fx-background-color: #252526;
+    -fx-border-color: #454545;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .text-field .text,
+.settings-content.settings-dark .password-field .text,
+.settings-content.settings-dark .combo-box-base .list-cell,
+.settings-content.settings-dark .combo-box-base .list-cell .text {
+    -fx-text-fill: #f3f3f3;
+    -fx-fill: #f3f3f3;
+}
+.settings-content.settings-dark .settings-section-list .list-cell:hover {
+    -fx-background-color: #303b49;
+}
+.settings-content.settings-dark .settings-runtime-content,
+.settings-content.settings-dark .settings-runtime-fields {
+    -fx-background-color: #1f1f1f;
+}
+.settings-content.settings-dark .settings-runtime-content .label,
+.settings-content.settings-dark .settings-runtime-fields .label {
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .code-editor-scroll-pane {
+    -fx-background-color: #1f1f1f;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .viewport,
+.settings-content.settings-dark .code-editor-scroll-pane .content {
+    -fx-background-color: #1f1f1f;
+    -fx-background: #1f1f1f;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical,
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: #252a32;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar .track,
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar .track-background {
+    -fx-background-color: #252a32;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+    -fx-background-radius: 6px;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+.settings-content.settings-dark .button {
+    -fx-background-color: #2d343d;
+    -fx-border-color: #4b5663;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .button:hover {
+    -fx-background-color: #3a4652;
+}
+.settings-content.settings-dark .check-box .box {
+    -fx-background-color: #252a32;
+    -fx-border-color: #697585;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+.settings-content.settings-dark .check-box:hover .box {
+    -fx-border-color: #9aa6b3;
+}
+.settings-content.settings-dark .check-box:selected .box {
+    -fx-background-color: #07566f;
+    -fx-border-color: #4f9fba;
+}
+.settings-content.settings-dark .check-box:selected .mark {
+    -fx-background-color: #ffffff;
+}
+.settings-content.settings-dark .spinner .increment-arrow-button,
+.settings-content.settings-dark .spinner .decrement-arrow-button {
+    -fx-background-color: #252a32;
+    -fx-border-color: #454545;
+}
+.settings-content.settings-dark .spinner .increment-arrow-button {
+    -fx-border-width: 0 0 1px 1px;
+}
+.settings-content.settings-dark .spinner .decrement-arrow-button {
+    -fx-border-width: 1px 0 0 1px;
+}
+.settings-content.settings-dark .spinner .increment-arrow,
+.settings-content.settings-dark .spinner .decrement-arrow {
+    -fx-background-color: #cbd5e1;
+}
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical > .track,
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:horizontal > .track,
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical > .track-background,
+.settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:horizontal > .track-background {
+    -fx-background-color: #252a32;
+    -fx-background-insets: 0;
 }
 
 .markdown-preview,
@@ -3652,10 +3995,6 @@
     -fx-border-width: 0;
 }
 
-.app-root.dark .main-menu-bar {
-    -fx-background-color: #20242b;
-}
-
 .app-root.dark .balf-titlebar .jb-menu-button,
 .app-root.dark .balf-titlebar .jb-menu-content,
 .app-root.dark .balf-titlebar .jb-chevron {
@@ -3705,10 +4044,19 @@
     -fx-padding: 3px 8px;
     -fx-background-color: rgba(82, 91, 102, 0.10);
     -fx-background-radius: 6px;
+    -fx-cursor: hand;
+}
+
+.status-bar .go-to-line-button:hover {
+    -fx-background-color: rgba(82, 91, 102, 0.18);
 }
 
 .app-root.dark .status-bar .caret-position {
     -fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-root.dark .status-bar .go-to-line-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
 }
 
 .status-bar .sftp-status-menu {
@@ -3764,6 +4112,39 @@
 .status-bar .status-bar-menu-button:hover,
 .status-bar .status-bar-menu-button:pressed {
     -fx-background-color: rgba(127, 127, 127, 0.16);
+}
+
+/* Bottom status menus also use BalfGlassMenuBarFX, whose shared
+   main-menu-bar class must not bring the purple application-menu surface
+   into the status bar. */
+.app-root .status-bar .main-menu-bar {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-min-height: 24px;
+    -fx-pref-height: 24px;
+    -fx-max-height: 24px;
+    -fx-padding: 0;
+}
+
+.app-root .status-bar .main-menu-bar .glass-menu-title-hitbox {
+    -fx-min-height: 24px;
+    -fx-pref-height: 24px;
+    -fx-max-height: 24px;
+}
+
+.app-root .status-bar .main-menu-bar .glass-menu-title {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.app-root .status-bar .sftp-status-menu .glass-menu-title {
+    -fx-text-fill: #111418;
+    -fx-background-color: rgba(82, 91, 102, 0.10);
+    -fx-background-insets: 0;
+}
+
+.app-root.dark .status-bar .sftp-status-menu .glass-menu-title {
+    -fx-background-color: rgba(255, 255, 255, 0.08);
 }
 
 .unfold-panel {
@@ -4208,4 +4589,20 @@
 .app-root.dark .project-tree .tree-cell:hover .project-file-name,
 .app-root.dark .project-tree .tree-cell.active-project-file .project-file-name {
     -fx-font-weight: bold;
+}
+
+.project-language-bar {
+    -fx-min-height: 12px;
+    -fx-pref-height: 12px;
+    -fx-max-height: 12px;
+    -fx-spacing: 0;
+    -fx-background-color: rgba(127, 127, 127, 0.18);
+    -fx-background-radius: 6px;
+    -fx-clip: true;
+}
+
+.project-language-segment {
+    -fx-min-height: 12px;
+    -fx-pref-height: 12px;
+    -fx-max-height: 12px;
 }

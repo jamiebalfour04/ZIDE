@@ -1,6 +1,6 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfTitleBar;
+import jamiebalfour.balflaf_fx.BalfTitleBarFX;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -32,7 +32,7 @@ public final class ZIDELoginWindow {
     final LoginResult[] result = new LoginResult[1];
 
     // ---- Titlebar ----
-    BalfTitleBar titleBar = new BalfTitleBar(stage, "Sign in to " + service, null, false, false, false, false);
+    BalfTitleBarFX titleBar = new BalfTitleBarFX(stage, "Sign in to " + service, null, false, false, false, false);
     titleBar.styleProperty().set("-fx-background-color: #517;");
     titleBar.setMinHeight(32);
 
