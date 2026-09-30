@@ -10,6 +10,7 @@ import jamiebalfour.balflaf_fx.BalfGlassContextMenuFX;
 import jamiebalfour.balflaf_fx.FXHelpers;
 import jamiebalfour.balflaf_fx.BalfTabBarFX;
 import jamiebalfour.balflaf_fx.BalfTitleBarFX;
+import jamiebalfour.balflaf_fx.BalfNativeWindow;
 import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
 import jamiebalfour.console.InteractiveConsoleFX;
@@ -201,7 +202,7 @@ public class ZIDEEditor extends Application {
   private BalfTitleBarFX titleBar;
   private Node titleBarActions;
   private Button projectSelector;
-  private ContextMenu projectSelectorMenu;
+  private Popup projectSelectorMenu;
   private Node newProjectMenuItem;
   private Node openProjectFolderMenuItem;
   private BalfGlassMenuBarFX.GlassMenu scriptMenu;
@@ -274,6 +275,7 @@ public class ZIDEEditor extends Application {
   private Node aiValidateMenuItem;
   private Node githubSignInMenuItem;
   private Node githubSignOutMenuItem;
+  private final List<Node> gitActionMenuItems = new ArrayList<>();
   private Node githubAuthSeparator;
   private Node githubCloneSeparator;
   private Node githubCommitSeparator;
@@ -1334,7 +1336,7 @@ public class ZIDEEditor extends Application {
     }));
 
     showInWindowModal(title, subtitle, picker, actions);
-    setActiveModalWidth(foldersOnly ? 760 : 820);
+    setActiveModalWidth(foldersOnly ? 640 : 680);
     activeModalDismiss = exitLoop;
     Platform.enterNestedEventLoop(nestedLoop);
     return selection.get();
@@ -1667,7 +1669,11 @@ public class ZIDEEditor extends Application {
     loadBundledFonts();
 
     stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(HelperFunctions.isMac() ? "/files/zide_macos.png" : "/files/zide.png"))));
-    stage.initStyle(StageStyle.TRANSPARENT);
+    // JavaFX 21 unified native frame: native controls remain available while
+    // JavaFX content can share the top title-bar zone.
+    BalfNativeWindow.configure(stage);
+    boolean addNormalControls = false;
+    boolean roundStageManually = false;
     stage.setResizable(true);
     stage.setMinWidth(720);
     stage.setMinHeight(480);
@@ -1752,6 +1758,12 @@ public class ZIDEEditor extends Application {
     // Keep the title bar outside the workspace stack so full-workspace tools
     // can cover the menus and editor without covering the window controls.
     titleBar = new BalfTitleBarFX(stage, "ZIDE", aboutHandler);
+
+    if(!addNormalControls){
+      // Native controls and resizing come from the macOS frame. JavaFX content
+      // in the extended title-bar zone still needs the title bar drag gesture.
+      BalfNativeWindow.apply(titleBar, false, false, false, false);
+    }
     titleBar.setDarkMode(darkThemeEnabled);
     titleBar.setOnCloseRequest(this::requestApplicationClose);
     if (isMacPlatform()) titleBar.setOnSettings(event -> openSettings());
@@ -1969,6 +1981,7 @@ public class ZIDEEditor extends Application {
     if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
       windowStack.getStyleClass().add("mac-window");
     }
+    if (addNormalControls) {
     Region resizeOverlay = new Region();
     resizeOverlay.setMouseTransparent(true);
     resizeOverlay.setPickOnBounds(false);
@@ -2006,14 +2019,17 @@ public class ZIDEEditor extends Application {
     addResizeHandle(windowStack, stage, Pos.TOP_LEFT, javafx.scene.Cursor.NW_RESIZE, -1, -1);
     addResizeHandle(windowStack, stage, Pos.TOP_RIGHT, javafx.scene.Cursor.NE_RESIZE, 1, -1);
     addResizeHandle(windowStack, stage, Pos.BOTTOM_LEFT, javafx.scene.Cursor.SW_RESIZE, -1, 1);
+    }
     // Clip the complete transparent window surface, including the bottom
     // console and status bar, to the same 16px radius used by the frame.
-    var roundedClip = new javafx.scene.shape.Rectangle();
-    roundedClip.setArcWidth(32);
-    roundedClip.setArcHeight(32);
-    roundedClip.widthProperty().bind(windowStack.widthProperty());
-    roundedClip.heightProperty().bind(windowStack.heightProperty());
-    windowStack.setClip(roundedClip);
+    if(roundStageManually) {
+      var roundedClip = new javafx.scene.shape.Rectangle();
+      roundedClip.setArcWidth(32);
+      roundedClip.setArcHeight(32);
+      roundedClip.widthProperty().bind(windowStack.widthProperty());
+      roundedClip.heightProperty().bind(windowStack.heightProperty());
+      windowStack.setClip(roundedClip);
+    }
     var scene = new Scene(windowStack, 1280, 800);
     // Leave the area outside the rounded frame genuinely transparent.
     scene.setFill(javafx.scene.paint.Color.TRANSPARENT);
@@ -2383,6 +2399,7 @@ public class ZIDEEditor extends Application {
     }
 
     TextField nameField = new TextField("Untitled");
+    nameField.getStyleClass().add("new-file-name-field");
     nameField.setPromptText("File name");
 
     registerLanguageSupports();
@@ -2409,7 +2426,14 @@ public class ZIDEEditor extends Application {
     BooleanSupplier[] createFileAction = new BooleanSupplier[1];
     StackPane fileTypeSurface = new StackPane(fileTypes);
     fileTypeSurface.getStyleClass().add("new-file-type-surface");
+    fileTypeSurface.setPadding(new Insets(12));
     fileTypeSurface.setMinHeight(Region.USE_PREF_SIZE);
+    Rectangle fileTypeSurfaceClip = new Rectangle();
+    fileTypeSurfaceClip.setArcWidth(18);
+    fileTypeSurfaceClip.setArcHeight(18);
+    fileTypeSurfaceClip.widthProperty().bind(fileTypeSurface.widthProperty());
+    fileTypeSurfaceClip.heightProperty().bind(fileTypeSurface.heightProperty());
+    fileTypeSurface.setClip(fileTypeSurfaceClip);
     VBox javaTypePopup = new VBox(8);
     javaTypePopup.getStyleClass().add("java-type-popup");
     javaTypePopup.setMaxWidth(350);
@@ -2619,12 +2643,14 @@ public class ZIDEEditor extends Application {
     }
 
     ScrollPane fileTypeScroll = new ScrollPane(fileTypeSurface);
-    fileTypeScroll.setFitToWidth(true);
+    // The outer ScrollPane owns the viewport; the card surface keeps its
+    // natural width so padding does not squeeze or stretch the tile grid.
+    fileTypeScroll.setFitToWidth(false);
     fileTypeScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
     fileTypeScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
     fileTypeScroll.setPrefViewportHeight(420);
     fileTypeScroll.setMaxHeight(Double.MAX_VALUE);
-    fileTypeScroll.getStyleClass().add("new-file-type-scroll");
+    fileTypeScroll.getStyleClass().addAll("new-file-type-scroll", "roundedArea");
     Rectangle fileTypeScrollClip = new Rectangle();
     fileTypeScrollClip.setArcWidth(18);
     fileTypeScrollClip.setArcHeight(18);
@@ -2879,8 +2905,7 @@ public class ZIDEEditor extends Application {
     content.setPrefWidth(410);
     showInWindowModal("About ZIDE", "A modern IDE for ZPE and YASS.", content, "Done", () -> true, false);
     if (activeModalOverlay != null && !activeModalOverlay.getChildren().isEmpty() && activeModalOverlay.getChildren().getFirst() instanceof Region aboutPanel) {
-      aboutPanel.setPrefWidth(470);
-      aboutPanel.setMaxWidth(470);
+      aboutPanel.setPrefWidth(400);
     }
   }
 
@@ -2922,6 +2947,17 @@ public class ZIDEEditor extends Application {
     selector.setContentDisplay(ContentDisplay.RIGHT);
     selector.setOnAction(event -> showProjectSelectorMenu(selector));
     return selector;
+  }
+
+  private void styleProjectSelector() {
+    if (projectSelector == null) return;
+    boolean hasProject = currentProjectRoot != null && !isWorkspaceContainerRoot(currentProjectRoot);
+    if (hasProject) {
+      projectSelector.setStyle("-fx-background-color: " + projectColourForFile(currentProjectRoot)
+          + "; -fx-border-color: rgba(0,0,0,0.28); -fx-text-fill: white;");
+    } else {
+      projectSelector.setStyle("-fx-background-color: white; -fx-border-color: black; -fx-text-fill: black;");
+    }
   }
 
   private void showProjectSelectorMenu(Button owner) {
@@ -2974,9 +3010,19 @@ public class ZIDEEditor extends Application {
     options.setPrefWidth(190);
     HBox popupContent = new HBox(10, projectScroll, options);
     popupContent.getStyleClass().add("titlebar-project-popup");
-    projectSelectorMenu = BalfGlassContextMenuFX.create(new CustomMenuItem(popupContent, false));
-    BalfGlassContextMenuFX.setDarkMode(projectSelectorMenu, darkThemeEnabled);
-    projectSelectorMenu.show(owner, Side.BOTTOM, 0, 0);
+    popupContent.getStyleClass().add("project-selector-popup");
+    popupContent.getStyleClass().add("glass-context-menu");
+    if (darkThemeEnabled) popupContent.getStyleClass().add("glass-context-menu-dark");
+    projectSelectorMenu = new Popup();
+    projectSelectorMenu.setAutoHide(true);
+    projectSelectorMenu.setAutoFix(true);
+    projectSelectorMenu.getContent().add(popupContent);
+    Point2D popupPoint = owner.localToScreen(0, owner.getHeight());
+    projectSelectorMenu.show(owner, popupPoint.getX(), popupPoint.getY());
+    Scene popupScene = projectSelectorMenu.getScene();
+    if (popupScene != null && owner.getScene() != null) {
+      popupScene.getStylesheets().addAll(owner.getScene().getStylesheets());
+    }
   }
 
   private void populateProjectSelectorOptions(VBox options, File project) {
@@ -3019,6 +3065,7 @@ public class ZIDEEditor extends Application {
 
     Button delete = new Button("Delete project");
     delete.getStyleClass().add("titlebar-project-delete");
+    delete.getStyleClass().add("titlebar-project-option");
     delete.setMaxWidth(Double.MAX_VALUE);
     delete.setOnAction(event -> {
       projectSelectorMenu.hide();
@@ -3063,6 +3110,7 @@ public class ZIDEEditor extends Application {
     if (projectSelector == null) return;
     projectSelector.setText(currentProjectRoot == null || isWorkspaceContainerRoot(currentProjectRoot)
         ? "Project" : currentProjectRoot.getName());
+    styleProjectSelector();
   }
 
   private File pluginDirectory() {
@@ -3198,9 +3246,11 @@ public class ZIDEEditor extends Application {
     var refactorMenu = code.submenu("Refactor");
     refactorMenu.createItem("Rename Symbol", "⌘⇧R", this::renameCurrentSymbol);
     expandShortBlocksMenuItem = refactorMenu.createItem("Expand Short Blocks", "", this::expandShortBlocks);
+    refactorMenu.separator();
     refactorMenu.createItem("Extract Variable", "", this::extractVariable);
     refactorMenu.createItem("Extract Function", "", this::extractFunction);
     refactorMenu.createItem("Change Signature", "", this::changeCurrentSignature);
+    refactorMenu.separator();
     refactorMenu.createItem("Safe Rename File", "", this::safeRenameCurrentFile);
     refactorMenu.createItem("Remove References to File", "", this::removeReferencesToCurrentFile);
     refactorMenu.createItem("Safe Delete File", "", this::safeDeleteCurrentFile);
@@ -3314,7 +3364,7 @@ public class ZIDEEditor extends Application {
     githubSignInMenuItem = git.createItem("Sign in to GitHub", "", this::signInToGitHub);
     githubSignOutMenuItem = git.createItem("Sign out of GitHub", "", this::signOutOfGitHub);
     githubAuthSeparator = git.separatorNode();
-    git.createItem("Create GitHub project from selection", "", () -> {
+    Node createGitHubProjectMenuItem = git.createItem("Create GitHub project from selection", "", () -> {
       TreeItem<File> selected = projectTree == null ? null : projectTree.getSelectionModel().getSelectedItem();
       File target = selected == null ? null : selected.getValue();
       if (target == null) {
@@ -3324,7 +3374,7 @@ public class ZIDEEditor extends Application {
       if (target == null) target = currentProjectRoot;
       createGitHubProject(target);
     });
-    git.createItem("Clone", "", this::cloneRepo);
+    Node cloneGitMenuItem = git.createItem("Clone", "", this::cloneRepo);
     githubCloneSeparator = git.separatorNode();
     githubStatusMenuItem = git.createItem("Repository Status", "", this::showGitStatus);
     githubCommitMenuItem = git.createItem("Commit All Changes", "", this::commitGitChanges);
@@ -3332,7 +3382,10 @@ public class ZIDEEditor extends Application {
     githubPullMenuItem = git.createItem("Pull", "", this::pullGitChanges);
     githubPushMenuItem = git.createItem("Push", "", this::pushGitChanges);
     git.separator();
-    git.createItem("Git Help", "", this::showGitHelp);
+    Node gitHelpMenuItem = git.createItem("Git Help", "", this::showGitHelp);
+    gitActionMenuItems.addAll(List.of(githubSignInMenuItem, githubSignOutMenuItem,
+        createGitHubProjectMenuItem, cloneGitMenuItem, githubStatusMenuItem,
+        githubCommitMenuItem, githubPullMenuItem, githubPushMenuItem, gitHelpMenuItem));
     updateGitHubAuthMenu();
 
 
@@ -3443,6 +3496,7 @@ public class ZIDEEditor extends Application {
       content.getChildren().add(new VBox(2, title, description));
     }
     showInWindowModal("Git Help", "Simple explanations of ZIDE's Git actions", content, "Done", () -> true, false);
+    setActiveModalWidth(520);
   }
 
   private void changeEditorZoom(double amount) {
@@ -3486,7 +3540,11 @@ public class ZIDEEditor extends Application {
       projectSelector.getStyleClass().remove("titlebar-project-selector-dark");
       if (enabled) projectSelector.getStyleClass().add("titlebar-project-selector-dark");
     }
-    if (projectSelectorMenu != null) BalfGlassContextMenuFX.setDarkMode(projectSelectorMenu, enabled);
+    if (projectSelectorMenu != null && !projectSelectorMenu.getContent().isEmpty()) {
+      Node popupRoot = projectSelectorMenu.getContent().getFirst();
+      popupRoot.getStyleClass().remove("glass-context-menu-dark");
+      if (enabled) popupRoot.getStyleClass().add("glass-context-menu-dark");
+    }
     if (languageMenuBar != null) languageMenuBar.setDarkMode(enabled);
     if (sftpMenuBar != null) sftpMenuBar.setDarkMode(enabled);
     if (layoutBuilder != null) layoutBuilder.setDarkMode(enabled);
@@ -3904,7 +3962,7 @@ public class ZIDEEditor extends Application {
       createGitHubProject(folder, repositoryName, description.getText().trim(), privateRepository.isSelected());
       return true;
     });
-    setActiveModalWidth(620);
+    setActiveModalWidth(460);
   }
 
   private String gitRepositoryName(String value) {
@@ -3998,6 +4056,9 @@ public class ZIDEEditor extends Application {
       setMenuItemAvailable(githubCommitMenuItem, gitContext);
       setMenuItemAvailable(githubCloneSeparator, gitContext);
       setMenuItemAvailable(githubCommitSeparator, gitContext);
+      if (activeCollaboration != null) {
+        for (Node item : gitActionMenuItems) setMenuItemEnabled(item, false);
+      }
     });
   }
 
@@ -4415,13 +4476,15 @@ public class ZIDEEditor extends Application {
 
     TextField name = new TextField();
     name.setPromptText("Project name");
+    name.getStyleClass().add("modal-rounded-text-field");
     name.setMaxWidth(Double.MAX_VALUE);
     ComboBox<String> type = new ComboBox<>(FXCollections.observableArrayList("Unassigned", "YASS / ZPE", "Java", "C", "C++"));
+    type.getStyleClass().add("new-project-type-combo");
     type.setValue("Unassigned");
     type.setMaxWidth(Double.MAX_VALUE);
     Label validation = modalValidationLabel();
     VBox content = new VBox(8, new Label("Project name"), name, new Label("Project type"), type, validation);
-    content.setPrefWidth(440);
+    content.setPrefWidth(360);
     showInWindowModal("New Project", "Create a folder in " + creationRoot.getName(), content, "Create", () -> {
       String trimmed = name.getText().trim();
 
@@ -4455,15 +4518,10 @@ public class ZIDEEditor extends Application {
         return false;
       }
 
-      if (!normalisedProjectPath(creationRoot).equals(normalisedProjectPath(currentProjectRoot))) {
-        currentProjectRoot = creationRoot;
-        projectDir = creationRoot;
-        rememberProjectRoot(creationRoot);
-      }
-      buildProjectTree(creationRoot);
+      activateProjectGroup(newDir);
       return true;
     });
-    setActiveModalWidth(520);
+    setActiveModalWidth(420);
     Platform.runLater(name::requestFocus);
   }
 
@@ -4948,8 +5006,10 @@ public class ZIDEEditor extends Application {
   private void loginToZPEOnline() {
     TextField usernameField = new TextField(username == null ? "" : username);
     usernameField.setPromptText("Username");
+    usernameField.getStyleClass().add("modal-rounded-text-field");
     PasswordField passwordField = new PasswordField();
     passwordField.setPromptText("Password");
+    passwordField.getStyleClass().add("modal-rounded-text-field");
     Label status = new Label();
     status.getStyleClass().add("editor-info-meta");
     GridPane fields = new GridPane();
@@ -4974,7 +5034,7 @@ public class ZIDEEditor extends Application {
       authenticateZPEOnline(usernameField, passwordField, status);
       return false;
     });
-    setActiveModalWidth(560);
+    setActiveModalWidth(440);
     passwordField.setOnAction(event -> {
       if (!usernameField.getText().isBlank() && !passwordField.getText().isBlank()) {
         username = usernameField.getText().trim();
@@ -5223,6 +5283,7 @@ public class ZIDEEditor extends Application {
     EditorTab tab = getCurrentTab();
 
     TextField code = new TextField();
+    code.getStyleClass().add("modal-rounded-text-field");
     code.setPromptText("8-character session code");
     Label state = new Label("Create a session to share the current project, or join with a code.");
     state.setWrapText(true);
@@ -5233,7 +5294,7 @@ public class ZIDEEditor extends Application {
     fields.addRow(0, new Label("Session code"), code);
     GridPane.setHgrow(code, Priority.ALWAYS);
     VBox content = new VBox(14, file, fields, state);
-    content.setPrefWidth(560);
+    content.setPrefWidth(360);
     AtomicBoolean attemptActive = new AtomicBoolean(true);
     showInWindowModal("Collaborate", "Create or join a live session", content, List.of(new ModalAction("Cancel", false, () -> {
       attemptActive.set(false);
@@ -5250,7 +5311,7 @@ public class ZIDEEditor extends Application {
       connectCollaboration(getCurrentTab(), false, sessionCode, state, attemptActive);
       return false;
     })));
-    setActiveModalWidth(620);
+    setActiveModalWidth(420);
     Platform.runLater(() -> {
       code.requestFocus();
       code.selectAll();
@@ -5284,8 +5345,10 @@ public class ZIDEEditor extends Application {
     boolean collaborating = activeCollaboration != null;
     if (gitMenu != null) {
       gitMenu.setVisible(true);
-      gitMenu.setDisable(collaborating);
       if (collaborating && applicationMenuBar != null) applicationMenuBar.hideMenus();
+    }
+    for (Node item : gitActionMenuItems) {
+      if (item != null) item.setDisable(collaborating);
     }
     if (zpeOnlineMenu != null) zpeOnlineMenu.setVisible(!collaborating);
     if (scratchPadMenuItem != null) scratchPadMenuItem.setDisable(collaborating);
@@ -6072,7 +6135,7 @@ public class ZIDEEditor extends Application {
     body.setMaxWidth(540);
     body.getStyleClass().add("in-window-modal-message");
     showInWindowModal(title, "", body, "OK", () -> true, false);
-    setActiveModalWidth(520);
+    setActiveModalWidth(360);
   }
 
   private void requestApplicationClose() {
@@ -8264,6 +8327,7 @@ public class ZIDEEditor extends Application {
   private void renameProjectFile(File file) {
     if (isProjectRoot(file)) return;
     TextField nameField = new TextField(file.getName());
+    nameField.getStyleClass().add("modal-rounded-text-field");
     nameField.setPromptText("New name");
     nameField.setMaxWidth(Double.MAX_VALUE);
     CheckBox safeRename = new CheckBox("Safe rename references across the project");
@@ -8272,7 +8336,7 @@ public class ZIDEEditor extends Application {
     safeRename.setManaged(!file.isDirectory());
     Label validation = modalValidationLabel();
     VBox content = new VBox(8, new Label("New name"), nameField, safeRename, validation);
-    content.setPrefWidth(440);
+    content.setPrefWidth(360);
 
     showInWindowModal(file.isDirectory() ? "Rename Folder" : "Rename File", "Rename " + file.getName(), content, "Rename", () -> {
       String name = nameField.getText().trim();
@@ -8301,7 +8365,7 @@ public class ZIDEEditor extends Application {
         return false;
       }
     });
-    setActiveModalWidth(520);
+    setActiveModalWidth(420);
     Platform.runLater(() -> {
       nameField.requestFocus();
       nameField.selectAll();
@@ -8311,11 +8375,12 @@ public class ZIDEEditor extends Application {
   private void renameProject(File project) {
     if (project == null || !project.isDirectory()) return;
     TextField nameField = new TextField(project.getName());
+    nameField.getStyleClass().add("modal-rounded-text-field");
     nameField.setPromptText("New project name");
     nameField.setMaxWidth(Double.MAX_VALUE);
     Label validation = modalValidationLabel();
     VBox content = new VBox(8, new Label("New project name"), nameField, validation);
-    content.setPrefWidth(440);
+    content.setPrefWidth(360);
     showInWindowModal("Rename project", "Rename " + project.getName(), content, "Rename", () -> {
       String name = nameField.getText().trim();
       if (name.isEmpty() || name.contains("/") || name.contains("\\")) {
@@ -8346,7 +8411,7 @@ public class ZIDEEditor extends Application {
         return false;
       }
     });
-    setActiveModalWidth(520);
+    setActiveModalWidth(420);
     Platform.runLater(() -> {
       nameField.requestFocus();
       nameField.selectAll();
@@ -9603,6 +9668,9 @@ public class ZIDEEditor extends Application {
     try {
       writeProjectMetadata(projectPath, colour, loadVariableColours(projectPath.toString()));
       projectGroupColors.put(projectPath, colour);
+      if (projectSelectorMenu != null) projectSelectorMenu.hide();
+      refreshProjectSelector();
+      updateSelectedTabProjectColour();
       rebuildProjectBrowser();
     } catch (IOException exception) {
       showError("Project Colour", "Could not save the project colour: " + exception.getMessage());
@@ -13422,6 +13490,7 @@ public class ZIDEEditor extends Application {
     BalfGlassContextMenuFX.install(tabMenu);
     BalfGlassContextMenuFX.setDarkMode(tabMenu, isDarkThemeEnabled());
     tabMenu.setOnShowing(event -> focusMode.setSelected(focusModeActive));
+    tab.setContextMenu(tabMenu);
 
     closeBtn.setOnContextMenuRequested(e -> {
       editorTabs.getSelectionModel().select(tab);
@@ -14477,7 +14546,7 @@ public class ZIDEEditor extends Application {
           connectSftp(host.getText().trim(), user.getText().trim(), parsedPort, identity.getText().trim());
           return true;
         })));
-    setActiveModalWidth(640);
+          setActiveModalWidth(500);
   }
 
   private void connectSftp(String host, String user, int port, String identity) {
@@ -14737,22 +14806,32 @@ public class ZIDEEditor extends Application {
     for (int i = 0; i < caret; i++) if (text.charAt(i) == '\n') currentLine++;
     int lineCount = Math.max(1, text.split("\\R", -1).length);
 
-    TextInputDialog dialog = new TextInputDialog(Integer.toString(currentLine));
-    dialog.setTitle("Go to line");
-    dialog.setHeaderText("Go to line");
-    dialog.setContentText("Line number:");
-    if (_stage != null) dialog.initOwner(_stage);
-    Optional<String> result = dialog.showAndWait();
-    if (result.isEmpty()) return;
-    try {
-      int line = Integer.parseInt(result.get().trim());
-      if (line < 1 || line > lineCount) throw new NumberFormatException();
-      tab.getEditor().goToLine(line);
-      tab.getEditor().getEditor().requestFocus();
-      tab.getEditor().getEditor().requestFollowCaret();
-    } catch (NumberFormatException exception) {
-      showMessage("Go to line", "Enter a line number between 1 and " + lineCount + ".");
-    }
+    TextField lineField = new TextField(Integer.toString(currentLine));
+    lineField.getStyleClass().add("modal-rounded-text-field");
+    lineField.setMaxWidth(Double.MAX_VALUE);
+    Label validation = modalValidationLabel();
+    VBox content = new VBox(8, new Label("Line number:"), lineField, validation);
+    content.setPrefWidth(260);
+    showInWindowModal("Go to line", "", content, List.of(
+        new ModalAction("Cancel", false, () -> true),
+        new ModalAction("OK", true, () -> {
+          try {
+            int line = Integer.parseInt(lineField.getText().trim());
+            if (line < 1 || line > lineCount) throw new NumberFormatException();
+            tab.getEditor().goToLine(line);
+            tab.getEditor().getEditor().requestFocus();
+            tab.getEditor().getEditor().requestFollowCaret();
+            return true;
+          } catch (NumberFormatException exception) {
+            showModalValidation(validation, "Enter a line number between 1 and " + lineCount + ".");
+            return false;
+          }
+        })));
+    setActiveModalWidth(360);
+    Platform.runLater(() -> {
+      lineField.requestFocus();
+      lineField.selectAll();
+    });
   }
 
   private Node wrapTitled(String title, Node content) {

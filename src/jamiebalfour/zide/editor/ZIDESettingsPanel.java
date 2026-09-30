@@ -151,7 +151,7 @@ final class ZIDESettingsPanel extends VBox {
 
     VBox runtimeContent = new VBox(10);
     runtimeContent.getStyleClass().add("settings-runtime-content");
-    runtimeContent.setPadding(new javafx.geometry.Insets(0, 0, 0, 12));
+    runtimeContent.setPadding(new javafx.geometry.Insets(12));
     if (runtimePaths.isEmpty()) {
       Label empty = new Label("Runtime and compiler paths will appear here after a language is run for the first time.");
       empty.setWrapText(true);
@@ -184,7 +184,7 @@ final class ZIDESettingsPanel extends VBox {
     runtimeScroll.setPrefHeight(420);
     runtimeScroll.setMaxHeight(420);
     runtimeScroll.setMinHeight(0);
-    runtimeScroll.getStyleClass().add("code-editor-scroll-pane");
+    runtimeScroll.getStyleClass().addAll("code-editor-scroll-pane", "roundedArea");
     VBox.setVgrow(runtimeScroll, Priority.ALWAYS);
     VBox runtimes = section("Runtimes & Compilers", runtimeScroll);
     runtimes.getStyleClass().add("settings-runtime-section");

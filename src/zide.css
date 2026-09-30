@@ -127,8 +127,36 @@
     -fx-effect: none;
 }
 
+/* Consistent rounded form controls. Code-editor fields use their own styles. */
+.app-root .text-field,
+.app-root .text-area {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5cbd2;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 7px 10px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.app-root .text-area .content {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 8px;
+}
+
+.app-root.dark .text-field,
+.app-root.dark .text-area,
+.app-root.dark .text-area .content {
+    -fx-background-color: #242a33;
+    -fx-border-color: #596575;
+    -fx-text-fill: #e6e9ee;
+}
+
 .app-root.dark .check-box .box,
-.in-window-modal-dark .check-box .box {
+.in-window-modal-dark .check-box .box,
+.balf-modal-dark .check-box .box {
     -fx-background-color: #242a33;
     -fx-background-insets: 0;
     -fx-background-radius: 3px;
@@ -137,22 +165,26 @@
     -fx-border-width: 1px;
 }
 
-.in-window-modal-dark .check-box {
+.in-window-modal-dark .check-box,
+.balf-modal-dark .check-box {
     -fx-text-fill: #e6e9ee;
 }
 
 .app-root.dark .check-box:hover .box,
-.in-window-modal-dark .check-box:hover .box {
+.in-window-modal-dark .check-box:hover .box,
+.balf-modal-dark .check-box:hover .box {
     -fx-border-color: #79b8ff;
 }
 
 .app-root.dark .check-box:selected .mark,
-.in-window-modal-dark .check-box:selected .mark {
+.in-window-modal-dark .check-box:selected .mark,
+.balf-modal-dark .check-box:selected .mark {
     -fx-background-color: #f1f4f8;
 }
 
 .app-root.dark .check-box:indeterminate .mark,
-.in-window-modal-dark .check-box:indeterminate .mark {
+.in-window-modal-dark .check-box:indeterminate .mark,
+.balf-modal-dark .check-box:indeterminate .mark {
     -fx-background-color: #f1f4f8;
 }
 
@@ -304,8 +336,8 @@
 
 /* Explicit project navigator: stable rows, indentation and project grouping. */
 .project-browser {
-    -fx-background-color: #ffffff;
-    -fx-control-inner-background: #ffffff;
+    -fx-background-color: #f4f5f6;
+    -fx-control-inner-background: #f4f5f6;
     -fx-padding: 0;
     -fx-background-insets: 0;
 }
@@ -894,7 +926,7 @@
     -fx-background-color: #111318;
 }
 
-.terminal-output {
+.app-root .terminal-output {
     -fx-font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
     -fx-font-weight: 500;
     -fx-font-size: 12px;
@@ -905,10 +937,41 @@
     -fx-border-width: 0;
     -fx-highlight-fill: #355c91;
     -fx-highlight-text-fill: white;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
 }
 
-.terminal-output .content {
+.app-root .terminal-output .content {
     -fx-background-color: #111318;
+    -fx-background-radius: 0;
+}
+
+.app-root.dark .terminal-output {
+    -fx-background-color: #111318;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+    -fx-text-fill: #e4e8f0;
+}
+
+.app-root.dark .terminal-output .content {
+    -fx-background-color: #111318;
+    -fx-background-radius: 0;
+}
+
+.terminal-pane .terminal-output,
+.terminal-pane .terminal-output .content {
+    -fx-background-color: #111318;
+    -fx-control-inner-background: #111318;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-radius: 0;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+    -fx-text-fill: #e4e8f0;
 }
 
 .terminal-input-bar {
@@ -950,9 +1013,9 @@
 .status-bar {
     -fx-background-color: -fx-control-inner-background;
     -fx-border-color: rgba(0,0,0,0.08);
-    -fx-border-width: 1 0 1 0;
+    -fx-border-width: 1 0 0 0;
     -fx-background-radius: 0 0 12 12;
-    -fx-border-radius: 0 0 12 12;
+    -fx-border-radius: 0;
 }
 
 .app-root.dark .project-manifest-view {
@@ -1758,6 +1821,157 @@
     -fx-effect: none;
 }
 
+.app-root .balf-titlebar .balf-titlebar-project-selector,
+.app-root .balf-titlebar .balf-titlebar-project-selector .balf-titlebar-project-arrow {
+    -fx-text-fill: white;
+}
+
+.app-root .balf-titlebar .balf-titlebar-project-selector {
+    -fx-background-radius: 5px;
+}
+
+.app-root .balf-titlebar .balf-titlebar-project-selector:focused {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-border-color: transparent;
+    -fx-effect: none;
+}
+
+.glass-context-menu .titlebar-project-row,
+.glass-context-menu .titlebar-project-option {
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-border-width: 0;
+    -fx-text-alignment: left;
+}
+
+.glass-context-menu .titlebar-project-delete{
+    -fx-text-fill: #ff0000;
+}
+
+.glass-context-menu .custom-menu-item,
+.glass-context-menu .custom-menu-item:hover,
+.glass-context-menu .custom-menu-item:focused {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.glass-context-menu .menu-item,
+.glass-context-menu .menu-item:hover,
+.glass-context-menu .menu-item:focused,
+.glass-context-menu .menu-item:pressed {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.project-selector-popup {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-text-background-color: #202020;
+    -fx-text-base-color: #202020;
+    -fx-background-radius: 12px;
+    -fx-padding: 6px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.24), 14, 0.18, 0, 5);
+}
+
+.project-selector-popup.glass-context-menu-dark {
+    -fx-background-color: #20252e;
+    -fx-text-background-color: #e6e9ee;
+    -fx-text-base-color: #e6e9ee;
+}
+
+.project-selector-popup.glass-context-menu-dark .titlebar-project-row,
+.project-selector-popup.glass-context-menu-dark .titlebar-project-option,
+.project-selector-popup.glass-context-menu-dark .titlebar-project-options-heading,
+.project-selector-popup.glass-context-menu-dark .titlebar-project-option-label,
+.project-selector-popup.glass-context-menu-dark .titlebar-project-empty {
+    -fx-text-fill: #e6e9ee;
+}
+
+.project-selector-popup.glass-context-menu-dark .titlebar-project-delete {
+    -fx-text-fill: #ff6878;
+}
+
+.glass-context-menu .titlebar-project-scroll,
+.glass-context-menu .titlebar-project-scroll .viewport,
+.glass-context-menu .titlebar-project-scroll .corner,
+.glass-context-menu .titlebar-project-scroll .scroll-bar:vertical,
+.glass-context-menu .titlebar-project-scroll .scroll-bar:horizontal,
+.glass-context-menu .titlebar-project-scroll .scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.glass-context-menu .titlebar-project-scroll .scroll-bar .thumb {
+    -fx-background-color: #b7c0ca;
+    -fx-background-radius: 5px;
+    -fx-background-insets: 2px;
+}
+
+.glass-context-menu .titlebar-project-colour,
+.glass-context-menu .titlebar-project-colour:hover,
+.glass-context-menu .titlebar-project-colour:focused,
+.glass-context-menu .titlebar-project-colour:pressed {
+    -fx-min-width: 18px;
+    -fx-pref-width: 18px;
+    -fx-max-width: 18px;
+    -fx-min-height: 18px;
+    -fx-pref-height: 18px;
+    -fx-max-height: 18px;
+    -fx-padding: 0;
+    -fx-background-radius: 50%;
+    -fx-border-radius: 50%;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-border-width: 0;
+    -fx-opacity: 1;
+}
+
+.glass-context-menu .titlebar-project-row:hover,
+.glass-context-menu .titlebar-project-row:focused,
+.glass-context-menu .titlebar-project-option:hover,
+.glass-context-menu .titlebar-project-option:focused {
+    -fx-background-color: transparent;
+    -fx-opacity: 1;
+}
+
+.glass-context-menu .titlebar-project-option:hover,
+.glass-context-menu .titlebar-project-option:focused,
+.glass-context-menu .titlebar-project-option:pressed {
+    -fx-background-color: #dceef5;
+    -fx-background-radius: 8px;
+    -fx-border-color: transparent;
+    -fx-opacity: 1;
+}
+
+.glass-context-menu-dark .titlebar-project-option:hover,
+.glass-context-menu-dark .titlebar-project-option:focused,
+.glass-context-menu-dark .titlebar-project-option:pressed {
+    -fx-background-color: #164b63;
+    -fx-background-radius: 8px;
+    -fx-border-color: transparent;
+    -fx-text-fill: #ffffff;
+}
+
+.project-selector-popup .titlebar-project-option {
+    -fx-background-color: #f3f5f7;
+    -fx-background-radius: 8px;
+}
+
+.project-selector-popup .button {
+    -fx-cursor: hand;
+}
+
+.project-selector-popup.glass-context-menu-dark .titlebar-project-option {
+    -fx-background-color: #252b35;
+    -fx-text-fill: #e6e9ee;
+}
+
 .app-root .balf-titlebar .titlebar-action-button {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
@@ -2053,56 +2267,69 @@
     -fx-text-fill: #4b5158;
 }
 
-.in-window-modal-dark .zpe-online-file-name {
+.in-window-modal-dark .zpe-online-file-name,
+.balf-modal-dark .zpe-online-file-name {
     -fx-text-fill: #e6e9ee;
 }
 
-.in-window-modal-dark .zpe-online-empty {
+.in-window-modal-dark .zpe-online-empty,
+.balf-modal-dark .zpe-online-empty {
     -fx-text-fill: #b9c1cb;
 }
 
-.in-window-modal-dark .zpe-online-scroll {
+.in-window-modal-dark .zpe-online-scroll,
+.balf-modal-dark .zpe-online-scroll {
     -fx-border-color: #4b525c;
 }
 
-.in-window-modal-dark .zpe-online-file-list {
+.in-window-modal-dark .zpe-online-file-list,
+.balf-modal-dark .zpe-online-file-list {
     -fx-background-color: #20242a;
 }
 
-.in-window-modal-dark .zpe-online-file-row:hover {
+.in-window-modal-dark .zpe-online-file-row:hover,
+.balf-modal-dark .zpe-online-file-row:hover {
     -fx-background-color: #303944;
 }
 
-.in-window-modal-dark .zpe-online-open-button {
+.in-window-modal-dark .zpe-online-open-button,
+.balf-modal-dark .zpe-online-open-button {
     -fx-background-color: #087fbd;
     -fx-text-fill: white;
 }
 
-.in-window-modal-dark .zpe-online-open-button:hover {
+.in-window-modal-dark .zpe-online-open-button:hover,
+.balf-modal-dark .zpe-online-open-button:hover {
     -fx-background-color: #159bdc;
 }
 
-.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical {
+.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical,
+.balf-modal-dark .zpe-online-scroll .scroll-bar:vertical {
     -fx-background-color: #1b1f24;
     -fx-padding: 1px;
 }
 
-.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .track {
+.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .track,
+.balf-modal-dark .zpe-online-scroll .scroll-bar:vertical .track {
     -fx-background-color: #1b1f24;
     -fx-border-color: transparent;
 }
 
-.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb {
+.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb,
+.balf-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb {
     -fx-background-color: #59636f;
     -fx-background-radius: 4px;
 }
 
-.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb:hover {
+.in-window-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb:hover,
+.balf-modal-dark .zpe-online-scroll .scroll-bar:vertical .thumb:hover {
     -fx-background-color: #718091;
 }
 
 .in-window-modal-dark .zpe-online-scroll .increment-button,
-.in-window-modal-dark .zpe-online-scroll .decrement-button {
+.in-window-modal-dark .zpe-online-scroll .decrement-button,
+.balf-modal-dark .zpe-online-scroll .increment-button,
+.balf-modal-dark .zpe-online-scroll .decrement-button {
     -fx-background-color: #1b1f24;
     -fx-padding: 3px;
 }
@@ -2399,8 +2626,8 @@
 
 .console-output,
 .console-output .content {
-    -fx-background-color: #ffffff;
-    -fx-control-inner-background: #ffffff;
+    -fx-background-color: #f4f5f6;
+    -fx-control-inner-background: #f4f5f6;
     -fx-text-fill: #000000;
 }
 
@@ -2515,6 +2742,14 @@
 
 .new-file-type-surface {
     -fx-min-height: 92px;
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 12px;
+}
+
+.app-root.dark .new-file-type-surface,
+.balf-modal-dark .new-file-type-surface,
+.in-window-modal-dark .new-file-type-surface {
+    -fx-background-color: #252a33;
 }
 
 .new-file-type-scroll {
@@ -2527,6 +2762,62 @@
     -fx-border-width: 1px;
 }
 
+/* Shared rounded surface: the scrollbar track must belong to the same panel. */
+.roundedArea {
+    -fx-background-color: #eef0f3;
+    -fx-background-radius: 12px;
+    -fx-background-insets: 0;
+    -fx-border-radius: 12px;
+}
+
+.roundedArea > .viewport,
+.roundedArea > .corner,
+.roundedArea .scroll-bar:vertical,
+.roundedArea .scroll-bar:horizontal,
+.roundedArea .scroll-bar .track,
+.roundedArea .scroll-bar .track-background {
+    -fx-background-color: #eef0f3;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+}
+
+.in-window-modal-panel .roundedArea,
+.in-window-modal-panel .roundedArea > .viewport,
+.in-window-modal-panel .roundedArea > .corner,
+.in-window-modal-panel .roundedArea .scroll-bar:vertical,
+.in-window-modal-panel .roundedArea .scroll-bar:horizontal,
+.in-window-modal-panel .roundedArea .scroll-bar .track,
+.in-window-modal-panel .roundedArea .scroll-bar .track-background {
+    -fx-background-color: #eef0f3;
+}
+
+.app-root.dark .roundedArea,
+.app-root.dark .roundedArea > .viewport,
+.app-root.dark .roundedArea > .corner,
+.app-root.dark .roundedArea .scroll-bar:vertical,
+.app-root.dark .roundedArea .scroll-bar:horizontal,
+.app-root.dark .roundedArea .scroll-bar .track,
+.app-root.dark .roundedArea .scroll-bar .track-background {
+    -fx-background-color: #252a33;
+}
+
+.in-window-modal-dark .roundedArea,
+.in-window-modal-dark .roundedArea > .viewport,
+.in-window-modal-dark .roundedArea > .corner,
+.in-window-modal-dark .roundedArea .scroll-bar:vertical,
+.in-window-modal-dark .roundedArea .scroll-bar:horizontal,
+.in-window-modal-dark .roundedArea .scroll-bar .track,
+.in-window-modal-dark .roundedArea .scroll-bar .track-background,
+.balf-modal-dark .roundedArea,
+.balf-modal-dark .roundedArea > .viewport,
+.balf-modal-dark .roundedArea > .corner,
+.balf-modal-dark .roundedArea .scroll-bar:vertical,
+.balf-modal-dark .roundedArea .scroll-bar:horizontal,
+.balf-modal-dark .roundedArea .scroll-bar .track,
+.balf-modal-dark .roundedArea .scroll-bar .track-background {
+    -fx-background-color: #252a33;
+}
+
 .new-file-type-scroll > .viewport {
     -fx-background-color: #eef0f3;
     -fx-background-radius: 12px;
@@ -2537,7 +2828,7 @@
     -fx-min-width: 18px;
     -fx-max-width: 18px;
     -fx-padding: 0 6px 0 6px;
-    -fx-background-color: #f4f6f8;
+    -fx-background-color: #eef0f3;
 }
 
 .new-file-type-scroll .scroll-bar .track,
@@ -2576,7 +2867,7 @@
 }
 
 .app-root.dark .new-file-type-scroll .scroll-bar {
-    -fx-background-color: #21262f;
+    -fx-background-color: #252a33;
 }
 
 .app-root.dark .new-file-type-scroll .scroll-bar .thumb {
@@ -2588,7 +2879,7 @@
 }
 .balf-modal-dark .new-file-type-scroll .scroll-bar,
 .in-window-modal-dark .new-file-type-scroll .scroll-bar {
-    -fx-background-color: #21262f;
+    -fx-background-color: #252a33;
 }
 .balf-modal-dark .new-file-type-scroll .scroll-bar .thumb,
 .in-window-modal-dark .new-file-type-scroll .scroll-bar .thumb {
@@ -2600,12 +2891,12 @@
 }
 .balf-modal-dark .new-file-type-scroll,
 .in-window-modal-dark .new-file-type-scroll {
-    -fx-background-color: #20252e;
+    -fx-background-color: #252a33;
     -fx-border-color: #3f4b59;
 }
 .balf-modal-dark .new-file-type-scroll > .viewport,
 .in-window-modal-dark .new-file-type-scroll > .viewport {
-    -fx-background-color: #20252e;
+    -fx-background-color: #252a33;
 }
 
 .java-type-popup {
@@ -2756,6 +3047,94 @@
     -fx-font-family: "Inter";
     -fx-text-fill: #616161;
     -fx-font-size: 11px;
+}
+
+.new-file-name-field {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5cbd2;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 7px 10px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.modal-rounded-text-field {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5cbd2;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 7px 10px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.new-project-type-combo {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5cbd2;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.new-project-type-combo > .arrow-button {
+    -fx-background-color: #eef0f3;
+    -fx-background-insets: 1px 1px 1px 0;
+    -fx-background-radius: 0 7px 7px 0;
+    -fx-border-color: transparent transparent transparent #c5cbd2;
+    -fx-border-width: 0 0 0 1px;
+}
+
+.new-project-type-combo > .arrow-button > .arrow {
+    -fx-background-color: #5d6670;
+}
+
+.new-project-type-combo .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #242a33;
+    -fx-padding: 7px 10px;
+}
+
+.in-window-modal-dark .modal-rounded-text-field,
+.balf-modal-dark .modal-rounded-text-field {
+    -fx-background-color: #252a33;
+    -fx-border-color: #596575;
+    -fx-text-fill: #e6e9ee;
+}
+
+.in-window-modal-dark .new-project-type-combo,
+.balf-modal-dark .new-project-type-combo {
+    -fx-background-color: #252a33;
+    -fx-border-color: #596575;
+}
+
+.in-window-modal-dark .new-project-type-combo > .arrow-button,
+.balf-modal-dark .new-project-type-combo > .arrow-button {
+    -fx-background-color: #303943;
+    -fx-border-color: transparent transparent transparent #596575;
+}
+
+.in-window-modal-dark .new-project-type-combo > .arrow-button > .arrow,
+.balf-modal-dark .new-project-type-combo > .arrow-button > .arrow {
+    -fx-background-color: #d6dce4;
+}
+
+.in-window-modal-dark .new-project-type-combo .list-cell,
+.balf-modal-dark .new-project-type-combo .list-cell {
+    -fx-text-fill: #e6e9ee;
+}
+
+.in-window-modal-dark .new-file-name-field,
+.balf-modal-dark .new-file-name-field {
+    -fx-background-color: #252a33;
+    -fx-border-color: #596575;
+    -fx-text-fill: #e6e9ee;
 }
 
 .new-file-type-heading {
@@ -2965,25 +3344,35 @@
     -fx-background-color: rgba(0, 122, 204, 0.22);
 }
 .in-window-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:hover,
-.in-window-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:selected {
+.in-window-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:selected,
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:hover,
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:filled:selected {
     -fx-background-color: rgba(0, 153, 204, 0.42);
 }
-.in-window-modal-dark .zide-file-picker .file-picker-list {
+.in-window-modal-dark .zide-file-picker .file-picker-list,
+.balf-modal-dark .zide-file-picker .file-picker-list {
     -fx-background-color: #20252e;
     -fx-border-color: #4a535f;
 }
-.in-window-modal-dark .zide-file-picker .file-picker-list .list-cell {
+.in-window-modal-dark .zide-file-picker .file-picker-list .list-cell,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell {
     -fx-text-fill: #e6e9ee;
 }
 .in-window-modal-dark .zide-file-picker .file-picker-list .list-cell:filled:hover,
-.in-window-modal-dark .zide-file-picker .file-picker-list .list-cell:filled:selected {
+.in-window-modal-dark .zide-file-picker .file-picker-list .list-cell:filled:selected,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell:filled:hover,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell:filled:selected {
     -fx-background-color: #07566f;
     -fx-text-fill: #ffffff;
 }
 .in-window-modal-dark .in-window-modal-title,
 .in-window-modal-dark .label,
 .in-window-modal-dark .new-file-type-name,
-.in-window-modal-dark .new-file-type-heading { -fx-text-fill: #f3f3f3; }
+.in-window-modal-dark .new-file-type-heading,
+.balf-modal-dark .in-window-modal-title,
+.balf-modal-dark .label,
+.balf-modal-dark .new-file-type-name,
+.balf-modal-dark .new-file-type-heading { -fx-text-fill: #f3f3f3; }
 .in-window-modal-dark .in-window-modal-subtitle,
 .in-window-modal-dark .new-file-type-extension { -fx-text-fill: #b9b9b9; }
 .in-window-modal-dark .in-window-modal-validation { -fx-text-fill: #ff8a80; }
@@ -3551,11 +3940,74 @@
 }
 .settings-content.settings-dark .text-field,
 .settings-content.settings-dark .password-field,
-.settings-content.settings-dark .combo-box-base,
 .settings-content.settings-dark .spinner {
     -fx-background-color: #252526;
     -fx-border-color: #454545;
     -fx-text-fill: #f3f3f3;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 7px 10px;
+}
+
+.settings-content .text-field,
+.settings-content .password-field,
+.settings-content .spinner {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c5cbd2;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-background-insets: 0;
+    -fx-padding: 7px 10px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* Keep spinners compact: the editor field is rounded, while the native
+   increment/decrement controls retain their original stacked buttons. */
+.settings-content .spinner {
+    -fx-padding: 0;
+}
+.settings-content .spinner .text-field {
+    -fx-background-color: #ffffff;
+    -fx-background-insets: 1px 28px 1px 1px;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+    -fx-padding: 7px 10px;
+}
+.settings-content .spinner .increment-arrow-button,
+.settings-content .spinner .decrement-arrow-button {
+    -fx-background-color: #eef0f3;
+    -fx-border-color: #c5cbd2;
+}
+.settings-content .spinner .increment-arrow-button {
+    -fx-border-width: 1px 1px 1px 0;
+}
+.settings-content .spinner .decrement-arrow-button {
+    -fx-border-width: 0 1px 1px 0;
+}
+.settings-content .spinner .increment-arrow,
+.settings-content .spinner .decrement-arrow {
+    -fx-background-color: #5d6670;
+}
+.settings-content.settings-dark .spinner .text-field {
+    -fx-background-color: #252526;
+    -fx-background-insets: 1px 28px 1px 1px;
+    -fx-border-color: transparent;
+    -fx-text-fill: #f3f3f3;
+}
+.settings-content.settings-dark .spinner .increment-arrow-button,
+.settings-content.settings-dark .spinner .decrement-arrow-button {
+    -fx-background-color: #252a32;
+}
+
+.settings-content .text-field .text,
+.settings-content .password-field .text,
+.settings-content .combo-box-base .list-cell {
+    -fx-text-fill: #242a33;
+    -fx-fill: #242a33;
 }
 .settings-content.settings-dark .text-field .text,
 .settings-content.settings-dark .password-field .text,
