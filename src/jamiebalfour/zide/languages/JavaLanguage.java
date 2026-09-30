@@ -42,6 +42,8 @@ public final class JavaLanguage extends LanguageSupport {
   }
 
   @Override public void run(EditorTab tab) { editor.runJavaCode(tab); }
+  @Override public String executionMenuLabel() { return "Execution"; }
+  @Override public boolean canBuildJar() { return true; }
 
   @Override public boolean canRun() { return true; }
 

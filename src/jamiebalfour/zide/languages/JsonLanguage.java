@@ -3,6 +3,7 @@ import jamiebalfour.codeeditor.CodeEditorViewFX;
 import jamiebalfour.codeeditor.CodeSyntaxModel;
 import java.util.Set;
 public final class JsonLanguage extends LanguageSupport {
+  @Override public boolean isDataLanguage() { return true; }
   public record Issue(int line, int column, String message) { }
   public JsonLanguage(jamiebalfour.zide.editor.ZIDEEditor ignored) { super("json", "JSON", Set.of("json", "jsonc")); }
   @Override public void configure(CodeEditorViewFX editor) { editor.setLineCommentMarkers("//"); editor.setBlockCommentMarkers("/*", "*/"); editor.setQuoteDelimiters("\""); editor.setVariableDelimiters(""); editor.setContextSeparator(""); editor.clearKeywords(); editor.clearContextualKeywords(); editor.clearAutoCompleteItems(); for (String keyword : java.util.List.of("true", "false")) { editor.addKeyword(keyword, CodeSyntaxModel.Style.BOOLEAN); editor.addAutoCompleteItem(keyword, CodeEditorViewFX.AutoCompleteItemType.Keyword); } editor.addKeyword("null", CodeSyntaxModel.Style.NULL); editor.addAutoCompleteItem("null", CodeEditorViewFX.AutoCompleteItemType.Keyword); for (String structural : java.util.List.of("object", "array", "string", "number", "boolean", "null")) editor.addAutoCompleteItem(structural, CodeEditorViewFX.AutoCompleteItemType.Type); }

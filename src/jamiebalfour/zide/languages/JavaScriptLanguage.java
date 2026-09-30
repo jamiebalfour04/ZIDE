@@ -41,5 +41,6 @@ public final class JavaScriptLanguage extends LanguageSupport {
 
   @Override public void run(EditorTab tab) { runExternalScript(tab, "javascript", "JavaScript", ".js"); }
 
-  @Override public boolean canRun() { return host.hasInterpreter("javascript"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public java.util.List<String> runtimeExecutables() { return java.util.List.of("node", "nodejs", "node.exe", "nodejs.exe"); }
 }

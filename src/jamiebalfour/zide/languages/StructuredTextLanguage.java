@@ -7,6 +7,7 @@ import java.util.Set;
 
 /** Shared editor rules for data/configuration formats without a runtime. */
 abstract class StructuredTextLanguage extends LanguageSupport {
+  @Override public boolean isDataLanguage() { return true; }
   private final String lineComment;
   private final String[] keywords;
 

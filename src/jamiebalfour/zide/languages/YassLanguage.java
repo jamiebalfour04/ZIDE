@@ -9,6 +9,7 @@ import jamiebalfour.zpe.core.ZPEKit;
 import jamiebalfour.zpe.core.ZPEModule;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * YASS language definition supplied to ZIDE's language registry.
@@ -89,4 +90,12 @@ public final class YassLanguage extends LanguageSupport {
   }
 
   @Override public void run(EditorTab tab) { editor.runYassCode(tab); }
+  @Override public boolean isYass() { return true; }
+  @Override public Pattern variablePattern() { return Pattern.compile("\\$?[A-Za-z_][A-Za-z0-9_]*"); }
+  @Override public boolean canRun() { return true; }
+  @Override public boolean canDebug() { return true; }
+  @Override public void compile(ZIDEEditor host, EditorTab tab) { host.compileProject(); }
+  @Override public boolean canCompile() { return true; }
+  @Override public boolean canCompileNative() { return true; }
+  @Override public boolean canTranspile() { return true; }
 }

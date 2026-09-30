@@ -5,6 +5,7 @@ import jamiebalfour.codeeditor.CodeSyntaxModel;
 import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Python language definition supplied to ZIDE's language registry. */
 public final class PythonLanguage extends LanguageSupport {
@@ -13,7 +14,11 @@ public final class PythonLanguage extends LanguageSupport {
   }
 
   @Override public void run(EditorTab tab) { runExternalScript(tab, "python", "Python", ".py"); }
-  @Override public boolean canRun() { return host.hasInterpreter("python"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public Pattern variablePattern() { return Pattern.compile("[A-Za-z_][A-Za-z0-9_]*"); }
+  @Override public boolean canDebug() { return host.hasInterpreter(this); }
+  @Override public java.util.List<String> runtimeExecutables() { return java.util.List.of("python3", "python", "py.exe", "python.exe", "python3.exe"); }
+  @Override public java.util.List<String> runtimeArguments(String executableName) { return "py.exe".equalsIgnoreCase(executableName) ? java.util.List.of("-3") : java.util.List.of(); }
 
   @Override public void configure(CodeEditorViewFX editor) {
     editor.setLineCommentMarkers("#");

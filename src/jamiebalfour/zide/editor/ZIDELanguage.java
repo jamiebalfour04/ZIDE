@@ -59,14 +59,28 @@ public interface ZIDELanguage {
   }
   ZIDEEditor.EditorInfo information(String token);
   void run(EditorTab tab);
-  default boolean isYass() { return "yass".equals(id()); }
+  default void compile(ZIDEEditor host, EditorTab tab) { }
+  /** Candidate executable names used to run this language externally. */
+  default List<String> runtimeExecutables() { return List.of(); }
+  /** Arguments required before the source path for a selected executable. */
+  default List<String> runtimeArguments(String executableName) { return List.of(); }
+  /** Candidate native compiler executable names for languages that build binaries. */
+  default List<String> nativeCompilerExecutables() { return List.of(); }
+  default boolean usesExternalRuntime() { return !runtimeExecutables().isEmpty(); }
+  default boolean isYass() { return false; }
+  default String executionMenuLabel() { return "Script"; }
+  default boolean isDataLanguage() { return false; }
+  default boolean supportsHtmlPreview() { return false; }
+  default boolean supportsYwpPreview() { return false; }
+  default boolean canBuildJar() { return false; }
+  default boolean supportsSqarlTranspilation() { return false; }
   /** Whether this language uses brace-delimited blocks for short control statements. */
   default boolean supportsShortBlockExpansion() {
     return Set.of("java", "c", "cpp", "js", "typescript", "jsx", "php").contains(id());
   }
   boolean canRun();
-  boolean canCompile();
+  default boolean canCompile() { return false; }
   boolean canDebug();
-  boolean canCompileNative();
-  boolean canTranspile();
+  default boolean canCompileNative() { return false; }
+  default boolean canTranspile() { return false; }
 }

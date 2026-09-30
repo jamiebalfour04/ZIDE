@@ -5,6 +5,7 @@ import jamiebalfour.codeeditor.CodeEditorViewFX;
 import java.util.Set;
 
 public final class CsvLanguage extends LanguageSupport {
+  @Override public boolean isDataLanguage() { return true; }
   public CsvLanguage(jamiebalfour.zide.editor.ZIDEEditor ignored) {
     super("csv", "CSV", Set.of("csv", "tsv"));
   }

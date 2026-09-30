@@ -43,5 +43,12 @@ public final class JsxLanguage extends LanguageSupport {
     String suffix = tab != null && tab.getPath() != null && tab.getPath().toLowerCase(java.util.Locale.ROOT).endsWith(".tsx") ? ".tsx" : ".jsx";
     runExternalScript(tab, "jsx", "JSX / React", suffix);
   }
-  @Override public boolean canRun() { return host.hasInterpreter("jsx"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public java.util.List<String> runtimeExecutables() { return java.util.List.of("tsx", "deno", "npx", "tsx.cmd", "tsx.exe", "deno.exe", "npx.cmd", "npx.exe", "ts-node.cmd", "ts-node.exe"); }
+  @Override public java.util.List<String> runtimeArguments(String executableName) {
+    String name = executableName.toLowerCase(java.util.Locale.ROOT);
+    if (name.startsWith("npx")) return java.util.List.of("--yes", "tsx");
+    if (name.startsWith("deno")) return java.util.List.of("run", "--allow-all");
+    return java.util.List.of();
+  }
 }

@@ -39,5 +39,12 @@ public final class TypeScriptLanguage extends LanguageSupport {
   }
 
   @Override public void run(EditorTab tab) { runExternalScript(tab, "typescript", "TypeScript", ".ts"); }
-  @Override public boolean canRun() { return host.hasInterpreter("typescript"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public List<String> runtimeExecutables() { return List.of("tsx", "deno", "npx", "tsx.cmd", "tsx.exe", "deno.exe", "npx.cmd", "npx.exe", "ts-node.cmd", "ts-node.exe"); }
+  @Override public List<String> runtimeArguments(String executableName) {
+    String name = executableName.toLowerCase(java.util.Locale.ROOT);
+    if (name.startsWith("npx")) return List.of("--yes", "tsx");
+    if (name.startsWith("deno")) return List.of("run", "--allow-all");
+    return List.of();
+  }
 }

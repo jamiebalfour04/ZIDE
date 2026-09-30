@@ -13,6 +13,8 @@ public final class YwpLanguage extends LanguageSupport {
     super("ywp", "YWP", Set.of("ywp"));
   }
 
+  @Override public boolean supportsYwpPreview() { return true; }
+
   @Override
   public void configure(CodeEditorViewFX editor) {
     editor.setLineCommentMarkers("");

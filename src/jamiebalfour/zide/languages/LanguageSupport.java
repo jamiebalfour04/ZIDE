@@ -59,34 +59,12 @@ public class LanguageSupport implements ZIDELanguage {
   @Override public String toString() { return label; }
 
   @Override public String defaultExtension() {
-    return switch (id) {
-      case "yass" -> "yas";
-      case "zpeedy" -> "zps";
-      case "python" -> "py";
-      case "js" -> "js";
-      case "typescript" -> "ts";
-      case "jsx" -> "jsx";
-      case "c" -> "c";
-      case "cpp" -> "cpp";
-      case "json" -> "json";
-      case "xml" -> "xml";
-      case "html" -> "html";
-      case "css" -> "css";
-      case "csv" -> "csv";
-      case "sqarl" -> "sqarl";
-      case "ywp" -> "ywp";
-      case "md" -> "md";
-      default -> extensions.iterator().next();
-    };
+    return extensions.iterator().next();
   }
 
   @Override public String iconStyleClass() { return "language-icon-" + id; }
 
   @Override public Pattern variablePattern() {
-    if ("yass".equals(id)) return Pattern.compile("\\$?[A-Za-z_][A-Za-z0-9_]*");
-    if (Set.of("zpeedy", "python", "sqarl").contains(id)) {
-      return Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    }
     return Pattern.compile("(?!)");
   }
 
@@ -111,7 +89,7 @@ public class LanguageSupport implements ZIDELanguage {
           : Files.createTempFile("zide-" + runtime + "-", suffix);
       Files.writeString(source, tab.getEditor().getText(), StandardCharsets.UTF_8);
       source.toFile().deleteOnExit();
-      List<String> command = host.languageInterpreterCommand(runtime);
+      List<String> command = host.languageRuntimeCommand(this);
       if (command == null) throw new FileNotFoundException(displayName + " runtime was not found");
       host.languageRememberRuntimePath("RUNTIME_" + runtime.toUpperCase(Locale.ROOT) + "_PATH", Path.of(command.getFirst()));
       if (prefixArguments != null) command.addAll(prefixArguments);
@@ -129,17 +107,8 @@ public class LanguageSupport implements ZIDELanguage {
     }
   }
 
-  @Override public boolean isYass() { return "yass".equals(id); }
-  @Override public boolean canRun() {
-    return isYass() || (runner != null
-            && (!Set.of("python", "php", "lua").contains(id)
-            || ZIDEEditor.interpreterCommand(id) != null));
-  }
-  @Override public boolean canCompile() { return isYass() || Set.of("zpeedy", "sqarl").contains(id); }
-  @Override public boolean canDebug() {
-    return isYass() || "html".equals(id)
-            || ("python".equals(id) && ZIDEEditor.interpreterCommand(id) != null);
-  }
-  @Override public boolean canCompileNative() { return isYass(); }
-  @Override public boolean canTranspile() { return isYass() || "zpeedy".equals(id); }
+  @Override public boolean canRun() { return runner != null && (!usesExternalRuntime() || host == null || host.hasInterpreter(this)); }
+  @Override public boolean canDebug() { return false; }
+  @Override public boolean canCompileNative() { return false; }
+  @Override public boolean canTranspile() { return false; }
 }

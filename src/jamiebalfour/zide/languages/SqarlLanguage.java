@@ -6,6 +6,7 @@ import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.Set;
 
 public final class SqarlLanguage extends LanguageSupport {
@@ -20,5 +21,11 @@ public final class SqarlLanguage extends LanguageSupport {
     }
   }
   @Override public void run(EditorTab tab) { runExternalScript(tab, "sqarl", "SQARL", ".sqarl", List.of("-r")); }
-  @Override public boolean canRun() { return host.hasInterpreter("sqarl"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public Pattern variablePattern() { return Pattern.compile("[A-Za-z_][A-Za-z0-9_]*"); }
+  @Override public void compile(ZIDEEditor host, EditorTab tab) { host.compileSqarl(tab); }
+  @Override public boolean canCompile() { return true; }
+  @Override public boolean canTranspile() { return true; }
+  @Override public boolean supportsSqarlTranspilation() { return true; }
+  @Override public List<String> runtimeExecutables() { return List.of("sqarl", "sqarl.exe", "sqarl.cmd"); }
 }

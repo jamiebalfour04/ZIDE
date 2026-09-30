@@ -6,6 +6,7 @@ import jamiebalfour.zide.editor.EditorTab;
 import jamiebalfour.zide.editor.ZIDEEditor;
 
 import java.util.Set;
+import java.util.List;
 
 /** C language support backed by the local clang/gcc toolchain. */
 public final class CLanguage extends LanguageSupport {
@@ -29,8 +30,9 @@ public final class CLanguage extends LanguageSupport {
   }
 
   @Override public String defaultExtension() { return "c"; }
-  @Override public void run(EditorTab tab) { editor.runNativeCode(tab, false); }
-  @Override public boolean canRun() { return editor.hasNativeCompiler(false); }
+  @Override public void run(EditorTab tab) { editor.runNativeCode(tab, this); }
+  @Override public List<String> nativeCompilerExecutables() { return List.of("clang", "gcc", "clang.exe", "gcc.exe"); }
+  @Override public boolean canRun() { return editor.hasNativeCompiler(this); }
   @Override public boolean canCompile() { return canRun(); }
 
   private static void add(CodeEditorViewFX editor, String value, CodeSyntaxModel.Style style, CodeEditorViewFX.AutoCompleteItemType type) { editor.addKeyword(value, style); editor.addAutoCompleteItem(value, type); }

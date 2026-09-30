@@ -1,7 +1,7 @@
 package jamiebalfour.zide.editor;
 
-import jamiebalfour.balflaf_fx.BalfGlassMenuBar;
-import jamiebalfour.balflaf_fx.BalfComboBox;
+import jamiebalfour.balflaf_fx.BalfGlassMenuBarFX;
+import jamiebalfour.balflaf_fx.BalfComboBoxFX;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.zpe.core.types.ZPEList;
 import jamiebalfour.zpe.core.types.ZPEMap;
@@ -41,7 +41,7 @@ public final class ZIDELanguageBuilder {
   private final Consumer<Path> trainAction;
   private final BiConsumer<Path, Path> testAction;
   private final Runnable closeAction;
-  private BalfGlassMenuBar glassMenuBar;
+  private BalfGlassMenuBarFX glassMenuBar;
   private final TextField languageName = new TextField();
   private final ObservableList<Rule> rules = FXCollections.observableArrayList();
   private final ListView<Rule> ruleList = new ListView<>(rules);
@@ -49,7 +49,7 @@ public final class ZIDELanguageBuilder {
   private final TextField friendlySyntax = new TextField();
   private final TextArea pattern = new TextArea();
   private final Label syntaxSummary = new Label();
-  private final BalfComboBox<String> action = new BalfComboBox<>();
+  private final BalfComboBoxFX<String> action = new BalfComboBoxFX<>();
   private final TextField parameters = new TextField();
   private final Label parameterHint = new Label();
   private final Label status = new Label("Ready");
@@ -96,14 +96,14 @@ public final class ZIDELanguageBuilder {
   }
 
   private Node buildMenuBar() {
-    glassMenuBar = new BalfGlassMenuBar();
-    BalfGlassMenuBar.GlassMenu fileMenu = glassMenuBar.menu("File");
+    glassMenuBar = new BalfGlassMenuBarFX();
+    BalfGlassMenuBarFX.GlassMenu fileMenu = glassMenuBar.menu("File");
     fileMenu.createItem("New", "", this::newDefinition);
     fileMenu.createItem("Open", "", this::open);
     fileMenu.separator();
     fileMenu.createItem("Save", "", () -> save(false));
 
-    BalfGlassMenuBar.GlassMenu languageMenu = glassMenuBar.menu("Language");
+    BalfGlassMenuBarFX.GlassMenu languageMenu = glassMenuBar.menu("Language");
     languageMenu.createItem("Test Script", "", this::testScript);
     languageMenu.createItem("Train", "", this::train);
     return glassMenuBar;

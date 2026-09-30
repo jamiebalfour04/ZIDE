@@ -13,7 +13,8 @@ public final class PHPLanguage extends LanguageSupport {
   }
 
   @Override public void run(EditorTab tab) { runExternalScript(tab, "php", "PHP", ".php"); }
-  @Override public boolean canRun() { return host.hasInterpreter("php"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public java.util.List<String> runtimeExecutables() { return java.util.List.of("php", "php.exe"); }
 
   @Override public void configure(CodeEditorViewFX editor) {
     editor.setLineCommentMarkers("#", "//");

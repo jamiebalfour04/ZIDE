@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /** Zpeedy Script language definition supplied to ZIDE's language registry. */
 public final class ZpeedyLanguage extends LanguageSupport {
@@ -38,7 +39,7 @@ public final class ZpeedyLanguage extends LanguageSupport {
       temporary = Files.createTempFile("zide-zpeedy-", ".zps");
       Files.writeString(temporary, tab.getEditor().getText(), StandardCharsets.UTF_8);
       temporary.toFile().deleteOnExit();
-      List<String> command = host.languageInterpreterCommand("zpeedy");
+      List<String> command = host.languageRuntimeCommand(this);
       if (command == null) throw new FileNotFoundException("Zpeedy runtime was not found");
       host.languageRememberRuntimePath("RUNTIME_ZPEEDY_PATH", Path.of(command.getFirst()));
       command.add("-r");
@@ -56,5 +57,10 @@ public final class ZpeedyLanguage extends LanguageSupport {
       host.reportLanguageFailure("Zpeedy Script", exception.getMessage());
     }
   }
-  @Override public boolean canRun() { return host.hasInterpreter("zpeedy"); }
+  @Override public boolean canRun() { return host.hasInterpreter(this); }
+  @Override public Pattern variablePattern() { return Pattern.compile("[A-Za-z_][A-Za-z0-9_]*"); }
+  @Override public void compile(ZIDEEditor host, jamiebalfour.zide.editor.EditorTab tab) { host.compileZpeedy(tab); }
+  @Override public boolean canCompile() { return true; }
+  @Override public boolean canTranspile() { return true; }
+  @Override public List<String> runtimeExecutables() { return List.of("zpeedy", "zpeedy.exe", "zpeedy.cmd"); }
 }
