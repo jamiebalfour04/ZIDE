@@ -22,6 +22,11 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "jamiebalfour.balflaf_fx.WindowsNativeWindowSupport$WindowProc",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.sun.javafx.tk.quantum.QuantumToolkit",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true

@@ -1790,6 +1790,11 @@ public class ZIDEEditor extends Application {
     // Keep the title bar outside the workspace stack so full-workspace tools
     // can cover the menus and editor without covering the window controls.
     titleBar = new BalfTitleBarFX(stage, "ZIDE", aboutHandler);
+    // On Windows the JavaFX title bar occupies the real top of the HWND while
+    // Windows continues to own the native caption buttons and hit-testing.
+    if (isWindowsPlatform()) {
+      BalfNativeWindow.enableWindowsCustomFrame(stage, 32);
+    }
 
     if(!addNormalControls){
       // Native controls and resizing come from the operating-system frame.
