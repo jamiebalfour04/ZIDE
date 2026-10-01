@@ -16,7 +16,6 @@ import jamiebalfour.codeeditor.CodeSyntaxModel;
 import jamiebalfour.console.InteractiveConsoleFX;
 import jamiebalfour.helpers.FileHelperFunctions;
 import jamiebalfour.helpers.HelperFunctions;
-import jamiebalfour.helpers.MacApplicationMenuJNA;
 import jamiebalfour.parsers.json.ZenithJSONParser;
 import jamiebalfour.zide.ZIDEHelperFunctions;
 import jamiebalfour.zide.ai.ZIDEOpenAIClient;
@@ -452,6 +451,10 @@ public class ZIDEEditor extends Application {
 
   private static boolean isMacPlatform() {
     return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+  }
+
+  private static boolean isWindowsPlatform() {
+    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
   }
 
   private static String rootMessage(Throwable failure) {
@@ -1687,12 +1690,22 @@ public class ZIDEEditor extends Application {
   public void start(Stage stage) {
     loadBundledFonts();
 
-    stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream(HelperFunctions.isMac() ? "/files/zide_macos.png" : "/files/zide.png"))));
-    // JavaFX 21 unified native frame: native controls remain available while
-    // JavaFX content can share the top title-bar zone.
-    BalfNativeWindow.configure(stage);
-    boolean addNormalControls = true;
-    boolean roundStageManually = true;
+    // macOS draws a stage icon in the unified title bar. The native AppKit
+    // frame already supplies the application icon, so do not duplicate it
+    // beside ZIDE's custom title-bar content.
+    if (!HelperFunctions.isMac()) {
+      stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/files/zide.png"))));
+    }
+    // Keep the operating system's native frame while allowing JavaFX content
+    // to share the unified title-bar zone. BalfNativeWindow applies the
+    // platform-specific frame policy for macOS and Windows.
+    if (isMacPlatform() || isWindowsPlatform()) {
+      BalfNativeWindow.configure(stage);
+    } else {
+      stage.initStyle(javafx.stage.StageStyle.UNIFIED);
+    }
+    boolean addNormalControls = false;
+    boolean roundStageManually = false;
     stage.setResizable(true);
     stage.setMinWidth(720);
     stage.setMinHeight(480);
@@ -1779,8 +1792,8 @@ public class ZIDEEditor extends Application {
     titleBar = new BalfTitleBarFX(stage, "ZIDE", aboutHandler);
 
     if(!addNormalControls){
-      // Native controls and resizing come from the macOS frame. JavaFX content
-      // in the extended title-bar zone still needs the title bar drag gesture.
+      // Native controls and resizing come from the operating-system frame.
+      // JavaFX content remains available in the extended title-bar zone.
       BalfNativeWindow.apply(titleBar, false, false, false, false);
     }
     titleBar.setDarkMode(darkThemeEnabled);
@@ -2087,7 +2100,6 @@ public class ZIDEEditor extends Application {
       if (collaboration != null) leaveCollaboration(collaboration);
     });
     stage.show();
-    configureMacNativeTitlebar(stage);
     Platform.runLater(this::installTabHeaderScrolling);
     restoreGitHubSession();
     Platform.runLater(this::restoreEditorLayout);
@@ -2258,22 +2270,6 @@ public class ZIDEEditor extends Application {
     });
   }
 
-  private void configureMacNativeTitlebar(Stage stage) {
-    if (!isMacPlatform()) return;
-    Platform.runLater(() -> {
-      try {
-        var getPeer = javafx.stage.Window.class.getDeclaredMethod("getPeer");
-        getPeer.setAccessible(true);
-        Object peer = getPeer.invoke(stage);
-        var getRawHandle = peer.getClass().getMethod("getRawHandle");
-        long handle = ((Number) getRawHandle.invoke(peer)).longValue();
-        MacApplicationMenuJNA.configureTransparentTitlebar(handle);
-      } catch (Throwable ignored) {
-        // Native decoration is optional across JavaFX runtime versions.
-      }
-    });
-  }
-
   private void installTabHeaderScrolling() {
     if (editorTabs == null || tabHeaderScrollInstalled) return;
     tabHeaderScrollInstalled = true;
@@ -2330,20 +2326,9 @@ public class ZIDEEditor extends Application {
    */
   private void installMacApplicationMenuItems() {
     if (!isMacPlatform()) return;
-    if (!MacApplicationMenuJNA.isAvailable()) return;
-    PauseTransition menuReady = new PauseTransition(Duration.millis(500));
-    menuReady.setOnFinished(event -> {
-      MacApplicationMenuJNA.setAllowMenuMutation(true);
-      // The helper inserts at a fixed Cocoa index, so calls are in reverse display order.
-      MacApplicationMenuJNA.addApplicationMenuSeparator();
-      MacApplicationMenuJNA.addApplicationMenuItem("Settings", () -> Platform.runLater(this::openSettings));
-      MacApplicationMenuJNA.addApplicationMenuSeparator();
-      MacApplicationMenuJNA.addApplicationMenuItem("About ZIDE", () -> Platform.runLater(this::showAboutPanel));
-      PauseTransition renamedMenuReady = new PauseTransition(Duration.millis(250));
-      renamedMenuReady.setOnFinished(ignored -> ZIDEMacApplicationMenu.setApplicationName("ZIDE"));
-      renamedMenuReady.play();
-    });
-    menuReady.play();
+    // JavaFX owns the AppKit application menu in the native build. Keep this
+    // hook for the application name without loading the old JNA bridge.
+    Platform.runLater(() -> ZIDEMacApplicationMenu.setApplicationName("ZIDE"));
   }
 
   private void loadBundledFonts() {
@@ -3588,11 +3573,10 @@ public class ZIDEEditor extends Application {
    */
   private void applyConsoleDarkMode(boolean enabled) {
     if (consoleOutputTextArea == null) return;
-    try {
-      consoleOutputTextArea.getClass().getMethod("setDarkMode", boolean.class).invoke(consoleOutputTextArea, enabled);
-    } catch (ReflectiveOperationException ignored) {
-      // Older library builds retain their original console appearance.
-    }
+    // Keep this direct: Graal native-image does not register this method when
+    // it is reached only through reflection, leaving native consoles with a
+    // dark surface but the light-mode black text colour.
+    consoleOutputTextArea.setDarkMode(enabled);
   }
 
   private boolean isDarkThemeEnabled() {
