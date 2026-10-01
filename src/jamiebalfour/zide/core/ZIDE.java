@@ -4,7 +4,11 @@ import jamiebalfour.zide.editor.ZIDEEditor;
 public class ZIDE {
 
   static {
-    if (System.getProperty("os.name", "").toLowerCase().contains("mac")) {
+    String operatingSystem = System.getProperty("os.name", "").toLowerCase();
+    if (operatingSystem.contains("win")) {
+      System.setProperty("native.encoding", "UTF-8");
+    }
+    if (operatingSystem.contains("mac")) {
       System.setProperty("apple.awt.application.name", "ZIDE");
       System.setProperty("com.apple.mrj.application.apple.menu.about.name", "ZIDE");
     }

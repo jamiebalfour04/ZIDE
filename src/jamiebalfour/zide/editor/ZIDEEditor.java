@@ -107,7 +107,11 @@ public class ZIDEEditor extends Application {
   private static final String[] PROJECT_COLOUR_PALETTE = {"#d1495b", "#00798c", "#edae49", "#30638e", "#6a4c93", "#2a9d8f", "#e76f51", "#577590", "#bc6c25", "#3a86ff"};
 
   static {
-    if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")) {
+    String operatingSystem = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+    if (operatingSystem.contains("win")) {
+      System.setProperty("native.encoding", "UTF-8");
+    }
+    if (operatingSystem.contains("mac")) {
       // These must be set before JavaFX/AWT creates the native application menu.
       System.setProperty("apple.awt.application.name", "ZIDE");
       System.setProperty("com.apple.mrj.application.apple.menu.about.name", "ZIDE");
