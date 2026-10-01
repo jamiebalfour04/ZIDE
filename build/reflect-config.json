@@ -1,5 +1,11 @@
 [
   {
+    "name": "java.lang.reflect.Method",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "jamiebalfour.zide.editor.ZIDEEditor",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true

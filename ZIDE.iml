@@ -19,7 +19,6 @@
     <orderEntry type="library" name="undofx-2.1.1" level="project" />
     <orderEntry type="library" name="wellbehavedfx-0.3.3" level="project" />
     <orderEntry type="library" name="PDFViewerFX-0.8" level="project" />
-    <orderEntry type="library" name="jna-5.13.0" level="project" />
     <orderEntry type="module-library">
       <library>
         <CLASSES>

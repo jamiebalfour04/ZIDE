@@ -15,7 +15,14 @@
     </properties>
     <root id="archive" name="zide.jar">
       <element id="directory" name="META-INF">
-        <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />
+      <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />
+      <element id="directory" name="native-image">
+        <element id="directory" name="zide">
+          <element id="directory" name="zide">
+            <element id="file-copy" path="$PROJECT_DIR$/build/reachability-metadata.json" output-file-name="reachability-metadata.json" />
+          </element>
+        </element>
+      </element>
       </element>
       <element id="extracted-dir" path="$ZPE$/zpe.jar" path-in-jar="/" />
       <element id="module-output" name="ZIDE" />
@@ -29,7 +36,7 @@
       <element id="extracted-dir" path="$JARs$/flowless-0.7.3.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/undofx-2.1.1.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$PROJECT_DIR$/lib/PDFViewerFX-0.8.jar" path-in-jar="/" />
-      <element id="extracted-dir" path="$PROJECT_DIR$/lib/BalfLafFX.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$JARs$/BalfLafFX.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

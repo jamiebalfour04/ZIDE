@@ -9,5 +9,6 @@
 /build/zide
 /build/librca
 /build/ni-build
+/build/native/
 **/.DS_Store
 build/*.jar

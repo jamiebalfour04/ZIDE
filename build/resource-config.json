@@ -2,7 +2,7 @@
   "resources": {
     "includes": [
       {
-        "pattern": "^(jamiebalfour/balflaf_fx/.*|files/.*|com/sun/jna/darwin-aarch64/libjnidispatch\\.jnilib|zide\\.css)$"
+        "pattern": "^(jamiebalfour/balflaf_fx/.*|files/.*|com/sun/jna/darwin-aarch64/libjnidispatch\\.jnilib|com/sun/jna/win32-x86-64/jnidispatch\\.dll|com/sun/jna/win32-aarch64/jnidispatch\\.dll|zide\\.css)$"
       }
     ]
   }

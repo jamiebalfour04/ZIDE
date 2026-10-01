@@ -33,6 +33,13 @@ jobs:
       - name: Show native-image version
         run: native-image --version
 
+      - name: Verify packaged ZIDE native-image inputs
+        run: |
+          test -f build/zide.jar
+          jar tf build/zide.jar | grep -q '^META-INF/native-image/reachability-metadata.json$'
+          jar tf build/zide.jar | grep -q '^jamiebalfour/balflaf_fx/BalfGlassMenuBarFX.class$'
+          jar tf build/zide.jar | grep -q '^jamiebalfour/console/InteractiveConsoleFX.class$'
+
       - name: Build ZIDE
         run: |
           mkdir -p build/native
@@ -43,9 +50,11 @@ jobs:
             -H:ReflectionConfigurationFiles=build/reflect-config.json \
             -H:JNIConfigurationFiles=build/jni-config-macos.json \
             -H:ResourceConfigurationFiles=build/resource-config.json \
-            --enable-native-access=javafx.graphics \
-            '--initialize-at-run-time=com.sun.jna,com.sun.jna.NativeLibrary,com.sun.jna.CallbackReference,jamiebalfour.helpers.MacApplicationMenuJNA' \
-            '--initialize-at-run-time=com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \
+            -J--module-path="$JAVA_HOME/jmods" \
+            -J--add-modules=javafx.controls,javafx.fxml,javafx.swing,javafx.web \
+            --enable-native-access=javafx.graphics,ALL-UNNAMED \
+            --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
+            '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport,com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \
             -H:Name=build/native/zide-aarch64 \
             -jar build/zide.jar \
             --no-fallback
@@ -188,6 +197,17 @@ jobs:
           $config = Get-Content build/reflect-config.json -Raw | ConvertFrom-Json
           @($config | Where-Object { -not $_.name.StartsWith("com.sun.glass.ui.mac.") }) |
             ConvertTo-Json -Depth 20 | Set-Content build/reflect-config-windows.json -Encoding utf8
+      - name: Verify packaged Windows native-image inputs
+        shell: pwsh
+        run: |
+          $entries = jar tf build/zide.jar
+          foreach ($entry in @(
+            'jamiebalfour/balflaf_fx/BalfGlassMenuBarFX.class',
+            'jamiebalfour/balflaf_fx/WindowsNativeWindowSupport.class',
+            'com/sun/jna/win32-x86-64/jnidispatch.dll'
+          )) {
+            if ($entries -notcontains $entry) { throw "Missing packaged entry: $entry" }
+          }
       - name: Build ZIDE
         shell: pwsh
         run: |
@@ -199,6 +219,8 @@ jobs:
             -H:ReflectionConfigurationFiles=build/reflect-config-windows.json `
             -H:ResourceConfigurationFiles=build/resource-config.json `
             --enable-native-access=javafx.graphics `
+            '--initialize-at-run-time=com.sun.jna,com.sun.jna.NativeLibrary,com.sun.jna.CallbackReference' `
+            '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' `
             -H:Name=build/native/zide-win-x64 `
             -jar build/zide.jar `
             --no-fallback
@@ -283,6 +305,7 @@ jobs:
             -H:ReflectionConfigurationFiles=build/reflect-config-linux.json \
             -H:ResourceConfigurationFiles=build/resource-config.json \
             --enable-native-access=javafx.graphics \
+            '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' \
             -H:Name=build/native/zide-linux-x64 \
             -jar build/zide.jar \
             --no-fallback

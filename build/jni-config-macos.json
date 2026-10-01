@@ -1,5 +1,124 @@
 [
   {
+    "name": "java.lang.reflect.Method",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Class",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "java.lang.Object",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "java.lang.String",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "java.lang.Number",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "java.lang.Void",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Boolean",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Byte",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Character",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Double",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Float",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Integer",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Long",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Short",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.Buffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.ByteBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.CharBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.DoubleBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.FloatBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.IntBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.LongBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.ShortBuffer",
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.lang.Enum",
+    "methods": [{"name": "toString", "parameterTypes": []}]
+  },
+  {
     "name": "com.sun.glass.ui.mac.MacAccessible",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
@@ -9,43 +128,55 @@
     "name": "com.sun.glass.ui.mac.MacAccessible$MacAttribute",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "toString",
+        "parameterTypes": []
+      }
+    ]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacAction",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacRole",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacSubrole",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacNotification",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacOrientation",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacAccessible$MacText",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true,
-    "allDeclaredFields": true
+    "allDeclaredFields": true,
+    "methods": [{"name": "toString", "parameterTypes": []}]
   },
   {
     "name": "com.sun.glass.ui.mac.MacVariant",
