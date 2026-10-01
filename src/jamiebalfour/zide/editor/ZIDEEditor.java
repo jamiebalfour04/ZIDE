@@ -1691,8 +1691,8 @@ public class ZIDEEditor extends Application {
     // JavaFX 21 unified native frame: native controls remain available while
     // JavaFX content can share the top title-bar zone.
     BalfNativeWindow.configure(stage);
-    boolean addNormalControls = false;
-    boolean roundStageManually = false;
+    boolean addNormalControls = true;
+    boolean roundStageManually = true;
     stage.setResizable(true);
     stage.setMinWidth(720);
     stage.setMinHeight(480);

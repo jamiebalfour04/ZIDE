@@ -21,6 +21,10 @@
     "allDeclaredMethods": true
   },
   {
+    "name": "com.sun.glass.ui.Window",
+    "allDeclaredMethods": true
+  },
+  {
     "name": "com.sun.glass.ui.mac.MacGestureSupport",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
