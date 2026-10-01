@@ -1,0 +1,24 @@
+[
+  {
+    "name": "java.lang.reflect.Method",
+    "methods": [
+      {
+        "name": "invoke",
+        "parameterTypes": ["java.lang.Object", "[Ljava.lang.Object;"]
+      }
+    ]
+  },
+  {
+    "name": "java.lang.Class",
+    "methods": [
+      {
+        "name": "getDeclaredMethod",
+        "parameterTypes": ["java.lang.String", "[Ljava.lang.Class;"]
+      },
+      {
+        "name": "getDeclaredMethods",
+        "parameterTypes": []
+      }
+    ]
+  }
+]

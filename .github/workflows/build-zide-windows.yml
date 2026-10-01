@@ -70,6 +70,7 @@ jobs:
             -march=compatibility `
             -H:+UnlockExperimentalVMOptions `
             -H:ReflectionConfigurationFiles=build/reflect-config-windows.json `
+            -H:JNIConfigurationFiles=build/jni-config-windows.json `
             -H:ResourceConfigurationFiles=build/resource-config.json `
             --enable-native-access=javafx.graphics,ALL-UNNAMED `
             '--initialize-at-run-time=com.sun.jna,com.sun.jna.NativeLibrary,com.sun.jna.CallbackReference' `
