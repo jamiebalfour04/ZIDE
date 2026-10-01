@@ -2958,12 +2958,15 @@ public class ZIDEEditor extends Application {
   private void styleProjectSelector() {
     if (projectSelector == null) return;
     boolean hasProject = currentProjectRoot != null && !isWorkspaceContainerRoot(currentProjectRoot);
-    if (hasProject) {
-      projectSelector.setStyle("-fx-background-color: " + projectColourForFile(currentProjectRoot)
-          + "; -fx-border-color: rgba(0,0,0,0.28); -fx-text-fill: white;");
-    } else {
-      projectSelector.setStyle("-fx-background-color: white; -fx-border-color: black; -fx-text-fill: black;");
-    }
+    String background = hasProject
+        ? projectColourForFile(currentProjectRoot)
+        : darkThemeEnabled ? "#303943" : "#ffffff";
+    String border = hasProject
+        ? "rgba(0,0,0,0.28)"
+        : darkThemeEnabled ? "transparent" : "black";
+    String text = hasProject ? "white" : darkThemeEnabled ? "#f2f4f7" : "#202020";
+    projectSelector.setStyle("-fx-background-color: " + background
+        + "; -fx-border-color: " + border + "; -fx-text-fill: " + text + ";");
   }
 
   private void showProjectSelectorMenu(Button owner) {
@@ -3144,6 +3147,10 @@ public class ZIDEEditor extends Application {
     BalfGlassMenuBarFX bar = new BalfGlassMenuBarFX();
     applicationMenuBar = bar;
     bar.getStyleClass().add("main-menu-bar");
+    // macOS uses the unified title-bar zone, so its menus intentionally
+    // overlap the title row. Windows retains a separate native title bar and
+    // needs the popup flush with the bottom of the menu row instead.
+    if (isWindowsPlatform()) bar.setPopupDownwardOffset(0);
     bar.setOnMouseMoved(event -> {
       if (event.getTarget() == bar && bar.isOutsideMenuTitles(event.getX())) {
         bar.hideMenus();
@@ -3545,6 +3552,7 @@ public class ZIDEEditor extends Application {
     if (projectSelector != null) {
       projectSelector.getStyleClass().remove("titlebar-project-selector-dark");
       if (enabled) projectSelector.getStyleClass().add("titlebar-project-selector-dark");
+      styleProjectSelector();
     }
     if (projectSelectorMenu != null && !projectSelectorMenu.getContent().isEmpty()) {
       Node popupRoot = projectSelectorMenu.getContent().getFirst();

@@ -1,0 +1,100 @@
+name: Temporary Windows Native Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-zide-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-x64:
+    name: Windows x64 native image
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out ZIDE
+        uses: actions/checkout@v6
+
+      - name: Install Liberica Native Image Kit 25 with JavaFX
+        uses: actions/setup-java@v6
+        with:
+          distribution: liberica-nik
+          java-version: "25"
+          java-package: jdk+fx
+          architecture: x64
+
+      - name: Show native-image version
+        shell: pwsh
+        run: native-image --version
+
+      - name: Enable the MSVC x64 toolchain
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64
+          "PATH=$env:PATH" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "INCLUDE=$env:INCLUDE" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIB=$env:LIB" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "LIBPATH=$env:LIBPATH" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Prepare Windows reflection configuration
+        shell: pwsh
+        run: |
+          $config = Get-Content build/reflect-config.json -Raw | ConvertFrom-Json
+          @($config | Where-Object { -not $_.name.StartsWith("com.sun.glass.ui.mac.") }) |
+            ConvertTo-Json -Depth 20 | Set-Content build/reflect-config-windows.json -Encoding utf8
+
+      - name: Verify packaged Windows native-image inputs
+        shell: pwsh
+        run: |
+          if (-not (Test-Path build/zide.jar)) { throw "Missing build/zide.jar" }
+          $entries = jar tf build/zide.jar
+          foreach ($entry in @(
+            'META-INF/native-image/reachability-metadata.json',
+            'jamiebalfour/balflaf_fx/BalfGlassMenuBarFX.class',
+            'jamiebalfour/balflaf_fx/WindowsNativeWindowSupport.class',
+            'com/sun/jna/win32-x86-64/jnidispatch.dll'
+          )) {
+            if ($entries -notcontains $entry) { throw "Missing packaged entry: $entry" }
+          }
+
+      - name: Build ZIDE
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/native | Out-Null
+          native-image `
+            -O3 `
+            -march=compatibility `
+            -H:+UnlockExperimentalVMOptions `
+            -H:ReflectionConfigurationFiles=build/reflect-config-windows.json `
+            -H:ResourceConfigurationFiles=build/resource-config.json `
+            --enable-native-access=javafx.graphics `
+            '--initialize-at-run-time=com.sun.jna,com.sun.jna.NativeLibrary,com.sun.jna.CallbackReference' `
+            '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' `
+            -H:Name=build/native/zide-win-x64 `
+            -jar build/zide.jar `
+            --no-fallback
+
+      - name: Verify and package native image
+        shell: pwsh
+        run: |
+          if (-not (Test-Path build/native/zide-win-x64.exe)) { throw "Windows ZIDE was not produced." }
+          Copy-Item src/files/zide.png build/native/zide.png -Force
+          Compress-Archive `
+            -Path build/native/zide-win-x64.exe,build/native/zide.png `
+            -DestinationPath build/native/ZIDE-windows-x64.zip `
+            -Force
+
+      - name: Upload Windows native build
+        uses: actions/upload-artifact@v6
+        with:
+          name: zide-windows-x64-temporary
+          path: |
+            build/native/zide-win-x64.exe
+            build/native/zide.png
+            build/native/ZIDE-windows-x64.zip
+          retention-days: 3
+          if-no-files-found: error
