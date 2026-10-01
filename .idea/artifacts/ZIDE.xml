@@ -17,7 +17,7 @@
       <element id="directory" name="META-INF">
         <element id="file-copy" path="$PROJECT_DIR$/ZIDE-META-INF/MANIFEST.mf" output-file-name="MANIFEST.MF" />
       </element>
-      <element id="extracted-dir" path="$USER_HOME$/Sync/Programs/ZPE/zpe.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$ZPE$/zpe.jar" path-in-jar="/" />
       <element id="module-output" name="ZIDE" />
       <element id="extracted-dir" path="$JARs$/slf4j-api-2.0.13.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/slf4j-simple-2.0.17.jar" path-in-jar="/" />
@@ -29,6 +29,7 @@
       <element id="extracted-dir" path="$JARs$/flowless-0.7.3.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$JARs$/undofx-2.1.1.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$PROJECT_DIR$/lib/PDFViewerFX-0.8.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/lib/BalfLafFX.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>
