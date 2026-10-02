@@ -58,7 +58,6 @@ jobs:
           javac --release 25 --module-path $javafx --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.web `
             -encoding UTF-8 -cp $classpath -d build/classes $sources
           Copy-Item -Recurse src/files build/classes/files -Force
-          Copy-Item -Recurse src/jamiebalfour/balflaf_fx/*.css build/classes/jamiebalfour/balflaf_fx -Force
           Copy-Item build/reachability-metadata.json build/classes/reachability-metadata.json -Force
           New-Item -ItemType Directory -Force build/classes/META-INF/native-image/zide/zide | Out-Null
           Move-Item build/classes/reachability-metadata.json build/classes/META-INF/native-image/zide/zide/reachability-metadata.json -Force
