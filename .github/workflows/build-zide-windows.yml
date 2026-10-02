@@ -40,6 +40,32 @@ jobs:
           "LIB=$env:LIB" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
           "LIBPATH=$env:LIBPATH" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Assemble ZIDE jar
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build/classes | Out-Null
+          $javafx = Get-ChildItem -Path $env:JAVA_HOME -Recurse -Filter javafx.base.jar |
+            Select-Object -First 1 -ExpandProperty DirectoryName
+          if (-not $javafx) { throw 'JavaFX modules were not found in the Liberica installation.' }
+          $sources = Get-ChildItem -Path src -Recurse -Filter *.java | ForEach-Object { $_.FullName }
+          $classpath = (Get-ChildItem lib -Filter *.jar | ForEach-Object { $_.FullName }) -join [IO.Path]::PathSeparator
+          javac --release 25 --module-path $javafx --add-modules javafx.controls,javafx.fxml,javafx.swing,javafx.web `
+            -encoding UTF-8 -cp $classpath -d build/classes $sources
+          Copy-Item -Recurse src/files build/classes/files -Force
+          Copy-Item -Recurse src/jamiebalfour/balflaf_fx/*.css build/classes/jamiebalfour/balflaf_fx -Force
+          Copy-Item build/reachability-metadata.json build/classes/reachability-metadata.json -Force
+          New-Item -ItemType Directory -Force build/classes/META-INF/native-image/zide/zide | Out-Null
+          Move-Item build/classes/reachability-metadata.json build/classes/META-INF/native-image/zide/zide/reachability-metadata.json -Force
+          Get-ChildItem lib -Filter *.jar | ForEach-Object {
+            Push-Location build/classes
+            jar xf $_.FullName
+            Pop-Location
+          }
+          New-Item -ItemType Directory -Force build/classes/META-INF | Out-Null
+          Copy-Item ZIDE-META-INF/MANIFEST.mf build/classes/META-INF/MANIFEST.MF -Force
+          jar --create --file build/zide.jar --manifest build/classes/META-INF/MANIFEST.MF -C build/classes .
+
       - name: Prepare Windows reflection configuration
         shell: pwsh
         run: |
