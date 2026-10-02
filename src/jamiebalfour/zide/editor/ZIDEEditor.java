@@ -105,7 +105,6 @@ public class ZIDEEditor extends Application {
   private static final String KEY_LAST_DIR = System.getProperty("user.home");//"/Users/jamiebalfour/Documents/";
   private static final int MAX_PROFILE_POINTS = 6000;
   private static final String[] PROJECT_COLOUR_PALETTE = {"#d1495b", "#00798c", "#edae49", "#30638e", "#6a4c93", "#2a9d8f", "#e76f51", "#577590", "#bc6c25", "#3a86ff"};
-
   static {
     String operatingSystem = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
     if (operatingSystem.contains("win")) {
@@ -1796,9 +1795,8 @@ public class ZIDEEditor extends Application {
     titleBar = new BalfTitleBarFX(stage, "ZIDE", aboutHandler);
     // On Windows the JavaFX title bar occupies the real top of the HWND while
     // Windows continues to own the native caption buttons and hit-testing.
-    if (isWindowsPlatform()) {
-      BalfNativeWindow.enableWindowsCustomFrame(stage, 32);
-    }
+    // Windows frame policy is owned by BalfLafFX. Its current default uses
+    // JavaFX 25's extended frame; the older HWND bridge remains there.
 
     if(!addNormalControls){
       // Native controls and resizing come from the operating-system frame.
