@@ -1,4 +1,30 @@
 {
+  "reflection": [
+    {
+      "type": "java.lang.reflect.Method",
+      "jniAccessibleType": true,
+      "methods": [
+        {
+          "name": "invoke",
+          "parameterTypes": ["java.lang.Object", "java.lang.Object[]"]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.Class",
+      "jniAccessibleType": true,
+      "methods": [
+        {
+          "name": "getDeclaredMethod",
+          "parameterTypes": ["java.lang.String", "java.lang.Class[]"]
+        },
+        {
+          "name": "getDeclaredMethods",
+          "parameterTypes": []
+        }
+      ]
+    }
+  ],
   "foreign": {
     "downcalls": [
       {
