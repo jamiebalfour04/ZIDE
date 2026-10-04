@@ -66,6 +66,38 @@ jobs:
           file build/native/zide-aarch64
           file build/native/zide-aarch64 | grep -q arm64
 
+      - name: Import Apple Developer ID certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          test -n "$APPLE_CERTIFICATE_P12"
+          test -n "$APPLE_CERTIFICATE_PASSWORD"
+          keychain="$RUNNER_TEMP/zide-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$APPLE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/developer-id.p12" \
+            -k "$keychain" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -s "$keychain"
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*\"\(Developer ID Application:.*\)\"/\1/p' | head -n 1)"
+          test -n "$identity"
+          {
+            echo "APPLE_SIGNING_KEYCHAIN=$keychain"
+            echo "APPLE_SIGNING_IDENTITY=$identity"
+          } >> "$GITHUB_ENV"
+
       - name: Package macOS app bundle
         run: |
           app="build/native/ZIDE.app"
@@ -100,12 +132,37 @@ jobs:
           PLIST
           plutil -lint "$app/Contents/Info.plist"
           test -x "$app/Contents/MacOS/ZIDE"
-          # Give the bundle a valid code signature so Gatekeeper does not
-          # report the downloaded application as damaged. Distribution signing
-          # and notarisation can be added when Apple credentials are configured.
-          codesign --force --deep --sign - "$app"
-          codesign --verify --deep --strict "$app"
+          codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app/Contents/MacOS/ZIDE"
+          codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
           ditto -c -k --sequesterRsrc --keepParent "$app" build/native/ZIDE-macos-arm64.zip
+
+      - name: Notarise macOS app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          test -n "$APPLE_ID"
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+          xcrun notarytool submit build/native/ZIDE-macos-arm64.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple build/native/ZIDE.app
+          xcrun stapler validate build/native/ZIDE.app
+          rm build/native/ZIDE-macos-arm64.zip
+          ditto -c -k --sequesterRsrc --keepParent build/native/ZIDE.app build/native/ZIDE-macos-arm64.zip
+
+      - name: Clean up Apple signing keychain
+        if: ${{ always() }}
+        run: |
+          if [ -n "${APPLE_SIGNING_KEYCHAIN:-}" ] && [ -f "$APPLE_SIGNING_KEYCHAIN" ]; then
+            security delete-keychain "$APPLE_SIGNING_KEYCHAIN" || true
+          fi
+          rm -f "$RUNNER_TEMP/developer-id.p12"
 
       - name: Upload macOS app archive
         uses: actions/upload-artifact@v6
