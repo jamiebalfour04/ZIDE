@@ -59,3 +59,64 @@ mkdir -p build/native
 test -x build/native/zide-aarch64
 file build/native/zide-aarch64
 echo "Built build/native/zide-aarch64"
+
+# Package the native executable as a macOS application bundle.
+APP_BUNDLE="build/ZIDE.app"
+APP_CONTENTS="$APP_BUNDLE/Contents"
+APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_PLIST_SOURCE=""
+
+if [[ -f package/ZIDE.app/Contents/Info.plist ]]; then
+  APP_PLIST_SOURCE="package/ZIDE.app/Contents/Info.plist"
+elif [[ -f build/Info.plist ]]; then
+  APP_PLIST_SOURCE="build/Info.plist"
+fi
+
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
+cp build/native/zide-aarch64 "$APP_MACOS/ZIDE"
+chmod 755 "$APP_MACOS/ZIDE"
+
+if [[ -n "$APP_PLIST_SOURCE" ]]; then
+  cp "$APP_PLIST_SOURCE" "$APP_CONTENTS/Info.plist"
+else
+  cat > "$APP_CONTENTS/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>English</string>
+  <key>CFBundleExecutable</key><string>ZIDE</string>
+  <key>CFBundleIdentifier</key><string>jamiebalfour.zide.core</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>ZIDE</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1.0</string>
+  <key>LSMinimumSystemVersion</key><string>10.11</string>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+PLIST
+fi
+
+if [[ -f ZIDE.icns ]]; then
+  cp ZIDE.icns "$APP_RESOURCES/ZIDE.icns"
+  /usr/libexec/PlistBuddy -c 'Delete :CFBundleIconFile' "$APP_CONTENTS/Info.plist" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string ZIDE.icns' "$APP_CONTENTS/Info.plist"
+fi
+
+/usr/bin/plutil -lint "$APP_CONTENTS/Info.plist"
+test -x "$APP_MACOS/ZIDE"
+
+if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+  codesign --force --deep --options runtime --sign "$APPLE_SIGNING_IDENTITY" "$APP_BUNDLE"
+fi
+
+if [[ -n "${APPLE_NOTARIZE_PROFILE:-}" ]]; then
+  xcrun notarytool submit "$APP_BUNDLE" --keychain-profile "$APPLE_NOTARIZE_PROFILE" --wait
+  xcrun stapler staple "$APP_BUNDLE"
+fi
+
+echo "Built $APP_BUNDLE"
