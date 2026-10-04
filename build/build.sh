@@ -41,6 +41,7 @@ fi
 mkdir -p build/native
 
 "$NATIVE_IMAGE" \
+  -Djavafx.enablePreview=true \
   -O3 \
   -march=compatibility \
   -H:+UnlockExperimentalVMOptions \
