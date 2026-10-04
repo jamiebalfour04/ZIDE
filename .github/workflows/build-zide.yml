@@ -264,16 +264,26 @@ jobs:
           printf '%b\n' "$SFTP_PRIVATE_KEY" | tr -d '\r' > "$ssh_dir/deploy_key"
           printf '%b\n' "$SFTP_HOST_KEY" | tr -d '\r' > "$ssh_dir/known_hosts"
           ssh-keygen -y -P "" -f "$ssh_dir/deploy_key" > /dev/null
-          rsync -az --progress \
+          rsync_retry() {
+            for attempt in 1 2 3; do
+              rsync "$@" && return 0
+              if [ "$attempt" -lt 3 ]; then
+                echo "rsync attempt $attempt failed; retrying in 10 seconds..."
+                sleep 10
+              fi
+            done
+            return 1
+          }
+          rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
             build/native/zide-win-x64.exe "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.exe"
-          rsync -az --progress \
+          rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
             build/native/zide.png "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
-          rsync -az --progress \
+          rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
             build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_PACKAGE_DESTINATION/"
-          rsync -az --progress \
+          rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
             build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
 
