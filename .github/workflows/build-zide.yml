@@ -2,6 +2,22 @@ name: Build ZIDE
 
 on:
   workflow_dispatch:
+    inputs:
+      build_macos:
+        description: Build and deploy the macOS ARM64 image
+        required: true
+        type: boolean
+        default: false
+      build_windows:
+        description: Build and deploy the Windows x64 image
+        required: true
+        type: boolean
+        default: true
+      build_linux:
+        description: Build and deploy the Linux x64 image
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -13,6 +29,7 @@ concurrency:
 jobs:
   build-macos-arm64:
     name: macOS ARM64 native image
+    if: ${{ inputs.build_macos }}
     runs-on: macos-15
 
     steps:
@@ -228,6 +245,7 @@ jobs:
 
   build-windows-x64:
     name: Windows x64 native image
+    if: ${{ inputs.build_windows }}
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
@@ -346,6 +364,7 @@ jobs:
 
   build-linux-x64:
     name: Linux x64 native image
+    if: ${{ inputs.build_linux }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
