@@ -97,6 +97,16 @@
     -fx-text-fill: #e6e9ee;
 }
 
+/* Keep every editor-tab close mark consistent in dark mode, including tabs
+   that are created outside the normal document-tab factory. */
+.app-root.dark .balf-tab-bar .tab-close-button {
+    -fx-background-color: rgba(255, 255, 255, 0.90);
+}
+
+.app-root.dark .balf-tab-bar .tab-close-button:hover {
+    -fx-background-color: #ffffff;
+}
+
 .app-root.dark .tree-view,
 .app-root.dark .tree-cell {
     -fx-background-color: #1b1f26;
@@ -197,7 +207,7 @@
 }
 
 .context-menu .separator:horizontal {
-    -fx-padding: 0;
+    -fx-padding: 3px 2px;
 }
 
 .context-menu .separator:horizontal .line {
@@ -1017,6 +1027,18 @@
     -fx-border-radius: 0;
 }
 
+.project-settings-scroll,
+.project-settings-scroll > .viewport {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.app-root.dark .project-settings-scroll,
+.app-root.dark .project-settings-scroll > .viewport {
+    -fx-background-color: #14171c;
+}
+
 .app-root.dark .project-manifest-view {
     -fx-background-color: #14171c;
 }
@@ -1834,6 +1856,28 @@
     -fx-faint-focus-color: transparent;
     -fx-border-color: transparent;
     -fx-effect: none;
+}
+
+.glass-menu-item-no-options .glass-menu-item-text {
+    -fx-font-style: italic;
+    -fx-text-fill: #8d9298;
+}
+.glass-menu-item-no-options:hover,
+.glass-menu-item-no-options:focused,
+.glass-menu-item-no-options:pressed {
+    -fx-background-color: transparent;
+}
+.glass-menu-item-no-options:hover .glass-menu-item-text,
+.glass-menu-item-no-options:focused .glass-menu-item-text,
+.glass-menu-item-no-options:pressed .glass-menu-item-text {
+    -fx-font-style: italic;
+    -fx-text-fill: #8d9298;
+}
+
+.titlebar-branding { -fx-alignment: center-left; }
+.titlebar-brand-name {
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
 }
 
 .glass-context-menu .titlebar-project-row,
@@ -4099,6 +4143,60 @@
 .settings-content.settings-dark .spinner .decrement-arrow {
     -fx-background-color: #cbd5e1;
 }
+
+/* Finish the spinner as one rounded control: the text side owns the left
+   corners and the two arrow buttons own the right corners. */
+.settings-content .spinner .text-field,
+.settings-content.settings-dark .spinner .text-field {
+    -fx-background-radius: 8px 0 0 8px;
+}
+
+.settings-content .spinner .increment-arrow-button,
+.settings-content.settings-dark .spinner .increment-arrow-button {
+    -fx-background-radius: 0 8px 0 0;
+    -fx-border-radius: 0 8px 0 0;
+}
+
+.settings-content .spinner .decrement-arrow-button,
+.settings-content.settings-dark .spinner .decrement-arrow-button {
+    -fx-background-radius: 0 0 8px 0;
+    -fx-border-radius: 0 0 8px 0;
+}
+
+/* Editable settings controls use the same dark surface as ordinary combo
+   boxes, rather than the darker text-field default. */
+.settings-content.settings-dark .text-field,
+.settings-content.settings-dark .password-field,
+.settings-content.settings-dark .spinner,
+.settings-content.settings-dark .spinner .text-field,
+.settings-content.settings-dark .combo-box-base,
+.settings-content.settings-dark .combo-box-base .text-field {
+    -fx-background-color: #252a32;
+}
+
+/* Keep spinner arrow buttons inside the rounded control in both themes. */
+.settings-content .spinner,
+.settings-content.settings-dark .spinner {
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+}
+
+.settings-content .spinner .text-field,
+.settings-content.settings-dark .spinner .text-field {
+    -fx-background-insets: 0 28px 0 0;
+    -fx-padding: 7px 10px;
+}
+
+.settings-content .spinner .increment-arrow-button,
+.settings-content .spinner .decrement-arrow-button,
+.settings-content.settings-dark .spinner .increment-arrow-button,
+.settings-content.settings-dark .spinner .decrement-arrow-button {
+    -fx-background-insets: 0;
+    -fx-border-insets: 0;
+    -fx-padding: 0 8px;
+}
+
 .settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical > .track,
 .settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:horizontal > .track,
 .settings-content.settings-dark .code-editor-scroll-pane .scroll-bar:vertical > .track-background,
@@ -4235,6 +4333,8 @@
     -fx-border-radius: 3px;
 }
 .language-builder-status {
+    -fx-background-color: #f4f5f7;
+    -fx-max-width: Infinity;
     -fx-padding: 5px 10px;
     -fx-border-color: #c9cdd2 transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
@@ -4282,6 +4382,8 @@
     -fx-text-fill: #087f8c;
 }
 .regex-builder-status {
+    -fx-background-color: #f4f5f7;
+    -fx-max-width: Infinity;
     -fx-padding: 6px 12px;
     -fx-border-color: #c9cdd2 transparent transparent transparent;
     -fx-border-width: 1px 0 0 0;
@@ -4650,6 +4752,15 @@
 
 .app-root.dark .status-bar .sftp-status-menu .glass-menu-title:hover {
     -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+.status-bar .sftp-status-menu .glass-menu-title-hitbox:focused,
+.status-bar .sftp-status-menu .glass-menu-title:focused {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: none;
 }
 
 .status-bar .status-bar-brand {
@@ -5163,4 +5274,365 @@
     -fx-min-height: 12px;
     -fx-pref-height: 12px;
     -fx-max-height: 12px;
+}
+
+/* The file browser follows BalfLaf's flatter chooser surface rather than the
+   rounded card treatment used by ordinary ZIDE modals. */
+.zide-file-picker-modal .balf-modal-panel {
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+    -fx-padding: 18px;
+}
+.zide-file-picker-modal .balf-modal-title {
+    -fx-padding: 0 0 2px 0;
+}
+.zide-file-picker-modal .balf-modal-subtitle {
+    -fx-padding: 0 0 8px 0;
+}
+.zide-file-picker {
+    -fx-spacing: 10px;
+    -fx-padding: 0;
+    -fx-background-color: #f7f8fa;
+}
+.zide-file-picker .label {
+    -fx-text-fill: #202020;
+}
+.zide-file-picker .button,
+.zide-file-picker .toggle-button {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 4px;
+    -fx-border-color: #d5d9de;
+    -fx-border-radius: 4px;
+    -fx-padding: 6px 10px;
+    -fx-text-fill: #202020;
+}
+.zide-file-picker .button:hover,
+.zide-file-picker .toggle-button:hover,
+.zide-file-picker .toggle-button:selected {
+    -fx-background-color: #e4eaf0;
+}
+.zide-file-picker .text-field {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 4px;
+    -fx-border-color: #d5d9de;
+    -fx-border-radius: 4px;
+    -fx-text-fill: #202020;
+    -fx-prompt-text-fill: #7a8188;
+}
+.file-picker-location {
+    -fx-padding: 0 0 2px 0;
+}
+.zide-file-picker .file-picker-shortcuts,
+.zide-file-picker .file-picker-list {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d5d9de;
+    -fx-border-radius: 2px;
+    -fx-background-radius: 2px;
+}
+.zide-file-picker .file-picker-shortcuts {
+    -fx-background-color: #eef2f6;
+}
+.zide-file-picker .file-picker-shortcuts .list-cell,
+.zide-file-picker .file-picker-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #202020;
+    -fx-padding: 7px 10px;
+}
+.zide-file-picker .file-picker-shortcuts .list-cell:hover,
+.zide-file-picker .file-picker-list .list-cell:hover {
+    -fx-background-color: #e4eaf0;
+}
+.zide-file-picker .file-picker-shortcuts .list-cell:selected,
+.zide-file-picker .file-picker-list .list-cell:selected {
+    -fx-background-color: #dcebF8;
+    -fx-text-fill: #202020;
+}
+.zide-file-picker .file-picker-list .column-header-background,
+.zide-file-picker .file-picker-list .column-header,
+.zide-file-picker .file-picker-list .filler {
+    -fx-background-color: #eef2f6;
+    -fx-border-color: transparent transparent #d5d9de transparent;
+}
+.zide-file-picker .file-picker-list .column-header .label {
+    -fx-text-fill: #30343a;
+    -fx-font-weight: bold;
+}
+.zide-file-picker .file-picker-list .table-row-cell {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent;
+    -fx-cell-size: 34px;
+}
+.zide-file-picker .file-picker-list .table-row-cell:hover {
+    -fx-background-color: #e4eaf0;
+}
+.zide-file-picker .file-picker-list .table-row-cell:selected {
+    -fx-background-color: #dcebf8;
+}
+.zide-file-picker .file-picker-list .table-cell {
+    -fx-border-color: transparent;
+    -fx-text-fill: #202020;
+    -fx-padding: 6px 10px;
+}
+.zide-file-picker .file-picker-icon-scroll {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d5d9de;
+}
+.zide-file-picker .file-picker-icon-view {
+    -fx-padding: 14px;
+    -fx-background-color: #ffffff;
+}
+.zide-file-picker .file-picker-icon-tile {
+    -fx-padding: 9px;
+    -fx-background-radius: 4px;
+    -fx-border-color: transparent;
+}
+.zide-file-picker .file-picker-icon-tile:hover {
+    -fx-background-color: #e4eaf0;
+    -fx-border-color: #d5d9de;
+}
+.zide-file-picker .file-picker-icon,
+.zide-file-picker .file-picker-icon-name {
+    -fx-text-fill: #202020;
+}
+.zide-file-picker .file-picker-icon-name {
+    -fx-text-alignment: center;
+    -fx-alignment: center;
+}
+.zide-file-picker .file-picker-icon {
+    -fx-font-size: 28px;
+}
+.zide-file-picker .scroll-bar:vertical {
+    -fx-pref-width: 18px;
+    -fx-min-width: 18px;
+    -fx-max-width: 18px;
+    -fx-padding: 0 6px 0 6px;
+    -fx-background-color: #f4f6f8;
+}
+.zide-file-picker .scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-padding: 1px;
+    -fx-background-color: #f4f6f8;
+}
+.zide-file-picker .scroll-bar .track,
+.zide-file-picker .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.zide-file-picker .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 2px 0 2px 0;
+    -fx-background-radius: 3px;
+    -fx-min-height: 30px;
+}
+.zide-file-picker .scroll-bar:horizontal .thumb {
+    -fx-min-width: 24px;
+}
+.zide-file-picker .file-picker-file-area {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d5d9de;
+    -fx-border-radius: 2px;
+    -fx-background-radius: 2px;
+}
+.zide-file-picker .file-picker-details-header {
+    -fx-background-color: #eef2f6;
+    -fx-border-color: transparent transparent #d5d9de transparent;
+    -fx-padding: 8px 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #30343a;
+}
+.zide-file-picker-modal .balf-modal-actions {
+    -fx-padding: 10px 0 0 0;
+}
+
+.balf-modal-dark .zide-file-picker {
+    -fx-background-color: #20252e;
+}
+.balf-modal-dark .zide-file-picker .label {
+    -fx-text-fill: #e6e9ee;
+}
+.balf-modal-dark .zide-file-picker .button,
+.balf-modal-dark .zide-file-picker .toggle-button,
+.balf-modal-dark .zide-file-picker .text-field {
+    -fx-background-color: #252c35;
+    -fx-border-color: #4e545c;
+    -fx-text-fill: #e6e9ee;
+    -fx-prompt-text-fill: #9ba3ad;
+}
+.balf-modal-dark .zide-file-picker .button:hover,
+.balf-modal-dark .zide-file-picker .toggle-button:hover,
+.balf-modal-dark .zide-file-picker .toggle-button:selected {
+    -fx-background-color: #343d48;
+}
+.balf-modal-dark .zide-file-picker .separator:vertical .line {
+    -fx-background-color: #4e545c;
+    -fx-border-color: #4e545c;
+    -fx-border-width: 0 1px 0 0;
+}
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts,
+.balf-modal-dark .zide-file-picker .file-picker-list,
+.balf-modal-dark .zide-file-picker .file-picker-file-area {
+    -fx-background-color: #252c35;
+    -fx-border-color: #4e545c;
+}
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts {
+    -fx-background-color: #262a2f;
+}
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell {
+    -fx-text-fill: #e6e9ee;
+}
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:hover,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell:hover {
+    -fx-background-color: #343a43;
+}
+.balf-modal-dark .zide-file-picker .file-picker-shortcuts .list-cell:selected,
+.balf-modal-dark .zide-file-picker .file-picker-list .list-cell:selected {
+    -fx-background-color: #364e65;
+    -fx-text-fill: #ffffff;
+}
+.balf-modal-dark .zide-file-picker .file-picker-details-header {
+    -fx-background-color: #262d36;
+    -fx-border-color: transparent transparent #4e545c transparent;
+    -fx-text-fill: #e6e9ee;
+}
+.balf-modal-dark .zide-file-picker .file-picker-list .column-header-background,
+.balf-modal-dark .zide-file-picker .file-picker-list .column-header,
+.balf-modal-dark .zide-file-picker .file-picker-list .filler {
+    -fx-background-color: #262d36;
+    -fx-border-color: transparent transparent #4e545c transparent;
+}
+.balf-modal-dark .zide-file-picker .file-picker-list .column-header .label,
+.balf-modal-dark .zide-file-picker .file-picker-list .table-cell,
+.balf-modal-dark .zide-file-picker .file-picker-icon,
+.balf-modal-dark .zide-file-picker .file-picker-icon-name {
+    -fx-text-fill: #e6e9ee;
+}
+.balf-modal-dark .zide-file-picker .file-picker-list .table-row-cell,
+.balf-modal-dark .zide-file-picker .file-picker-icon-scroll,
+.balf-modal-dark .zide-file-picker .file-picker-icon-view {
+    -fx-background-color: #252c35;
+}
+.balf-modal-dark .zide-file-picker .file-picker-icon-scroll > .viewport,
+.balf-modal-dark .zide-file-picker .file-picker-icon-scroll > .corner {
+    -fx-background-color: #252c35;
+}
+.balf-modal-dark .zide-file-picker .file-picker-list .table-row-cell:hover,
+.balf-modal-dark .zide-file-picker .file-picker-icon-tile:hover {
+    -fx-background-color: #343a43;
+}
+.balf-modal-dark .zide-file-picker .file-picker-list .table-row-cell:selected {
+    -fx-background-color: #364e65;
+}
+.balf-modal-dark .zide-file-picker .file-picker-icon-tile:hover {
+    -fx-border-color: #4e545c;
+}
+.balf-modal-dark .zide-file-picker .scroll-bar {
+    -fx-background-color: #21262f;
+}
+.balf-modal-dark .zide-file-picker .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+
+/* Global ZIDE scrollbar: a slim rounded thumb with no arrow controls. */
+.app-root .scroll-bar:vertical,
+.balf-modal-dark .scroll-bar:vertical,
+.in-window-modal-dark .scroll-bar:vertical {
+    -fx-pref-width: 14px;
+    -fx-min-width: 14px;
+    -fx-max-width: 14px;
+    -fx-padding: 0 2px;
+    -fx-background-color: transparent;
+}
+
+.app-root .scroll-bar:horizontal,
+.balf-modal-dark .scroll-bar:horizontal,
+.in-window-modal-dark .scroll-bar:horizontal {
+    -fx-pref-height: 10px;
+    -fx-min-height: 10px;
+    -fx-max-height: 10px;
+    -fx-padding: 1px 0;
+    -fx-background-color: transparent;
+}
+
+.app-root .scroll-bar .track,
+.app-root .scroll-bar .track-background,
+.balf-modal-dark .scroll-bar .track,
+.balf-modal-dark .scroll-bar .track-background,
+.in-window-modal-dark .scroll-bar .track,
+.in-window-modal-dark .scroll-bar .track-background {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.app-root .scroll-bar .thumb,
+.balf-modal-dark .scroll-bar .thumb,
+.in-window-modal-dark .scroll-bar .thumb {
+    -fx-background-color: #b9bec5;
+    -fx-background-insets: 0;
+    -fx-background-radius: 5px;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-min-height: 30px;
+}
+
+.app-root .scroll-bar:horizontal .thumb,
+.balf-modal-dark .scroll-bar:horizontal .thumb,
+.in-window-modal-dark .scroll-bar:horizontal .thumb {
+    -fx-min-width: 30px;
+}
+
+.app-root .scroll-bar .thumb:hover,
+.balf-modal-dark .scroll-bar .thumb:hover,
+.in-window-modal-dark .scroll-bar .thumb:hover {
+    -fx-background-color: #969da6;
+}
+
+.app-root .scroll-bar .increment-button,
+.app-root .scroll-bar .decrement-button,
+.balf-modal-dark .scroll-bar .increment-button,
+.balf-modal-dark .scroll-bar .decrement-button,
+.in-window-modal-dark .scroll-bar .increment-button,
+.in-window-modal-dark .scroll-bar .decrement-button {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-min-width: 0;
+    -fx-min-height: 0;
+    -fx-max-width: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.app-root .scroll-bar .increment-arrow,
+.app-root .scroll-bar .decrement-arrow,
+.balf-modal-dark .scroll-bar .increment-arrow,
+.balf-modal-dark .scroll-bar .decrement-arrow,
+.in-window-modal-dark .scroll-bar .increment-arrow,
+.in-window-modal-dark .scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+
+.app-root.dark .scroll-bar .thumb,
+.balf-modal-dark .scroll-bar .thumb,
+.in-window-modal-dark .scroll-bar .thumb {
+    -fx-background-color: #59616d;
+}
+
+.app-root.dark .scroll-bar .thumb:hover,
+.balf-modal-dark .scroll-bar .thumb:hover,
+.in-window-modal-dark .scroll-bar .thumb:hover {
+    -fx-background-color: #737d89;
+}
+
+/* The spinner already owns the outer border. Keep the light arrow column
+   inside it and use the outline colour as its single continuous surface. */
+.settings-content:not(.settings-dark) .spinner .increment-arrow-button,
+.settings-content:not(.settings-dark) .spinner .decrement-arrow-button {
+    -fx-background-color: #c5cbd2;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }

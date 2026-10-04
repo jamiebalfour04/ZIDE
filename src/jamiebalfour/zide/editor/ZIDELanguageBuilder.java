@@ -49,6 +49,7 @@ public final class ZIDELanguageBuilder {
   private final TextField friendlySyntax = new TextField();
   private final TextArea pattern = new TextArea();
   private final Label syntaxSummary = new Label();
+  private final Label exampleSummary = new Label();
   private final BalfComboBoxFX<String> action = new BalfComboBoxFX<>();
   private final TextField parameters = new TextField();
   private final Label parameterHint = new Label();
@@ -68,6 +69,7 @@ public final class ZIDELanguageBuilder {
     root.setCenter(buildWorkspace());
     root.setBottom(status);
     status.getStyleClass().add("language-builder-status");
+    status.setMaxWidth(Double.MAX_VALUE);
     root.setMinSize(820, 560);
     bindEditor();
     newDefinition();
@@ -231,6 +233,8 @@ public final class ZIDELanguageBuilder {
     pattern.setPrefRowCount(5);
     syntaxSummary.getStyleClass().add("language-builder-syntax-summary");
     syntaxSummary.setWrapText(true);
+    exampleSummary.getStyleClass().add("language-builder-syntax-summary");
+    exampleSummary.setWrapText(true);
     action.setItems(FXCollections.observableArrayList(ACTION_PARAMETERS.keySet()));
     action.setMaxWidth(Double.MAX_VALUE);
     action.setCellFactory(list -> behaviourCell());
@@ -252,8 +256,9 @@ public final class ZIDELanguageBuilder {
     form.addRow(0, new Label("Name"), ruleName);
     form.addRow(1, new Label("Syntax"), friendlySyntax);
     form.addRow(2, new Label("Matches"), syntaxSummary);
-    form.addRow(3, new Label("Behaviour"), action);
-    form.add(parameterHint, 1, 4);
+    form.addRow(3, new Label("Example"), exampleSummary);
+    form.addRow(4, new Label("Behaviour"), action);
+    form.add(parameterHint, 1, 5);
     Label syntaxHint = new Label("Use named values such as ${condition:expression}, ${name:identifier}, "
             + "${variable:variable}, ${values:values}, ${parameters:parameters}, ${count:number} or ${text:text}.");
     syntaxHint.getStyleClass().add("language-builder-hint");
@@ -373,17 +378,23 @@ public final class ZIDELanguageBuilder {
     selected = rule;
     updating = true;
     boolean disabled = rule == null;
+    String selectedSyntax = disabled ? "" : rule.syntax;
+    if (!disabled && (selectedSyntax == null || selectedSyntax.isBlank())) {
+      selectedSyntax = reversePatternToSyntax(rule.pattern);
+      rule.syntax = selectedSyntax;
+    }
     ruleName.setDisable(disabled);
     friendlySyntax.setDisable(disabled);
     pattern.setDisable(disabled);
     action.setDisable(disabled);
     parameters.setDisable(disabled);
     ruleName.setText(disabled ? "" : rule.name);
-    friendlySyntax.setText(disabled ? "" : rule.syntax);
+    friendlySyntax.setText(selectedSyntax);
     pattern.setText(disabled ? "" : rule.pattern);
     action.setValue(disabled ? null : rule.action);
     parameters.setText(disabled ? "" : rule.parameters);
     syntaxSummary.setText(disabled ? "Select a rule" : rule.description);
+    exampleSummary.setText(exampleForSyntax(selectedSyntax));
     updating = false;
     updateParameterHint();
   }
@@ -394,8 +405,17 @@ public final class ZIDELanguageBuilder {
     selected.pattern = pattern.getText();
     selected.action = action.getValue();
     selected.parameters = parameters.getText();
-    selected.description = describe(selected.pattern, selected.action);
+    String reversedSyntax = reversePatternToSyntax(selected.pattern);
+    if (!reversedSyntax.isBlank()) {
+      updating = true;
+      selected.syntax = reversedSyntax;
+      friendlySyntax.setText(reversedSyntax);
+      updating = false;
+    }
+    selected.description = reversedSyntax.isBlank()
+            ? describe(selected.pattern, selected.action) : friendlyDescription(reversedSyntax);
     syntaxSummary.setText(selected.description);
+    exampleSummary.setText(exampleForSyntax(selected.syntax));
     ruleList.refresh();
   }
 
@@ -407,6 +427,7 @@ public final class ZIDELanguageBuilder {
       pattern.setText(selected.pattern);
       selected.description = friendlyDescription(selected.syntax);
       syntaxSummary.setText(selected.description);
+      exampleSummary.setText(exampleForSyntax(selected.syntax));
       status.setText("Syntax updated");
     } catch (IllegalArgumentException exception) {
       status.setText(exception.getMessage());
@@ -686,6 +707,106 @@ public final class ZIDELanguageBuilder {
       if (template.pattern.equals(pattern) && template.action.equals(action)) return template.syntax;
     }
     return "";
+  }
+
+  /** Converts the common, named-capture form of a regex back into builder syntax. */
+  private static String reversePatternToSyntax(String regex) {
+    if (regex == null || regex.isBlank()) return "";
+    StringBuilder syntax = new StringBuilder();
+    for (int index = 0; index < regex.length();) {
+      if (regex.startsWith("(?<", index)) {
+        int nameEnd = regex.indexOf('>', index + 3);
+        if (nameEnd > index + 3) {
+          int bodyEnd = matchingGroupEnd(regex, nameEnd + 1);
+          if (bodyEnd > nameEnd) {
+            String name = regex.substring(index + 3, nameEnd);
+            if (name.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+              syntax.append("${").append(name).append(':')
+                      .append(captureType(regex.substring(nameEnd + 1, bodyEnd))).append('}');
+              index = bodyEnd + 1;
+              continue;
+            }
+          }
+        }
+      }
+      if (regex.startsWith("\\s+", index)) { syntax.append(' '); index += 3; continue; }
+      if (regex.startsWith("\\s*", index)) {
+        char previous = index == 0 ? 0 : regex.charAt(index - 1);
+        char next = index + 3 < regex.length() ? regex.charAt(index + 3) : 0;
+        if (Character.isLetterOrDigit(previous) && next == '(') syntax.append(' ');
+        index += 3;
+        continue;
+      }
+      if (regex.charAt(index) == '\\' && index + 1 < regex.length()) {
+        syntax.append(regex.charAt(index + 1));
+        index += 2;
+        continue;
+      }
+      char current = regex.charAt(index++);
+      if (current == '(' && regex.startsWith("?:", index)) { index += 2; continue; }
+      if (current != ')' && current != '|' && current != '?' && current != '*'
+              && current != '+') syntax.append(current);
+    }
+    return syntax.toString().trim();
+  }
+
+  private static int matchingGroupEnd(String regex, int start) {
+    int depth = 1;
+    boolean characterClass = false;
+    for (int index = start; index < regex.length(); index++) {
+      char current = regex.charAt(index);
+      if (current == '\\') { index++; continue; }
+      if (current == '[') characterClass = true;
+      else if (current == ']') characterClass = false;
+      else if (!characterClass && current == '(') depth++;
+      else if (!characterClass && current == ')' && --depth == 0) return index;
+    }
+    return -1;
+  }
+
+  private static String captureType(String pattern) {
+    return switch (pattern) {
+      case "[A-Za-z_][A-Za-z0-9_]*" -> "identifier";
+      case "\\$?[A-Za-z_][A-Za-z0-9_]*" -> "variable";
+      case "[0-9]+(?:\\.[0-9]+)?" -> "number";
+      case "[^)\\n]*" -> "parameters";
+      case "[^)\\n]+" -> "expression";
+      case "[^;\\n]+" -> "values";
+      case ".+?" -> "expression";
+      case "(?:\"[^\"\\n]*\"|'[^'\\n]*')" -> "string";
+      default -> "text";
+    };
+  }
+
+  private static String exampleForSyntax(String syntax) {
+    if (syntax == null || syntax.isBlank()) return "";
+    StringBuilder example = new StringBuilder();
+    for (int index = 0; index < syntax.length();) {
+      if (syntax.charAt(index) == '$' && index + 1 < syntax.length() && syntax.charAt(index + 1) == '{') {
+        int end = syntax.indexOf('}', index + 2);
+        if (end > index) {
+          String[] value = syntax.substring(index + 2, end).split(":", 2);
+          example.append(exampleValue(value.length == 2 ? value[0] : "value", value.length == 2 ? value[1] : "text"));
+          index = end + 1;
+          continue;
+        }
+      }
+      example.append(syntax.charAt(index++));
+    }
+    return example.toString();
+  }
+
+  private static String exampleValue(String name, String type) {
+    return switch (type.toLowerCase()) {
+      case "identifier" -> name;
+      case "variable" -> "$" + name;
+      case "parameters" -> "a, b";
+      case "number", "count" -> "2";
+      case "expression", "condition" -> "condition";
+      case "string" -> "\"text\"";
+      case "values", "assignment" -> "value";
+      default -> "text";
+    };
   }
 
   private static String friendlyDescription(String syntax) {

@@ -47,6 +47,7 @@ public final class ZIDERegexBuilder {
     root.setCenter(buildWorkspace());
     root.setBottom(status);
     status.getStyleClass().add("regex-builder-status");
+    status.setMaxWidth(Double.MAX_VALUE);
     loadSavedPatterns();
     expression.textProperty().addListener((obs, oldValue, newValue) -> refreshMatches());
     sample.textProperty().addListener((obs, oldValue, newValue) -> refreshMatches());
