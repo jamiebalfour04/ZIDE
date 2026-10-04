@@ -69,6 +69,8 @@ public class EditorTab extends Tab {
   private final PauseTransition infoTimer = new PauseTransition(Duration.millis(INFORMATION_DELAY_MS));
   private final PauseTransition infoHideTimer = new PauseTransition(Duration.millis(350));
   private final PauseTransition markdownTimer = new PauseTransition(Duration.millis(180));
+  private final PauseTransition gitDiffTimer = new PauseTransition(Duration.millis(300));
+  private final AtomicInteger gitDiffGeneration = new AtomicInteger();
   private final Popup infoPopup = new Popup();
   private final AtomicInteger analysisVersion = new AtomicInteger();
   private final Set<Integer> breakpointLines = new HashSet<>();
@@ -105,6 +107,7 @@ public class EditorTab extends Tab {
   private IntFunction<? extends Node> originalParagraphGraphicFactory;
   private boolean blockClosuresEnabled;
   private final Map<String, VariableColour> variableColours = new HashMap<>();
+  private final Map<Integer, String> gitDiffMarkers = new HashMap<>();
 
   private record VariableColour(String background, String text) { }
 
@@ -173,6 +176,7 @@ public class EditorTab extends Tab {
 
     analysisTimer.setOnFinished(e -> analyseCurrentSource());
     markdownTimer.setOnFinished(e -> renderMarkdownPreview());
+    gitDiffTimer.setOnFinished(e -> owner.refreshGitDiff(this));
     symbolTimer.setOnFinished(e -> owner.refreshDocumentSymbols(this));
     editor.getEditor().textProperty().addListener((observable, oldText, newText) -> {
       changes = true;
@@ -181,6 +185,9 @@ public class EditorTab extends Tab {
       symbolTimer.playFromStart();
       if (markdownPreview != null) markdownTimer.playFromStart();
       scheduleVariableColours();
+      gitDiffGeneration.incrementAndGet();
+      if (!gitDiffMarkers.isEmpty()) setGitDiffMarkers(Map.of());
+      gitDiffTimer.playFromStart();
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
@@ -781,7 +788,7 @@ public class EditorTab extends Tab {
     editor.requestFocus();
   }
 
-  void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); hideInformation(); }
+  void dispose() { analysisVersion.incrementAndGet(); analysisTimer.stop(); gitDiffTimer.stop(); hideInformation(); }
   void markLoadedContentClean() {
     changes = false;
     lastDiskContent = editor.getText();
@@ -872,7 +879,7 @@ public class EditorTab extends Tab {
     originalParagraphGraphicFactory = editor.getEditor().paragraphGraphicFactoryProperty().get();
     editor.getEditor().paragraphGraphicFactoryProperty().set(line -> {
       Node existing = originalParagraphGraphicFactory == null ? null : originalParagraphGraphicFactory.apply(line);
-      if (!blockClosuresEnabled) return existing;
+      if (!blockClosuresEnabled && !gitDiffMarkers.containsKey(line)) return existing;
       Integer end = foldRegions.get(line);
       Label marker = new Label(end != null && end > line ? (foldedRegions.contains(line) ? "…" : ">") : "");
       marker.getStyleClass().add("editor-fold-marker");
@@ -880,7 +887,17 @@ public class EditorTab extends Tab {
       HBox graphic = new HBox(3);
       graphic.setAlignment(Pos.CENTER_RIGHT);
       if (existing != null) graphic.getChildren().add(existing);
-      graphic.getChildren().add(marker);
+      String diffKind = gitDiffMarkers.get(line);
+      if (diffKind != null) {
+        Region diffMarker = new Region();
+        diffMarker.setMinWidth(4);
+        diffMarker.setPrefWidth(4);
+        diffMarker.setMaxWidth(4);
+        diffMarker.setMinHeight(12);
+        diffMarker.setStyle("-fx-background-color: " + ("added".equals(diffKind) ? "#3fb950" : "#f85149") + "; -fx-background-radius: 2;");
+        graphic.getChildren().add(diffMarker);
+      }
+      if (blockClosuresEnabled) graphic.getChildren().add(marker);
       marker.setOnMouseClicked(event -> {
         handleLineNumberClick(line);
         event.consume();
@@ -983,6 +1000,19 @@ public class EditorTab extends Tab {
   boolean hasChanges() { return changes; }
   String getLastDiskContent() { return lastDiskContent; }
   void setLastDiskContent(String content) { lastDiskContent = content; }
+  void setGitDiffMarkers(Map<Integer, String> markers) {
+    Set<Integer> affectedLines = new HashSet<>(gitDiffMarkers.keySet());
+    affectedLines.addAll(markers.keySet());
+    gitDiffMarkers.clear();
+    gitDiffMarkers.putAll(markers);
+    for (int line : affectedLines) {
+      if (line >= 0 && line < editor.getEditor().getParagraphs().size()) {
+        editor.getEditor().recreateParagraphGraphic(line);
+      }
+    }
+  }
+
+  int gitDiffGeneration() { return gitDiffGeneration.get(); }
 
   private void setMarkdownPreviewEnabled(boolean enabled) {
     if (enabled) {

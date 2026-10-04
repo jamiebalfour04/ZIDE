@@ -38,6 +38,7 @@ final class ZIDESettingsPanel extends VBox {
   private final BalfComboBoxFX<String> fontFamily;
   private final Spinner<Integer> fontSize;
   private final Spinner<Integer> indentationSpaces;
+  private final TextField projectsPath;
   private final CheckBox wordWrap;
   private final CheckBox codeMap;
   private final CheckBox useZpex;
@@ -59,6 +60,7 @@ final class ZIDESettingsPanel extends VBox {
 
   ZIDESettingsPanel(boolean darkMode, String themeName, String lightTheme, String darkTheme,
                     String fontName, int fontSizeValue, int indentationSpacesValue, boolean wrapLines, boolean codeMapValue, boolean preferZpex, boolean showInputPromptValue, String maximumMemoryValue, boolean groupProjectTabsValue, boolean blockClosuresValue, boolean autoOpenCsvSpreadsheetValue,
+                    String projectsPathValue, Function<String, String> chooseProjectsPath,
                     String chatGPTUrl, String chatGPTKey, String chatGPTModel,
                     String collaborationServerName, String collaborationPortNumber, String collaborationDisplayName,
                     String collaborationPasswordValue, String collaborationAvatarValue,
@@ -127,9 +129,22 @@ final class ZIDESettingsPanel extends VBox {
     editorFields.addRow(2, new Label("Font"), fontFamily);
     editorFields.addRow(3, new Label("Font size"), fontSize);
     editorFields.addRow(4, new Label("Indentation spaces"), indentationSpaces);
-    editorFields.add(wordWrap, 1, 5);
-    editorFields.add(codeMap, 1, 6);
-    editorFields.add(autoOpenCsvSpreadsheet, 1, 7);
+    projectsPath = new TextField(projectsPathValue == null ? "" : projectsPathValue);
+    projectsPath.getStyleClass().add("modal-rounded-text-field");
+    projectsPath.setMaxWidth(Double.MAX_VALUE);
+    Button setProjectsPath = new Button("Set");
+    setProjectsPath.setOnAction(event -> {
+      if (chooseProjectsPath == null) return;
+      String selected = chooseProjectsPath.apply(projectsPath.getText().trim());
+      if (selected != null && !selected.isBlank()) projectsPath.setText(selected);
+    });
+    HBox projectsPathRow = new HBox(8, projectsPath, setProjectsPath);
+    projectsPathRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+    HBox.setHgrow(projectsPath, Priority.ALWAYS);
+    editorFields.addRow(5, new Label("Projects path"), projectsPathRow);
+    editorFields.add(wordWrap, 1, 6);
+    editorFields.add(codeMap, 1, 7);
+    editorFields.add(autoOpenCsvSpreadsheet, 1, 8);
     for (Node control : List.of(lightEditorTheme, darkEditorTheme, fontFamily, fontSize, indentationSpaces)) {
       GridPane.setHgrow(control, Priority.ALWAYS);
     }
@@ -382,6 +397,7 @@ final class ZIDESettingsPanel extends VBox {
   String getFontFamily() { return fontFamily.getEditor().getText().trim(); }
   int getFontSize() { return fontSize.getValue(); }
   int getIndentationSpaces() { return indentationSpaces.getValue(); }
+  String getProjectsPath() { return projectsPath.getText().trim(); }
   boolean isWordWrapEnabled() { return wordWrap.isSelected(); }
   boolean isCodeMapEnabled() { return codeMap.isSelected(); }
   boolean isZpexPreferred() { return useZpex.isSelected(); }
