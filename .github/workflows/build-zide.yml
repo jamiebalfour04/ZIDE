@@ -99,15 +99,12 @@ jobs:
           PLIST
           plutil -lint "$app/Contents/Info.plist"
           test -x "$app/Contents/MacOS/ZIDE"
+          # Give the bundle a valid code signature so Gatekeeper does not
+          # report the downloaded application as damaged. Distribution signing
+          # and notarisation can be added when Apple credentials are configured.
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app"
           ditto -c -k --sequesterRsrc --keepParent "$app" build/native/ZIDE-macos-arm64.zip
-
-      - name: Upload macOS app bundle
-        uses: actions/upload-artifact@v6
-        with:
-          name: zide-macos-aarch64-app
-          path: build/native/ZIDE.app
-          retention-days: 3
-          if-no-files-found: error
 
       - name: Upload macOS app archive
         uses: actions/upload-artifact@v6
