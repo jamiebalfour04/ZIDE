@@ -1856,7 +1856,7 @@ public class ZIDEEditor extends Application {
       zideIcon.setPreserveRatio(true);
       Label zideName = new Label("ZIDE");
       zideName.getStyleClass().add("titlebar-brand-name");
-      HBox branding = new HBox(6, zideIcon, zideName, projectSelector);
+      HBox branding = new HBox(12, zideIcon, zideName, projectSelector);
       branding.setAlignment(Pos.CENTER_LEFT);
       branding.getStyleClass().add("titlebar-branding");
       titleBar.setLeadingContent(branding);

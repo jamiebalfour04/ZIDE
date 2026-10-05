@@ -276,8 +276,7 @@ jobs:
           $entries = jar tf build/zide.jar
           foreach ($entry in @(
             'jamiebalfour/balflaf_fx/BalfGlassMenuBarFX.class',
-            'jamiebalfour/balflaf_fx/WindowsNativeWindowSupport.class',
-            'com/sun/jna/win32-x86-64/jnidispatch.dll'
+            'jamiebalfour/balflaf_fx/WindowsNativeWindowSupport.class'
           )) {
             if ($entries -notcontains $entry) { throw "Missing packaged entry: $entry" }
           }
@@ -294,7 +293,6 @@ jobs:
             -H:JNIConfigurationFiles=build/jni-config-windows.json `
             -H:ResourceConfigurationFiles=build/resource-config.json `
             --enable-native-access=javafx.graphics,ALL-UNNAMED `
-            '--initialize-at-run-time=com.sun.jna,com.sun.jna.NativeLibrary,com.sun.jna.CallbackReference' `
             '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' `
             -H:Name=build/native/zide-win-x64 `
             -jar build/zide.jar `

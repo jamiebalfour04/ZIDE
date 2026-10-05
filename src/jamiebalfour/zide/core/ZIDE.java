@@ -4,6 +4,10 @@ import jamiebalfour.zide.editor.ZIDEEditor;
 public class ZIDE {
 
   static {
+    // JavaFX's EXTENDED stage style is a preview feature in JavaFX 25. Set
+    // the property before Application.launch so native-image executables can
+    // be started by double-clicking them without a command-line switch.
+    System.setProperty("javafx.enablePreview", "true");
     String operatingSystem = System.getProperty("os.name", "").toLowerCase();
     if (operatingSystem.contains("win")) {
       System.setProperty("native.encoding", "UTF-8");
