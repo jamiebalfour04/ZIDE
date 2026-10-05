@@ -294,21 +294,21 @@ jobs:
             -H:ResourceConfigurationFiles=build/resource-config.json `
             --enable-native-access=javafx.graphics,ALL-UNNAMED `
             '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' `
-            -H:Name=build/native/zide-win-x64 `
+            -H:Name=build/native/ZIDE `
             -jar build/zide.jar `
             --no-fallback
       - name: Verify native image
         shell: pwsh
         run: |
-          if (-not (Test-Path build/native/zide-win-x64.exe)) { throw "Windows ZIDE was not produced." }
+          if (-not (Test-Path build/native/ZIDE.exe)) { throw "Windows ZIDE was not produced." }
           Copy-Item src/files/zide.png build/native/zide.png -Force
-          Compress-Archive -Path build/native/zide-win-x64.exe,build/native/zide.png -DestinationPath build/native/ZIDE-windows-x64.zip -Force
+          Compress-Archive -Path build/native/ZIDE.exe,build/native/zide.png -DestinationPath build/native/ZIDE-windows-x64.zip -Force
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-windows-x64
           path: |
-            build/native/zide-win-x64.exe
+            build/native/ZIDE.exe
             build/native/zide.png
             build/native/ZIDE-windows-x64.zip
           retention-days: 3
@@ -349,7 +349,7 @@ jobs:
           }
           rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
-            build/native/zide-win-x64.exe "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.exe"
+            build/native/ZIDE.exe "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE.exe"
           rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
             build/native/zide.png "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
