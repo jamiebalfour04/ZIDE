@@ -1389,7 +1389,13 @@ public class ZIDEEditor extends Application {
     normalWindowWidth = width;
     normalWindowHeight = height;
     String maximised = MAIN_PROPERTIES.getProperty("MAXIMISE", MAIN_PROPERTIES.getProperty("MAXIMISED", MAIN_PROPERTIES.getProperty("MAXIMIZED", "false")));
-    if (!isMacPlatform()) stage.setMaximized(Boolean.parseBoolean(maximised));
+    if (!isMacPlatform() && Boolean.parseBoolean(maximised)) {
+      // JavaFX can ignore setMaximized while the stage is still being built.
+      // Apply it after the stage has been shown instead.
+      Platform.runLater(() -> {
+        if (stage.isShowing() && !stage.isMaximized()) stage.setMaximized(true);
+      });
+    }
   }
 
   private double propertyDouble(String name, double fallback) {
@@ -1409,6 +1415,10 @@ public class ZIDEEditor extends Application {
     stage.widthProperty().addListener(boundsChanged);
     stage.heightProperty().addListener(boundsChanged);
     stage.maximizedProperty().addListener((observable, wasMaximized, maximized) -> {
+      if (stage.isShowing()) {
+        MAIN_PROPERTIES.setProperty("MAXIMISE", Boolean.toString(maximized));
+        saveProps();
+      }
       if (!maximized) Platform.runLater(() -> captureNormalWindowBounds(stage));
     });
   }
