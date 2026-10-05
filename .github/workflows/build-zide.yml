@@ -82,6 +82,8 @@ jobs:
           test -x build/native/ZIDE
           file build/native/ZIDE
           file build/native/ZIDE | grep -q arm64
+          cp src/files/zide_macos.png build/native/zide.png
+          (cd build/native && /usr/bin/zip -q ZIDE-macos-arm64-native.zip ZIDE zide.png)
 
       - name: Import Apple Developer ID certificate
         env:
@@ -193,7 +195,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: zide-macos-aarch64
-          path: build/native/ZIDE
+          path: |
+            build/native/ZIDE
+            build/native/zide.png
+            build/native/ZIDE-macos-arm64-native.zip
           retention-days: 3
           if-no-files-found: error
 
@@ -226,17 +231,20 @@ jobs:
             echo "::error::SFTP_PRIVATE_KEY is invalid or passphrase-protected."
             exit 1
           fi
+          ssh -p "$port" -i "$HOME/.ssh/zide_deploy" -o IdentitiesOnly=yes \
+            "$SFTP_USERNAME@$SFTP_HOST" \
+            "rm -rf -- '$SFTP_DESTINATION/ZIDE.app' '$SFTP_DESTINATION/ZIDE-macos-arm64.zip'"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
             build/native/ZIDE \
             "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/ZIDE.app \
-            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
+            build/native/zide.png \
+            "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/ZIDE-macos-arm64.zip \
+            build/native/ZIDE-macos-arm64-native.zip \
             "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
@@ -355,10 +363,10 @@ jobs:
             build/native/zide.png "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
           rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
-            build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_PACKAGE_DESTINATION/"
+            build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
           rsync_retry -az --progress \
             -e "ssh -p $port -i $ssh_dir/deploy_key -o UserKnownHostsFile=$ssh_dir/known_hosts -o IdentitiesOnly=yes" \
-            build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
+            build/native/ZIDE-windows-x64.zip "$SFTP_USERNAME@$SFTP_HOST:$SFTP_PACKAGE_DESTINATION/"
 
   build-linux-x64:
     name: Linux x64 native image
@@ -437,7 +445,7 @@ jobs:
             build/native/zide.png "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/ZIDE-linux-x64.tar.gz "$SFTP_USERNAME@$SFTP_HOST:$SFTP_PACKAGE_DESTINATION/"
+            build/native/ZIDE-linux-x64.tar.gz "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/ZIDE-linux-x64.tar.gz "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/"
+            build/native/ZIDE-linux-x64.tar.gz "$SFTP_USERNAME@$SFTP_HOST:$SFTP_PACKAGE_DESTINATION/"
