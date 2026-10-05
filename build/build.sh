@@ -53,13 +53,13 @@ mkdir -p build/native
   --enable-native-access=javafx.graphics,ALL-UNNAMED \
   --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
   '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport,com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \
-  -H:Name=build/native/zide-aarch64 \
+  -H:Name=build/native/ZIDE \
   -jar build/zide.jar \
   --no-fallback
 
-test -x build/native/zide-aarch64
-file build/native/zide-aarch64
-echo "Built build/native/zide-aarch64"
+test -x build/native/ZIDE
+file build/native/ZIDE
+echo "Built build/native/ZIDE"
 
 # Package the native executable as a macOS application bundle.
 APP_BUNDLE="build/ZIDE.app"
@@ -76,7 +76,7 @@ fi
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
-cp build/native/zide-aarch64 "$APP_MACOS/ZIDE"
+cp build/native/ZIDE "$APP_MACOS/ZIDE"
 chmod 755 "$APP_MACOS/ZIDE"
 
 if [[ -n "$APP_PLIST_SOURCE" ]]; then

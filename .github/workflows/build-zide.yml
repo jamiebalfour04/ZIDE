@@ -73,15 +73,15 @@ jobs:
             --enable-native-access=javafx.graphics,ALL-UNNAMED \
             --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
             '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport,com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \
-            -H:Name=build/native/zide-aarch64 \
+            -H:Name=build/native/ZIDE \
             -jar build/zide.jar \
             --no-fallback
 
       - name: Verify native image
         run: |
-          test -x build/native/zide-aarch64
-          file build/native/zide-aarch64
-          file build/native/zide-aarch64 | grep -q arm64
+          test -x build/native/ZIDE
+          file build/native/ZIDE
+          file build/native/ZIDE | grep -q arm64
 
       - name: Import Apple Developer ID certificate
         env:
@@ -119,7 +119,7 @@ jobs:
         run: |
           app="build/native/ZIDE.app"
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-          cp build/native/zide-aarch64 "$app/Contents/MacOS/ZIDE"
+          cp build/native/ZIDE "$app/Contents/MacOS/ZIDE"
           iconset="build/native/ZIDE.iconset"
           mkdir -p "$iconset"
           for size in 16 32 128 256 512 1024; do
@@ -193,7 +193,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: zide-macos-aarch64
-          path: build/native/zide-aarch64
+          path: build/native/ZIDE
           retention-days: 3
           if-no-files-found: error
 
@@ -228,7 +228,7 @@ jobs:
           fi
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-aarch64 \
+            build/native/ZIDE \
             "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
@@ -391,21 +391,21 @@ jobs:
             -H:ResourceConfigurationFiles=build/resource-config.json \
             --enable-native-access=javafx.graphics \
             '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport' \
-            -H:Name=build/native/zide-linux-x64 \
+            -H:Name=build/native/ZIDE \
             -jar build/zide.jar \
             --no-fallback
       - name: Verify native image
         run: |
-          test -x build/native/zide-linux-x64
-          file build/native/zide-linux-x64 | grep -q x86-64
+          test -x build/native/ZIDE
+          file build/native/ZIDE | grep -q x86-64
           cp src/files/zide.png build/native/zide.png
-          tar -czf build/native/ZIDE-linux-x64.tar.gz -C build/native zide-linux-x64 zide.png
+          tar -czf build/native/ZIDE-linux-x64.tar.gz -C build/native ZIDE zide.png
       - name: Upload ZIDE
         uses: actions/upload-artifact@v6
         with:
           name: zide-linux-x64
           path: |
-            build/native/zide-linux-x64
+            build/native/ZIDE
             build/native/zide.png
             build/native/ZIDE-linux-x64.tar.gz
           retention-days: 3
@@ -431,7 +431,7 @@ jobs:
           ssh-keygen -y -P "" -f "$HOME/.ssh/zide_deploy" > /dev/null
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
-            build/native/zide-linux-x64 "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
+            build/native/ZIDE "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/ZIDE"
           rsync -az --progress \
             -e "ssh -p $port -i $HOME/.ssh/zide_deploy -o IdentitiesOnly=yes" \
             build/native/zide.png "$SFTP_USERNAME@$SFTP_HOST:$SFTP_DESTINATION/zide.png"
