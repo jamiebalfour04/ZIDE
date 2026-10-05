@@ -28,24 +28,24 @@
   "foreign": {
     "downcalls": [
       {
-        "returnType": "void",
-        "parameterTypes": ["void*", "void*", "int"]
-      },
-      {
-        "returnType": "void",
-        "parameterTypes": ["void*", "void*", "long"]
-      },
-      {
-        "returnType": "void",
-        "parameterTypes": ["void*", "void*", "void*"]
-      },
-      {
-        "returnType": "long",
+        "returnType": "void*",
         "parameterTypes": ["void*", "void*"]
       },
       {
+        "returnType": "int",
+        "parameterTypes": []
+      },
+      {
         "returnType": "long",
-        "parameterTypes": ["void*"]
+        "parameterTypes": ["void*", "int", "long", "long"]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": ["void*", "int", "void*", "int"]
+      },
+      {
+        "returnType": "int",
+        "parameterTypes": ["void*", "void*"]
       }
     ]
   }
