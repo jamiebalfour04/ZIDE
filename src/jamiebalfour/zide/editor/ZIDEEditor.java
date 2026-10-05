@@ -1389,7 +1389,7 @@ public class ZIDEEditor extends Application {
     normalWindowWidth = width;
     normalWindowHeight = height;
     String maximised = MAIN_PROPERTIES.getProperty("MAXIMISE", MAIN_PROPERTIES.getProperty("MAXIMISED", MAIN_PROPERTIES.getProperty("MAXIMIZED", "false")));
-    if (!isMacPlatform() && Boolean.parseBoolean(maximised)) {
+    if (Boolean.parseBoolean(maximised)) {
       // JavaFX can ignore setMaximized while the stage is still being built.
       // Apply it after the stage has been shown instead.
       Platform.runLater(() -> {
