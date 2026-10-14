@@ -53,6 +53,8 @@ import java.util.regex.PatternSyntaxException;
 public class EditorTab extends Tab {
   private static final int ANALYSIS_DELAY_MS = 400;
   private static final int INFORMATION_DELAY_MS = 500;
+  private static final int FOLD_REFRESH_DELAY_MS = 180;
+  private static final int VARIABLE_COLOUR_DELAY_MS = 220;
   private static final Pattern MARKDOWN_INLINE = Pattern.compile(
           "(\\*\\*([^*]+)\\*\\*)|(`([^`]+)`)|(\\[([^]]+)]\\((https?://[^ )]+)\\))");
   private static final ExecutorService ANALYSER = Executors.newSingleThreadExecutor(r -> {
@@ -70,6 +72,8 @@ public class EditorTab extends Tab {
   private final PauseTransition infoHideTimer = new PauseTransition(Duration.millis(350));
   private final PauseTransition markdownTimer = new PauseTransition(Duration.millis(180));
   private final PauseTransition gitDiffTimer = new PauseTransition(Duration.millis(300));
+  private final PauseTransition foldRefreshTimer = new PauseTransition(Duration.millis(FOLD_REFRESH_DELAY_MS));
+  private final PauseTransition variableColourTimer = new PauseTransition(Duration.millis(VARIABLE_COLOUR_DELAY_MS));
   private final AtomicInteger gitDiffGeneration = new AtomicInteger();
   private final Popup infoPopup = new Popup();
   private final AtomicInteger analysisVersion = new AtomicInteger();
@@ -107,6 +111,7 @@ public class EditorTab extends Tab {
   private IntFunction<? extends Node> originalParagraphGraphicFactory;
   private boolean blockClosuresEnabled;
   private final Map<String, VariableColour> variableColours = new HashMap<>();
+  private final Map<String, Pattern> variableColourPatterns = new HashMap<>();
   private final Map<Integer, String> gitDiffMarkers = new HashMap<>();
 
   private record VariableColour(String background, String text) { }
@@ -121,6 +126,7 @@ public class EditorTab extends Tab {
       String[] colours = entry.getValue();
       if (colours != null && colours.length >= 2) {
         variableColours.put(entry.getKey(), new VariableColour(colours[0], colours[1]));
+        variableColourPatterns.put(entry.getKey(), variablePattern(entry.getKey()));
       }
     }
     editor.setLineNumberClickListener(this::handleLineNumberClick);
@@ -178,9 +184,10 @@ public class EditorTab extends Tab {
     markdownTimer.setOnFinished(e -> renderMarkdownPreview());
     gitDiffTimer.setOnFinished(e -> owner.refreshGitDiff(this));
     symbolTimer.setOnFinished(e -> owner.refreshDocumentSymbols(this));
+    foldRefreshTimer.setOnFinished(e -> refreshFoldRegions(editor.getText()));
     editor.getEditor().textProperty().addListener((observable, oldText, newText) -> {
       changes = true;
-      refreshFoldRegions(newText);
+      scheduleFoldRefresh();
       scheduleAnalysis();
       symbolTimer.playFromStart();
       if (markdownPreview != null) markdownTimer.playFromStart();
@@ -191,6 +198,11 @@ public class EditorTab extends Tab {
     });
     symbolTimer.playFromStart();
     scheduleAnalysis();
+  }
+
+  private void scheduleFoldRefresh() {
+    if (!blockClosuresEnabled) return;
+    foldRefreshTimer.playFromStart();
   }
 
   public void setCodeMapEnabled(boolean enabled) {
@@ -204,7 +216,13 @@ public class EditorTab extends Tab {
   void setVariableColour(String variable, String background, String text) {
     if (variable == null || variable.isBlank() || background == null || text == null) return;
     variableColours.put(variable, new VariableColour(background, text));
-    applyVariableColours();
+    variableColourPatterns.put(variable, variablePattern(variable));
+    scheduleVariableColours();
+  }
+
+  private static Pattern variablePattern(String variable) {
+    return Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(variable)
+            + "(?![A-Za-z0-9_])");
   }
 
   /**
@@ -213,10 +231,14 @@ public class EditorTab extends Tab {
    * as well, after the highlighter has installed its spans.
    */
   private void scheduleVariableColours() {
-    Platform.runLater(() -> {
+    if (variableColours.isEmpty()) return;
+    variableColourTimer.setOnFinished(event -> Platform.runLater(() -> {
       applyVariableColours();
+      // Syntax highlighting is asynchronous. Reapply on the following pulse
+      // so it cannot overwrite the custom colours immediately afterwards.
       Platform.runLater(this::applyVariableColours);
-    });
+    }));
+    variableColourTimer.playFromStart();
   }
 
   private void applyVariableColours() {
@@ -225,18 +247,17 @@ public class EditorTab extends Tab {
     if (source.isEmpty() || variableColours.isEmpty()) return;
     editor.runVisualUpdate(() -> {
       for (Map.Entry<String, VariableColour> entry : variableColours.entrySet()) {
-      Pattern pattern = Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(entry.getKey())
-              + "(?![A-Za-z0-9_])");
+      Pattern pattern = variableColourPatterns.computeIfAbsent(entry.getKey(), EditorTab::variablePattern);
       Matcher matcher = pattern.matcher(source);
+      String variableStyle = " -rtfx-background-color: " + entry.getValue().background()
+              + "; -rtfx-background-radius: 3px; -rtfx-background-insets: 0 2px"
+              + "; -fx-fill: " + entry.getValue().text() + ";";
       while (matcher.find()) {
         int position = matcher.start();
         int end = matcher.end();
         for (var span : area.getStyleSpans(position, end)) {
           int spanEnd = position + span.getLength();
-          String style = withoutVariableColourStyle(span.getStyle())
-                  + " -rtfx-background-color: " + entry.getValue().background()
-                  + "; -rtfx-background-radius: 3px; -rtfx-background-insets: 0 2px"
-                  + "; -fx-fill: " + entry.getValue().text() + ";";
+          String style = withoutVariableColourStyle(span.getStyle()) + variableStyle;
           try { area.setStyle(position, spanEnd, style); }
           catch (IllegalArgumentException ignored) { }
           position = spanEnd;

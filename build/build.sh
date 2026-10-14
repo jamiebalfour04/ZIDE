@@ -5,15 +5,27 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
-export JAVA_HOME="/Library/Java/LibericaNativeImageKit/liberica-vm-full-25.0.4-openjdk25/Contents/Home"
+NATIVE_IMAGE="$(command -v native-image || true)"
 
-if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then
-  export PATH="$JAVA_HOME/bin:$PATH"
+if [[ -z "$NATIVE_IMAGE" || ! -x "$NATIVE_IMAGE" ]]; then
+  echo "native-image was not found on PATH." >&2
+  echo "Activate the desired Native Image Kit before running this script." >&2
+  exit 1
 fi
 
-NATIVE_IMAGE="$JAVA_HOME/bin/native-image"
+# Keep Native Image and JavaFX from the same NIK installation. This avoids
+# mixing the selected native-image version with JavaFX modules from JAVA_HOME.
+NATIVE_IMAGE_HOME="$(cd -- "$(dirname -- "$NATIVE_IMAGE")/.." && pwd)"
+NATIVE_IMAGE_JAVA="$NATIVE_IMAGE_HOME/bin/java"
+NATIVE_IMAGE_JMODS="$NATIVE_IMAGE_HOME/jmods"
 
-echo "Using Java: $(command -v java)"
+if [[ ! -x "$NATIVE_IMAGE_JAVA" || ! -d "$NATIVE_IMAGE_JMODS" ]]; then
+  echo "The selected native-image installation is missing its Java runtime or jmods." >&2
+  echo "Expected installation: $NATIVE_IMAGE_HOME" >&2
+  exit 1
+fi
+
+echo "Using Java: $NATIVE_IMAGE_JAVA"
 echo "Using native-image: $NATIVE_IMAGE"
 
 if ! "$NATIVE_IMAGE" --version 2>&1 | grep -q 'Liberica\|BellSoft'; then
@@ -48,7 +60,7 @@ mkdir -p build/native
   -H:ReflectionConfigurationFiles=build/reflect-config.json \
   -H:JNIConfigurationFiles=build/jni-config-macos.json \
   -H:ResourceConfigurationFiles=build/resource-config.json \
-  -J--module-path="$JAVA_HOME/jmods" \
+  -J--module-path="$NATIVE_IMAGE_JMODS" \
   -J--add-modules=javafx.controls,javafx.fxml,javafx.swing,javafx.web \
   --enable-native-access=javafx.graphics,ALL-UNNAMED \
   --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \

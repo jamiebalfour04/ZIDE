@@ -1412,7 +1412,7 @@
 }
 
 .split-pane > .split-pane-divider {
-    -fx-background-color: #eee; /* simple grey line */
+    -fx-background-color: #d0d5dc;
     -fx-padding: 0;
 }
 
@@ -1437,7 +1437,7 @@
 }
 
 .split-pane > .split-pane-divider {
-    -fx-background-color: #eee;
+    -fx-background-color: #d0d5dc;
     -fx-padding: 0;
 }
 
@@ -1455,6 +1455,53 @@
 
 .app-root.dark .split-pane > .split-pane-divider:hover {
     -fx-background-color: #3a414d;
+}
+
+.split-pane > .split-pane-divider:hover {
+    -fx-background-color: #517;
+}
+
+/* The editor/utility-panel divider must remain visible above the panel
+   surface so its hover state is not hidden by the panel itself. */
+.main-vertical-split:vertical > .split-pane-divider {
+    -fx-background-color: #d0d5dc;
+    -fx-pref-height: 5px;
+    -fx-min-height: 5px;
+    -fx-max-height: 5px;
+    -fx-padding: 0;
+}
+
+.main-vertical-split:vertical > .split-pane-divider:hover {
+    -fx-background-color: #517;
+}
+
+.app-root.dark .main-vertical-split:vertical > .split-pane-divider {
+    -fx-background-color: #2a2f38;
+}
+
+.app-root.dark .main-vertical-split:vertical > .split-pane-divider:hover {
+    -fx-background-color: #517;
+}
+
+/* Explicit class applied to the live divider after the SplitPane skin is
+   created. This keeps the resizer visible even when the skin's generic
+   divider rules are overridden by the workspace palette. */
+.zide-bottom-resizer {
+    -fx-background-color: #d0d5dc;
+    -fx-background-insets: 0;
+    -fx-padding: 3px 0;
+}
+
+.zide-bottom-resizer:hover {
+    -fx-background-color: #517;
+}
+
+.app-root.dark .zide-bottom-resizer {
+    -fx-background-color: #2a2f38;
+}
+
+.app-root.dark .zide-bottom-resizer:hover {
+    -fx-background-color: #517;
 }
 
 .table-view {
@@ -1519,8 +1566,8 @@
     -fx-text-fill: #444444;
 }
 .bottom-panel {
-    -fx-border-color: #d0d0d0 transparent transparent transparent;
-    -fx-border-width: 1 0 0 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-background-color: #ffffff;
 }
 
@@ -1689,6 +1736,10 @@
     -fx-background-color: #26734d;
     -fx-border-color: white;
     -fx-border-width: 1px;
+}
+
+.layout-builder-resize-handle:hover {
+    -fx-background-color: #517;
 }
 
 .zui-native-preview {
@@ -4871,11 +4922,17 @@
     -fx-border-width: 0;
 }
 .bytecode-panel .text-area,
-.bytecode-panel .text-area .content {
+.bytecode-panel .text-area .content,
+.bytecode-panel .text-area .scroll-pane,
+.bytecode-panel .text-area .scroll-pane .viewport {
     -fx-font-family: "Menlo", "Consolas", monospace;
     -fx-font-size: 12px;
     -fx-background-insets: 0;
     -fx-border-insets: 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
     -fx-padding: 0;
 }
 .bytecode-panel .text-area .scroll-pane,
@@ -4930,9 +4987,13 @@
 }
 .app-root.dark .bytecode-panel { -fx-background-color: #20252e; -fx-border-color: transparent; }
 .app-root.dark .bytecode-panel .text-area,
-.app-root.dark .bytecode-panel .text-area .content {
+.app-root.dark .bytecode-panel .text-area .content,
+.app-root.dark .bytecode-panel .text-area .scroll-pane,
+.app-root.dark .bytecode-panel .text-area .scroll-pane .viewport {
     -fx-control-inner-background: #20252e;
     -fx-background-color: #20252e;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
     -fx-text-fill: #dce2e9;
 }
 .app-root.dark .bytecode-panel .text-area .scroll-pane,

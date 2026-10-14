@@ -32,8 +32,16 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** JavaFX visual designer for ZUI constraint layouts. */
+/** JavaFX visual designer for ZUI layout containers. */
 public final class ZUILayoutBuilder {
+  private enum LayoutMode {
+    CONSTRAINT("Constraint layout"), VERTICAL("Vertical layout"), HORIZONTAL("Horizontal layout"), GRID("Grid layout");
+
+    final String label;
+    LayoutMode(String label) { this.label = label; }
+    @Override public String toString() { return label; }
+  }
+
   private enum Kind {
     LABEL("Label", 120, 26), BUTTON("Button", 110, 34), IMAGE("Image", 160, 120), TEXT_FIELD("Text field", 180, 30),
     TEXT_AREA("Text area", 220, 90), CHECKBOX("Checkbox", 150, 26), LIST("List", 200, 110),
@@ -77,6 +85,9 @@ public final class ZUILayoutBuilder {
   private final Spinner<Integer> yField = spinner(0, 2000, 0);
   private final Spinner<Integer> widthField = spinner(20, 2000, 120);
   private final Spinner<Integer> heightField = spinner(20, 2000, 30);
+  private final ComboBox<LayoutMode> layoutModeField = new ComboBox<>();
+  private final Spinner<Integer> spacingField = spinner(0, 200, 8);
+  private final Spinner<Integer> gridColumnsField = spinner(1, 20, 2);
   private final BalfComboBoxFX<String> eventField = new BalfComboBoxFX<>();
   private final BalfComboBoxFX<HandlerOption> handlerField = new BalfComboBoxFX<>();
   private final List<HandlerOption> handlers = new ArrayList<>();
@@ -91,6 +102,7 @@ public final class ZUILayoutBuilder {
   private int nextId = 1;
   private BalfGlassMenuBarFX glassMenuBar;
   private boolean darkMode;
+  private LayoutMode layoutMode = LayoutMode.CONSTRAINT;
 
   public ZUILayoutBuilder(Window owner, Path file, String source, Runnable savedAction, Runnable closeAction) {
     this.owner = owner;
@@ -207,7 +219,30 @@ public final class ZUILayoutBuilder {
     close.setOnAction(e -> {
       if (save() && closeAction != null) closeAction.run();
     });
-    ToolBar toolbar = new ToolBar(heading, spacer, close);
+    layoutModeField.getItems().setAll(LayoutMode.values());
+    layoutModeField.setValue(layoutMode);
+    layoutModeField.setPrefWidth(160);
+    layoutModeField.setOnAction(e -> {
+      layoutMode = layoutModeField.getValue();
+      reflowItems();
+      setPropertiesEnabled(selected != null);
+      updateCode();
+    });
+    Label layoutLabel = new Label("Layout:");
+    Label spacingLabel = new Label("Spacing:");
+    Label columnsLabel = new Label("Columns:");
+    spacingField.setPrefWidth(72);
+    gridColumnsField.setPrefWidth(72);
+    spacingField.valueProperty().addListener((o, oldValue, newValue) -> {
+      reflowItems();
+      updateCode();
+    });
+    gridColumnsField.valueProperty().addListener((o, oldValue, newValue) -> {
+      reflowItems();
+      updateCode();
+    });
+    ToolBar toolbar = new ToolBar(heading, spacer, layoutLabel, layoutModeField,
+        spacingLabel, spacingField, columnsLabel, gridColumnsField, close);
     toolbar.getStyleClass().add("layout-builder-toolbar");
     return toolbar;
   }
@@ -574,12 +609,30 @@ public final class ZUILayoutBuilder {
     installResize(item);
     items.add(item);
     canvas.getChildren().add(shell);
+    reflowItems();
     select(item);
     if (!loadingSource) updateCode();
   }
 
   private void loadSource(String source) {
     loadingSource = true;
+    Matcher verticalLayout = Pattern.compile("\\$window->verticalLayout\\(\\s*(\\d+)\\s*\\)").matcher(source);
+    Matcher horizontalLayout = Pattern.compile("\\$window->horizontalLayout\\(\\s*(\\d+)\\s*\\)").matcher(source);
+    Matcher gridLayout = Pattern.compile("\\$window->gridLayout\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)").matcher(source);
+    if (verticalLayout.find()) {
+      layoutMode = LayoutMode.VERTICAL;
+      spacingField.getValueFactory().setValue(Integer.parseInt(verticalLayout.group(1)));
+      layoutModeField.setValue(layoutMode);
+    } else if (horizontalLayout.find()) {
+      layoutMode = LayoutMode.HORIZONTAL;
+      spacingField.getValueFactory().setValue(Integer.parseInt(horizontalLayout.group(1)));
+      layoutModeField.setValue(layoutMode);
+    } else if (gridLayout.find()) {
+      layoutMode = LayoutMode.GRID;
+      spacingField.getValueFactory().setValue(Integer.parseInt(gridLayout.group(3)));
+      gridColumnsField.getValueFactory().setValue(Integer.parseInt(gridLayout.group(2)));
+      layoutModeField.setValue(layoutMode);
+    }
     Pattern itemPattern = Pattern.compile(
         "\\$(\\w+)\\s*=\\s*\\$layout->add\\((.*?),\\s*\\[\\s*\\\"left\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"top\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"width\\\"\\s*=>\\s*(\\d+)\\s*,\\s*\\\"height\\\"\\s*=>\\s*(\\d+)\\s*\\]\\)",
         Pattern.DOTALL);
@@ -598,6 +651,24 @@ public final class ZUILayoutBuilder {
         item.shell.setPrefSize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
         item.shell.resize(Integer.parseInt(matcher.group(5)), Integer.parseInt(matcher.group(6)));
         updatePreviewText(item);
+      }
+      if (items.isEmpty() && layoutMode != LayoutMode.CONSTRAINT) {
+        Pattern managedItemPattern = Pattern.compile(
+            "\\$(\\w+)\\s*=\\s*\\$layout->add\\((.*?),\\s*\\[\\s*\\\"(height|width|row)\\\"\\s*=>\\s*(\\d+)(?:\\s*,\\s*\\\"column\\\"\\s*=>\\s*(\\d+))?\\s*\\]\\)",
+            Pattern.DOTALL);
+        Matcher managedItems = managedItemPattern.matcher(source);
+        while (managedItems.find()) {
+          Kind kind = kindForFactory(managedItems.group(2));
+          if (kind == null) continue;
+          addItem(kind);
+          Item item = items.get(items.size() - 1);
+          item.name = managedItems.group(1);
+          item.text = textForFactory(kind, managedItems.group(2));
+          int dimension = Integer.parseInt(managedItems.group(4));
+          if ("height".equals(managedItems.group(3))) item.shell.setPrefHeight(dimension);
+          if ("width".equals(managedItems.group(3))) item.shell.setPrefWidth(dimension);
+          updatePreviewText(item);
+        }
       }
       Pattern bindingPattern = Pattern.compile("\\$(\\w+)\\s*->\\s*on\\((UI::[A-Za-z0-9_:]+),\\s*&([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)\\s*\\)");
       Matcher binding = bindingPattern.matcher(source);
@@ -721,6 +792,7 @@ public final class ZUILayoutBuilder {
       drag[0] = e.getSceneX(); drag[1] = e.getSceneY(); drag[2] = item.shell.getLayoutX(); drag[3] = item.shell.getLayoutY(); e.consume();
     });
     item.shell.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
+      if (layoutMode != LayoutMode.CONSTRAINT) return;
       item.shell.relocate(Math.max(0, drag[2] + e.getSceneX() - drag[0]), Math.max(0, drag[3] + e.getSceneY() - drag[1]));
       loadSelection(); updateCode(); e.consume();
     });
@@ -791,11 +863,33 @@ public final class ZUILayoutBuilder {
   private void applyProperties() {
     if (updating || selected == null) return;
     selected.name = sanitiseName(variableField.getText()); selected.text = textField.getText();
-    selected.shell.relocate(xField.getValue(), yField.getValue());
+    if (layoutMode == LayoutMode.CONSTRAINT) {
+      selected.shell.relocate(xField.getValue(), yField.getValue());
+    }
     selected.shell.setPrefSize(widthField.getValue(), heightField.getValue());
     selected.shell.resize(widthField.getValue(), heightField.getValue());
     selected.event = eventField.getValue(); selected.handler = handlerField.getValue();
-    updatePreviewText(selected); updateCode();
+    updatePreviewText(selected);
+    reflowItems();
+    updateCode();
+  }
+
+  private void reflowItems() {
+    if (layoutMode == LayoutMode.CONSTRAINT) return;
+    int spacing = spacingField.getValue();
+    int columns = Math.max(1, gridColumnsField.getValue());
+    for (int index = 0; index < items.size(); index++) {
+      Item item = items.get(index);
+      if (layoutMode == LayoutMode.VERTICAL) {
+        item.shell.relocate(24, 24 + index * (item.shell.getHeight() + spacing));
+      } else if (layoutMode == LayoutMode.HORIZONTAL) {
+        item.shell.relocate(24 + index * (item.shell.getWidth() + spacing), 24);
+      } else {
+        int row = index / columns;
+        int column = index % columns;
+        item.shell.relocate(24 + column * (item.shell.getWidth() + spacing), 24 + row * (item.shell.getHeight() + spacing));
+      }
+    }
   }
 
   private static void updatePreviewText(Item item) {
@@ -821,18 +915,44 @@ public final class ZUILayoutBuilder {
   private void setPropertiesEnabled(boolean enabled) {
     variableField.setDisable(!enabled); textField.setDisable(!enabled); xField.setDisable(!enabled);
     yField.setDisable(!enabled); widthField.setDisable(!enabled); heightField.setDisable(!enabled);
+    boolean constraints = enabled && layoutMode == LayoutMode.CONSTRAINT;
+    xField.setDisable(!constraints);
+    yField.setDisable(!constraints);
     eventField.setDisable(!enabled); handlerField.setDisable(!enabled || eventField.getItems().isEmpty());
   }
 
   private void updateCode() {
     StringBuilder out = new StringBuilder("$ui = new UI()\n$window = $ui->window(\"My ZUI App\", 640, 560)\n")
-        .append("$window->enable_default_keybindings()\n$layout = $window->layout()\n\n");
-    for (Item item : items) {
-      out.append('$').append(item.name).append(" = $layout->add(").append(factory(item)).append(", [\n")
-          .append("  \"left\" => ").append((int) Math.round(item.shell.getLayoutX()))
-          .append(", \"top\" => ").append((int) Math.round(item.shell.getLayoutY())).append(",\n")
-          .append("  \"width\" => ").append((int) Math.round(item.shell.getWidth()))
-          .append(", \"height\" => ").append((int) Math.round(item.shell.getHeight())).append("\n])\n\n");
+        .append("$window->enable_default_keybindings()\n");
+    if (layoutMode == LayoutMode.VERTICAL) {
+      out.append("$layout = $window->verticalLayout(").append(spacingField.getValue()).append(")\n\n");
+    } else if (layoutMode == LayoutMode.HORIZONTAL) {
+      out.append("$layout = $window->horizontalLayout(").append(spacingField.getValue()).append(")\n\n");
+    } else if (layoutMode == LayoutMode.GRID) {
+      int columns = Math.max(1, gridColumnsField.getValue());
+      int rows = Math.max(1, (items.size() + columns - 1) / columns);
+      out.append("$layout = $window->gridLayout(").append(rows).append(", ").append(columns).append(", ")
+          .append(spacingField.getValue()).append(")\n\n");
+    } else {
+      out.append("$layout = $window->layout()\n\n");
+    }
+    for (int index = 0; index < items.size(); index++) {
+      Item item = items.get(index);
+      out.append('$').append(item.name).append(" = $layout->add(").append(factory(item));
+      if (layoutMode == LayoutMode.CONSTRAINT) {
+        out.append(", [\n  \"left\" => ").append((int) Math.round(item.shell.getLayoutX()))
+            .append(", \"top\" => ").append((int) Math.round(item.shell.getLayoutY())).append(",\n")
+            .append("  \"width\" => ").append((int) Math.round(item.shell.getWidth()))
+            .append(", \"height\" => ").append((int) Math.round(item.shell.getHeight())).append("\n])");
+      } else if (layoutMode == LayoutMode.VERTICAL) {
+        out.append(", [\"height\" => ").append((int) Math.round(item.shell.getHeight())).append("])");
+      } else if (layoutMode == LayoutMode.HORIZONTAL) {
+        out.append(", [\"width\" => ").append((int) Math.round(item.shell.getWidth())).append("])");
+      } else {
+        int columns = Math.max(1, gridColumnsField.getValue());
+        out.append(", [\"row\" => ").append(index / columns).append(", \"column\" => ").append(index % columns).append("])");
+      }
+      out.append("\n\n");
     }
     for (Item item : items) {
       if (item.event != null && item.handler != null && item.handler.reference != null) {

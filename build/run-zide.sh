@@ -36,10 +36,10 @@ fi
 
 BALFLAFFX_PATH=""
 for candidate in \
-  "$PROJECT_DIR/lib/BalfLafFX.jar" \
   "$PROJECT_DIR/../BalfLafFX/out/production/BalfLafFX" \
   "$BUILD_DIR/BalfLafFX.jar" \
   "$PROJECT_DIR/../BalfLafFX/build/dist/BalfLafFX.jar" \
+  "$PROJECT_DIR/lib/BalfLafFX.jar" \
   "$PROJECT_DIR/../BalfLafFX/build/BalfLafFX.jar"; do
   if [ -d "$candidate" ] || [ -f "$candidate" ]; then
     BALFLAFFX_PATH=$candidate

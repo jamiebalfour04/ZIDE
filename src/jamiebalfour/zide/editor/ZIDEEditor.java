@@ -1999,8 +1999,15 @@ public class ZIDEEditor extends Application {
     setLeftSplitWidth(horizontalSplit, initialExplorerWidth);
 
     mainVerticalSplit = new SplitPane(horizontalSplit, bottom);
+    mainVerticalSplit.getStyleClass().add("main-vertical-split");
     var verticalSplit = mainVerticalSplit;
     verticalSplit.setOrientation(Orientation.VERTICAL);
+    Platform.runLater(() -> {
+      Node divider = verticalSplit.lookup(".split-pane-divider");
+      if (divider != null && !divider.getStyleClass().contains("zide-bottom-resizer")) {
+        divider.getStyleClass().add("zide-bottom-resizer");
+      }
+    });
 
     // store height in pixels (e.g. console height)
     final double[] bottomHeight = {layoutDimension("LAYOUT_BOTTOM_HEIGHT", 250, 160, 700)};
@@ -3278,6 +3285,8 @@ public class ZIDEEditor extends Application {
     edit.createItem("Word Colours", "", this::showProjectWordColours);
 
     var viewMenu = bar.menu("View");
+
+    viewMenu.createItem("View Breakpoints", "", this::showBreakpointsDialog);
     var panelsMenu = viewMenu.submenu("Panels");
     unfoldMenuItem = panelsMenu.checkItem("Unfold", unfoldPanelVisible, selected -> {
       unfoldPanelVisible = selected;
@@ -3300,7 +3309,6 @@ public class ZIDEEditor extends Application {
     pdfMenuItem = panelsMenu.checkItem("PDF Viewer", pdfPanelVisible, selected -> {
       if (selected != rightSidePanels.getTabs().contains(pdfDockTab)) togglePdfPanel();
     });
-    viewMenu.createItem("View Breakpoints", "", this::showBreakpointsDialog);
 
     var code = bar.menu("Code");
     formatDocumentMenuItem = code.createItem("Format document", "", this::beautifyCurrentDocument);
@@ -3544,7 +3552,7 @@ public class ZIDEEditor extends Application {
     String scriptName = tab == null || tab.getPath() == null || tab.getPath().isBlank() ? "Untitled" : Path.of(tab.getPath()).getFileName().toString();
 
     Path languageLog = Path.of(ZPEInstance.getLogPath(), languageId.toLowerCase(Locale.ROOT) + ".log");
-    Path logFile = Files.exists(languageLog) ? languageLog : Path.of(ZPEInstance.getInstallPath(), "log.txt");
+    Path logFile = Files.exists(languageLog) ? languageLog : Path.of(ZPEInstance.getLogPath(), "log.txt");
     String log;
     try {
       log = Files.exists(logFile) ? Files.readString(logFile) : "Log file not found.";
