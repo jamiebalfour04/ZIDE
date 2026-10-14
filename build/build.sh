@@ -17,16 +17,17 @@ fi
 # mixing the selected native-image version with JavaFX modules from JAVA_HOME.
 NATIVE_IMAGE_HOME="$(cd -- "$(dirname -- "$NATIVE_IMAGE")/.." && pwd)"
 NATIVE_IMAGE_JAVA="$NATIVE_IMAGE_HOME/bin/java"
-NATIVE_IMAGE_JMODS="$NATIVE_IMAGE_HOME/jmods"
+NATIVE_IMAGE_MODULES="$PROJECT_DIR/lib/jfx25"
 
-if [[ ! -x "$NATIVE_IMAGE_JAVA" || ! -d "$NATIVE_IMAGE_JMODS" ]]; then
-  echo "The selected native-image installation is missing its Java runtime or jmods." >&2
-  echo "Expected installation: $NATIVE_IMAGE_HOME" >&2
+if [[ ! -x "$NATIVE_IMAGE_JAVA" || ! -d "$NATIVE_IMAGE_MODULES" ]]; then
+  echo "The selected native-image installation is missing its Java runtime or JavaFX modules." >&2
+  echo "Expected JavaFX modules under: $NATIVE_IMAGE_MODULES" >&2
   exit 1
 fi
 
 echo "Using Java: $NATIVE_IMAGE_JAVA"
 echo "Using native-image: $NATIVE_IMAGE"
+echo "Using JavaFX modules: $NATIVE_IMAGE_MODULES"
 
 if ! "$NATIVE_IMAGE" --version 2>&1 | grep -q 'Liberica\|BellSoft'; then
   echo "The selected native-image is not Liberica Native Image Kit." >&2
@@ -51,8 +52,13 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 mkdir -p build/native
+NATIVE_IMAGE_TMP="$PROJECT_DIR/build/native/tmp"
+mkdir -p "$NATIVE_IMAGE_TMP"
+export TMPDIR="$NATIVE_IMAGE_TMP"
 
 "$NATIVE_IMAGE" \
+  -J-Djava.io.tmpdir="$NATIVE_IMAGE_TMP" \
+  -H:TempDirectory="$NATIVE_IMAGE_TMP" \
   -Djavafx.enablePreview=true \
   -O3 \
   -march=compatibility \
@@ -60,8 +66,8 @@ mkdir -p build/native
   -H:ReflectionConfigurationFiles=build/reflect-config.json \
   -H:JNIConfigurationFiles=build/jni-config-macos.json \
   -H:ResourceConfigurationFiles=build/resource-config.json \
-  -J--module-path="$NATIVE_IMAGE_JMODS" \
-  -J--add-modules=javafx.controls,javafx.fxml,javafx.swing,javafx.web \
+  -p "$NATIVE_IMAGE_MODULES" \
+  --add-modules=javafx.controls,javafx.fxml,javafx.swing,javafx.web \
   --enable-native-access=javafx.graphics,ALL-UNNAMED \
   --add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED \
   '--initialize-at-run-time=jamiebalfour.balflaf_fx.MacNativeWindowSupport,com.sun.glass.ui.mac.MacAccessible,com.sun.glass.ui.mac.MacAccessible$MacAttribute,com.sun.glass.ui.mac.MacAccessible$MacAction,com.sun.glass.ui.mac.MacAccessible$MacRole,com.sun.glass.ui.mac.MacAccessible$MacSubrole,com.sun.glass.ui.mac.MacAccessible$MacNotification,com.sun.glass.ui.mac.MacAccessible$MacOrientation,com.sun.glass.ui.mac.MacAccessible$MacText,com.sun.glass.ui.mac.MacGestureSupport' \

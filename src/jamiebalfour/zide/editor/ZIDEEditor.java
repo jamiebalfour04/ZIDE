@@ -1792,7 +1792,7 @@ public class ZIDEEditor extends Application {
     stage.setMinHeight(400);
 
   /*  stage.getIcons().add(
-            new Image(Objects.requireNonNull(getClass().getResourceAsStream("/jamiebalfour/balflaf_fx/icons/jb.png")))
+            new Image(Objects.requireNonNull(getClass().getResourceAsStream("/jamiebalfour/balflaf_fx/icons/jb-new.png")))
     );
 */
     //Application.setUserAgentStylesheet(STYLESHEET_CASPIAN);
@@ -15207,12 +15207,6 @@ public class ZIDEEditor extends Application {
     });
     sftpMenuBar = buildSftpMenu();
 
-    ImageView jbLogo = new ImageView(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/jamiebalfour/balflaf_fx/icons/jb.png"))));
-    jbLogo.setPreserveRatio(true);
-    jbLogo.setFitWidth(20);
-    jbLogo.setFitHeight(20);
-    jbLogo.getStyleClass().add("status-bar-brand");
-
     Menu installMenu = new Menu("Install");
     MenuItem installZpe = new MenuItem("ZPE");
     installZpe.setOnAction(event -> downloadZPERuntime());
@@ -15229,7 +15223,6 @@ public class ZIDEEditor extends Application {
         installMenu);
     FXHelpers.setJBMenuDarkMode(appMenu, darkThemeEnabled);
     if (appMenu != null) {
-      appMenu.setGraphic(jbLogo);
       appMenu.setTooltip(new Tooltip("ZIDE menu"));
       appMenu.getStyleClass().add("status-bar-menu-button");
     }
